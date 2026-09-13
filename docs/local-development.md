@@ -44,6 +44,10 @@ bodies are deleted after success or failure unless `--keep-raw` was explicitly
 requested. Production data is never modified. The refresh includes referenced
 v2 and legacy reader bodies, not just D1 metadata.
 
+SIGINT, SIGTERM, and SIGHUP stop the tracked Bun/Turbo service subtree, native
+preview, and proxy, including non-TTY sessions. Cleanup targets descendants
+of this invocation only.
+
 Normal restarts preserve local edits. Existing state without a compatible
 sanitized snapshot manifest stops startup with refresh instructions; no
 unconditional overwrite or cross-worktree copying occurs. This includes old

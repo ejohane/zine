@@ -24,7 +24,7 @@
 - Start all dev tasks: `bun run dev`
 - Start the web app only: `bun run dev:web`
 - Worktree-safe dev startup with native `serve-sim` preview: `bun run dev:worktree`
-- Reset worktree state before re-seeding: `bun run dev:reset`
+- Back up worktree state before fresh provisioning: `bun run dev:reset`
 - Run repository tests (worker + web unit/component): `bun run test`
 - Run web unit/component tests: `bun run test:web`
 - Run Storybook browser checks: `bun run test:web:storybook`
@@ -56,14 +56,17 @@
 
 - `scripts/dev.sh` is worktree-aware:
   - Computes an available worker port (default range `8700-8799`)
-  - Seeds `apps/worker/.wrangler/state` from the main worktree on first run
+  - Provisions sanitized production D1 and article bodies when local state is absent; otherwise preserves local edits
   - Applies local D1 migrations
-  - Symlinks `apps/worker/.dev.vars` from the main worktree when appropriate
+  - Never copies or symlinks Worker secrets from the main worktree
   - Detects the current Tailscale IPv4 when available for web and physical-device API access
   - Falls back to `localhost` when Tailscale is unavailable
   - Starts a small local HTTP proxy for non-localhost phone access because local `workerd` is not directly reachable on the Tailscale interface
   - Builds, installs, and launches `apps/ios/ZineNative.xcodeproj` in the dedicated Zine Simulator
   - Starts a scoped `serve-sim` browser preview and stops it with the rest of the dev stack
+  - Handles SIGINT, SIGTERM, and SIGHUP through `scripts/dev-processes.sh`, stopping the tracked Bun/Turbo descendants, preview, and proxy even in non-TTY sessions
+- Before using a shared simulator, coordinate ownership with other active tasks; select a dedicated alternate when needed.
+- When ending a verification session, stop its orchestrator and confirm its Worker, web, archive, proxy (if used), and preview ports are released. Never use blanket process-name kills or stop another task's services.
 - Override worker port with `ZINE_WORKER_PORT=<port> bun run dev:worktree`.
 - Override the mobile/API host with `ZINE_DEV_HOST=<host> bun run dev:worktree`.
 - Override the public API port with `ZINE_API_PORT=<port> bun run dev:worktree`.
@@ -82,8 +85,8 @@
 
 ### Production-Shaped Local Data
 
-- To refresh local D1 from the primary production account, run `bun run data:prod:local -- --yes` from the repo root.
-- The script exports production D1, keeps only `user_31ejjz59G6mTX1SIyErOi0fwu4A`, remaps it to local `dev-user-001`, sanitizes sensitive fields, and restores the result into `apps/worker/.wrangler/state`.
+- To refresh local D1 and reader bodies from the primary production account, run `bun run data:prod:local -- --yes --include-article-bodies` from the repo root.
+- The script exports production D1, keeps only `user_31ejjz59G6mTX1SIyErOi0fwu4A`, retains that Clerk user ID by default (or remaps to the explicit `ZINE_LOCAL_USER_ID` Clerk subject), sanitizes sensitive fields, and restores the result into `apps/worker/.wrangler/state`.
 - Stop `bun run dev:worktree` before running the restore. The script refuses to replace local Wrangler state while this worktree's Worker is running; restart the dev stack after the sync.
 - Add `--include-article-bodies` when local reader work needs the production article corpus. This downloads only current v2 artifacts and legacy HTML objects referenced by the sanitized user snapshot from production R2, then restores them into the local `ARTICLE_CONTENT` bucket.
 - Sensitive production values are not meant to survive this flow:
@@ -92,48 +95,20 @@
   - Gmail mailbox identity/cursor fields and newsletter unsubscribe targets are scrubbed.
   - Raw production export artifacts and temporary article-body downloads are deleted by default; sanitized SQL remains under `.local-data/`, which is gitignored.
 - The script backs up the previous local Wrangler state under `.local-data/local-d1-backups/` before replacing it.
-- After refreshing the main worktree this way, feature worktrees can pick up the refreshed data through the normal `bun run dev:reset && bun run dev:worktree` seed-from-main flow.
 - Use `--skip-restore` to generate and inspect the sanitized SQL without replacing local D1. Use `--keep-raw` only for short-lived debugging, and remove raw exports afterward.
 
-### Agent Browser Verification
+### Authenticated Local Verification
 
-- When manually verifying the web app with `agent-browser`, prefer the local development auth bypass instead of trying to sign into Clerk.
-- Start the local stack with `bun run dev:worktree` so the worktree gets:
-  - a seeded `apps/worker/.wrangler/state` copied from the main worktree when available
-  - local D1 migrations applied before the app starts
-  - generated `apps/web/.env.local` pointing the web app at the correct local worker
-- For local web verification, keep Clerk disabled in the local dev env:
-  - leave `VITE_CLERK_PUBLISHABLE_KEY` unset in `apps/web/.env.local` so `apps/web/src/lib/trpc.tsx` uses `development-bypass` on localhost
-  - leave `CLERK_JWKS_URL` unset in local worker development so `apps/worker/src/middleware/auth.ts` uses `dev-user-001`
-- This bypass is the preferred path for `agent-browser` screenshots and UI checks on localhost because it exercises protected routes without needing an interactive Clerk login flow.
-- If `/bookmarks` or other protected pages load but show empty state unexpectedly, do not assume auth is broken; first follow **Local D1 Data Recovery** below to verify the worktree D1 file actually contains the expected local data for `dev-user-001`.
-
-### Native iOS Auth Verification
-
-- Configure the native app through `apps/ios/Configuration/Local.xcconfig`, copied from `Local.xcconfig.example` when a local override is needed.
-- Use ClerkKit authentication and the existing Clerk-authenticated `/api/v1` REST surface.
-- Build, run, and verify the `ZineNative` scheme from `apps/ios/ZineNative.xcodeproj` on an iOS Simulator or physical device.
-- The API defaults to `https://api.myzine.app`; set `ZINE_API_BASE_URL` in `Local.xcconfig` when verification requires a local Worker.
-
-### Local D1 Data Recovery
-
-- Symptom: a local client loads, but Home/Inbox/Library are empty even though local test data should exist.
-- First verify which local Worker the client is actually using:
-  - For `apps/ios`, check `ZINE_API_BASE_URL` in `apps/ios/Configuration/Local.xcconfig`.
-  - For the web app, check `apps/web/.env.local`.
-- Then inspect the local D1 file behind that worker:
-  - Path: `apps/worker/.wrangler/state/v3/d1/miniflare-D1DatabaseObject/2a13f10f1e768310d0250437a6253d204a8c839f02e306404fa5e52ca7ded965.sqlite`
-  - Quick check:
-    - `sqlite3 <db> "SELECT 'items', count(*) FROM items UNION ALL SELECT 'subscriptions', count(*) FROM subscriptions UNION ALL SELECT 'provider_connections', count(*) FROM provider_connections UNION ALL SELECT 'user_items', count(*) FROM user_items;"`
-- Important failure mode:
-  - `bun run dev:reset && bun run dev:worktree` only re-seeds from the main worktree.
-  - If the main worktree D1 file is empty, missing, or `0` bytes, the worktree will faithfully copy that broken state and the app will still show no data.
-- Recovery order:
-  - If the current worktree DB is broken, check the same D1 path in other Zine worktrees for a non-empty SQLite file with real row counts.
-  - If another worktree has the expected data, stop the active local `wrangler dev` process, copy that SQLite file into both:
-    - the current worktree D1 path
-    - the main worktree D1 path
-  - Restart `wrangler dev` after the copy.
+- Use real Clerk login for both native and web manual verification. Read the shared `agent-secrets` skill, then `secretsctl current`, `metadata`, and `check` before credential use. Fill credentials through the protected clipboard workflow; never print or persist them.
+- `bun run dev:worktree` supplies the selected LOCAL API URL to the native build. No verification writes should go to production. Check the built app configuration before reusing an installed build.
+- The default sanitized snapshot preserves `user_31ejjz59G6mTX1SIyErOi0fwu4A`, the account selected by the export and the current Bitwarden Zine login. For a different Clerk account, set `ZINE_LOCAL_USER_ID=user_...` consistently for refresh and startup. Obtain the ID from the authenticated account; never map arbitrary authenticated users onto one local identity.
+- Startup provisions D1/R2 only when local state is absent. Existing unrecognized state, old `dev-user-001` snapshots, or snapshots without bodies cause an actionable stop. Refresh explicitly after stopping this worktree's Worker. The restore backs up existing state; startup never unconditionally refreshes or copies another worktree's state.
+- Native uses the existing Clerk publishable key. That production key rejects localhost browser origins. Web verification requires an approved local-origin Clerk instance, matching Worker JWKS configuration, and a snapshot owned by its authenticated subject; see `docs/local-development.md`. Missing configuration or an origin/login/MFA failure is a blocker to report, not permission to fall back to bypass.
+- Worker auth bypass is restricted to explicit isolated tests (`ENVIRONMENT=test`, `TEST_AUTH_BYPASS=true`). Web smoke tests explicitly set `VITE_TEST_AUTH_BYPASS=true` on a localhost development server with mocked APIs. Never use these settings for manual verification.
+- Debug screenshot fixtures and unit/integration fixtures remain useful deterministic test inputs. They are not proof of authenticated runtime behavior.
+- Require a live streamed frame and computer-use login/navigation through populated Library, bookmark detail, and reader for local reader verification. Report auth, sanitized D1/R2 refresh, build/install/launch, live stream, interactions and visible final state separately.
+- If Library is empty, inspect this worktree's local D1 `users` and `user_items` IDs against the authenticated Clerk subject. Do not disable auth, copy live tokens, or point the app at production to compensate.
+- See `docs/local-development.md` for provisioning, refresh, recovery, and credential instructions.
 
 ## Quality Gates and Commit Hygiene
 

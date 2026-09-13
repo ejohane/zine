@@ -1,6 +1,6 @@
 import Foundation
 
-struct LibraryQuery: Hashable {
+struct LibraryQuery: Hashable, Codable {
     var search = ""
     var isFinished = false
     var provider: Provider?
@@ -158,13 +158,35 @@ struct APIClient {
     }
 
     func saveBookmark(url: URL) async throws -> EditorialBookmarkSaveResult {
+        let archives = await bookmarkMutationOutbox?.pendingMutations().filter { $0.kind == .archive } ?? []
         var request = URLRequest(url: baseURL.appending(path: "/api/v1/bookmarks"))
         request.httpMethod = "POST"
         request.httpBody = try JSONEncoder().encode(
             SaveEditorialBookmarkRequest(url: url.absoluteString, tags: [])
         )
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let result: EditorialBookmarkSaveResult = try await send(request)
+        for mutation in archives where mutation.bookmarkID == result.bookmark.userItemId {
+            await bookmarkMutationOutbox?.remove(mutation)
+        }
+        return result
+    }
+
+    func startSyncJob() async throws -> NativeSyncStart {
+        var request = URLRequest(url: baseURL.appending(path: "/api/v1/sync-jobs"))
+        request.httpMethod = "POST"
         return try await send(request)
+    }
+
+    func activeSyncJob() async throws -> NativeSyncActive {
+        try await request(url: baseURL.appending(path: "/api/v1/sync-jobs/active"))
+    }
+
+    func syncJob(id: String) async throws -> NativeSyncStatus {
+        guard !id.isEmpty, id.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }) else {
+            throw CommandError("invalid_sync_job_id")
+        }
+        return try await request(url: baseURL.appending(path: "/api/v1/sync-jobs/\(id)"))
     }
 
     func listBookmarks(
@@ -474,9 +496,13 @@ struct APIClient {
     }
 
     func archiveBookmark(id: String, bookmark: Bookmark? = nil) async throws {
+        _ = try await archiveBookmarkWithReceipt(id: id, bookmark: bookmark)
+    }
+
+    func archiveBookmarkWithReceipt(id: String, bookmark: Bookmark? = nil) async throws -> NativeMutationDelivery {
         guard let bookmarkMutationOutbox else {
             try await sendArchiveBookmark(id: id)
-            return
+            return .serverCommitted
         }
         let mutation = await bookmarkMutationOutbox.stageArchive(
             bookmarkID: id,
@@ -487,8 +513,10 @@ struct APIClient {
             try await sendArchiveBookmark(id: id)
             await bookmarkMutationOutbox.remove(mutation)
             await articleBodyCache?.remove(bookmarkID: id)
+            return .serverCommitted
         } catch where error.isRetryableOfflineMutationFailure {
             await articleBodyCache?.remove(bookmarkID: id)
+            return .localPending
         } catch {
             await bookmarkMutationOutbox.remove(mutation)
             throw error
@@ -502,9 +530,11 @@ struct APIClient {
     }
 
     func bookmarkItem(id: String) async throws {
+        let archives = await bookmarkMutationOutbox?.pendingMutations().filter { $0.bookmarkID == id && $0.kind == .archive } ?? []
         var request = URLRequest(url: baseURL.appending(path: "/api/v1/inbox/\(id)/bookmark"))
         request.httpMethod = "POST"
         let _: EmptyResponse = try await send(request)
+        for mutation in archives { await bookmarkMutationOutbox?.remove(mutation) }
     }
 
     func archiveInboxItem(id: String) async throws {

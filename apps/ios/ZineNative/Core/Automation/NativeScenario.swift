@@ -6,6 +6,10 @@
     public enum NativeScenario {
         @MainActor
         public static func run(_ name: String) async throws -> Data {
+            if name == "sync-workflows" { return try await SyncWorkflowScenario.run() }
+            if name == "bookmark-lifecycle" { return try await BookmarkLifecycleScenario.run() }
+            if name == "library-workflows" { return try await LibraryWorkflowScenario.run() }
+            if name == "reader-recovery" { return try await ReaderRecoveryScenario.run() }
             guard ["reader-offline", "reader-rollback"].contains(name) else {
                 throw CommandError("unknown_scenario")
             }
@@ -97,14 +101,19 @@
         }
     }
 
-    private final class ScenarioServer: @unchecked Sendable {
-        enum Mode { case online, offline, reject }
+    final class ScenarioServer: @unchecked Sendable {
+        enum Mode { case online, offline, reject, missing }
         private let lock = NSLock()
         private var storedMode = Mode.online
         var mode: Mode {
             get { lock.withLock { storedMode } }
             set { lock.withLock { storedMode = newValue } }
         }
+        var pageDelay: TimeInterval = 0
+        var syncMode = "success"
+        var syncReads = 0
+        var syncStarts = 0
+        var catalog: [Bookmark]?
         var bookmark = Bookmark(
             id: "article-1", itemId: "item-1", title: "Native fixture",
             thumbnailUrl: nil, canonicalUrl: URL(string: "https://example.com/article")!,
@@ -120,7 +129,109 @@
                 let method = request.httpMethod ?? "GET"
                 if storedMode == .reject && method != "GET" { return (403, Data("{}".utf8)) }
                 let path = request.url!.path
+                if path.hasSuffix("/sync-jobs") && method == "POST" {
+                    syncStarts += 1
+                    syncReads = 0
+                    return (202, Data(#"{"jobId":"fixture-job","total":1,"existing":false}"#.utf8))
+                }
+                if path.hasSuffix("/sync-jobs/active") {
+                    let active = syncStarts > 0 && (syncMode == "timeout" || syncReads < 2)
+                    return (
+                        200,
+                        try JSONSerialization.data(withJSONObject: [
+                            "inProgress": active, "jobId": active ? "fixture-job" as Any : NSNull(),
+                        ])
+                    )
+                }
+                if path.contains("/sync-jobs/") {
+                    guard path.hasSuffix("/fixture-job") else { return (404, Data("{}".utf8)) }
+                    syncReads += 1
+                    let done = syncMode != "timeout" && syncReads > 1
+                    let errors: [[String: String]] =
+                        done && ["partial", "expired"].contains(syncMode)
+                        ? [
+                            [
+                                "subscriptionId": "fixture-subscription",
+                                "error": syncMode == "expired"
+                                    ? "YOUTUBE not connected" : "Provider unavailable",
+                            ]
+                        ] : []
+                    if done && syncMode == "success" { bookmark.state = "BOOKMARKED" }
+                    let json: [String: Any] = [
+                        "jobId": "fixture-job", "status": done ? "completed" : "processing",
+                        "total": syncMode == "expired" ? 0 : syncMode == "partial" ? 2 : 1,
+                        "completed": done ? (syncMode == "expired" ? 0 : syncMode == "partial" ? 2 : 1) : 0,
+                        "succeeded": done && syncMode != "expired" ? 1 : 0,
+                        "failed": syncMode == "partial" && done ? 1 : 0,
+                        "itemsFound": done && syncMode == "success" ? 1 : 0,
+                        "progress": done ? 100 : 0, "errors": errors,
+                    ]
+                    return (200, try JSONSerialization.data(withJSONObject: json))
+                }
+                if var catalog {
+                    if method == "PATCH",
+                        let index = catalog.firstIndex(where: { path.hasSuffix("/" + $0.id) })
+                    {
+                        let body =
+                            try JSONSerialization.jsonObject(with: bodyData(request)) as! [String: Bool]
+                        catalog[index].isFinished = body["isFinished"]!
+                        self.catalog = catalog
+                        return (200, try JSONEncoder().encode(["bookmark": catalog[index]]))
+                    }
+                    if path.hasSuffix("/bookmarks") {
+                        let query =
+                            URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!.queryItems ?? []
+                        func value(_ key: String) -> String? { query.first { $0.name == key }?.value }
+                        let filtered = catalog.filter { item in
+                            item.isFinished == (value("isFinished") == "true")
+                                && (value("search") == nil
+                                    || item.title.localizedCaseInsensitiveContains(value("search")!))
+                                && (value("contentType") == nil
+                                    || item.contentType.rawValue == value("contentType"))
+                                && (value("provider") == nil || item.provider.rawValue == value("provider"))
+                        }
+                        if value("cursor") != nil && pageDelay > 0 {
+                            Thread.sleep(forTimeInterval: pageDelay)
+                        }
+                        let offset = Int(value("cursor") ?? "0") ?? 0
+                        let page = Array(filtered.dropFirst(offset).prefix(2))
+                        var json: [String: Any] = [
+                            "items": try JSONSerialization.jsonObject(with: JSONEncoder().encode(page))
+                        ]
+                        if offset + 2 < filtered.count { json["nextCursor"] = String(offset + 2) }
+                        return (200, try JSONSerialization.data(withJSONObject: json))
+                    }
+                    if let item = catalog.first(where: { path.hasSuffix("/" + $0.id) }) {
+                        return (200, try JSONEncoder().encode(["item": item]))
+                    }
+                }
+                if path.hasSuffix("/bookmarks") && method == "POST" {
+                    let status = bookmark.state == "BOOKMARKED" ? "already_bookmarked" : "rebookmarked"
+                    bookmark.state = "BOOKMARKED"
+                    return (
+                        200,
+                        Data(
+                            "{\"bookmark\":{\"itemId\":\"item-1\",\"userItemId\":\"article-1\",\"status\":\"\(status)\"}}"
+                                .utf8)
+                    )
+                }
+                if path.hasSuffix("/bookmark") && method == "POST" {
+                    bookmark.state = "BOOKMARKED"
+                    return (200, Data("{}".utf8))
+                }
+                if method == "DELETE" {
+                    bookmark.state = "ARCHIVED"
+                    return (200, Data("{}".utf8))
+                }
                 if path.hasSuffix("/article-content") {
+                    if storedMode == .missing {
+                        return (
+                            200,
+                            Data(
+                                #"{"content":null,"articleBody":{"availability":"UNAVAILABLE","pipelineStatus":"UNAVAILABLE","lastErrorCode":"NOT_READERABLE","qualityWarnings":[]}}"#
+                                    .utf8)
+                        )
+                    }
                     return (
                         200,
                         Data(
@@ -147,7 +258,12 @@
                     return (200, try JSONEncoder().encode(["bookmark": bookmark]))
                 }
                 if path.hasSuffix("/bookmarks") {
-                    return (200, try JSONEncoder().encode(["items": bookmark.isFinished ? [] : [bookmark]]))
+                    return (
+                        200,
+                        try JSONEncoder().encode([
+                            "items": bookmark.isFinished || bookmark.state != "BOOKMARKED" ? [] : [bookmark]
+                        ])
+                    )
                 }
                 return (200, try JSONEncoder().encode(["item": bookmark]))
             }
@@ -169,7 +285,7 @@
         }
     }
 
-    private final class ScenarioProtocol: URLProtocol, @unchecked Sendable {
+    final class ScenarioProtocol: URLProtocol, @unchecked Sendable {
         static var server: ScenarioServer?
         override class func canInit(with request: URLRequest) -> Bool {
             request.url?.host == "fixture.invalid"

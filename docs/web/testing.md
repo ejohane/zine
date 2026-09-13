@@ -74,12 +74,12 @@ For browser-level manual verification, use the real app instead of Storybook fir
 ### Local app
 
 1. Start the backend/worktree stack from the repo root: `bun run dev:worktree`
-2. Start the web app from the repo root: `bun run dev:web`
-3. Open the Vite URL, usually `http://localhost:5173`
+2. Open the exact web URL printed by the stack; it already starts Vite.
+3. Sign in with Clerk using the approved Bitwarden credentials.
 
 ### Auth behavior in local development
 
-`apps/web/src/lib/trpc.tsx` supports a localhost development-bypass mode when `VITE_CLERK_PUBLISHABLE_KEY` is absent and the app is running on `localhost` or `127.0.0.1`. That is the intended local path for bookmark and settings verification without live Clerk auth.
+Manual verification uses real Clerk login and sanitized local data; see `docs/local-development.md`. Missing Clerk configuration never signs a user in. Only isolated smoke tests with mocked APIs opt into `VITE_TEST_AUTH_BYPASS=true` on a localhost development server. Production builds ignore this flag.
 
 ### Recommended manual checks
 

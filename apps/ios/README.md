@@ -74,7 +74,7 @@ version pinned by the repository.
 
 ## Reader routing fixture
 
-After building and installing a Debug app, launch with `-screenshot-fixtures`
+For deterministic screenshot tests only (not manual runtime verification), after building and installing a Debug app, launch with `-screenshot-fixtures`
 and `-screenshot-reader-routing-fixtures` to exercise Library → bookmark detail →
 Read in Zine with Substack, custom-domain Substack, and regular web articles.
 This uses the real navigation and reader views with synthetic article responses;
@@ -104,3 +104,6 @@ saving the bookmark.
 See [the first native agent experiment](../../docs/native-agent-experiment.md) for
 shared desktop tests, deterministic offline scenarios, and explicitly enabled
 Simulator commands against the authenticated local app.
+See [workflow coverage and commands](../../docs/native-agent-workflows.md) for the expanded CLI.
+
+Local manual verification uses real Clerk login and sanitized local D1/R2. See [the authenticated local workflow](../../docs/local-development.md). `dev:worktree` passes its selected local API URL as a build setting, overriding production defaults.

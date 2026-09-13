@@ -438,7 +438,7 @@ struct ArticleReaderView: View {
     }
 }
 
-private struct ArticleTagEditorView: View {
+struct ArticleTagEditorView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var availableTags: [BookmarkTag]

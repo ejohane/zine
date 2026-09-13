@@ -211,6 +211,26 @@ private struct AuthenticatedAppView: View {
         .environment(\.nativeCommandSession, commandSession)
         .task {
             commandSession.navigate = navigateCommand
+            commandSession.queryLibrary = { query in
+                let target: AppTab = query.search.isEmpty ? .library : .search
+                let route = query.search.isEmpty ? "library" : "search"
+                navigationPath = NavigationPath()
+                selectedTab = target
+                for _ in 0..<100 {
+                    if commandSession.route == route, let apply = commandSession.applyLibraryQuery {
+                        await apply(query)
+                        // The view task may supersede the explicit reload after bindings change.
+                        for _ in 0..<2500 {
+                            if let library = commandSession.library,
+                               library.activeQuery == query, !library.isReloading { return }
+                            try await Task.sleep(for: .milliseconds(20))
+                        }
+                        throw CommandError("library_query_timed_out")
+                    }
+                    try await Task.sleep(for: .milliseconds(20))
+                }
+                throw CommandError("library_navigation_timed_out")
+            }
             #if DEBUG && targetEnvironment(simulator)
             if let bridge = SimulatorCommandBridge(session: commandSession) { await bridge.run() }
             #endif
@@ -383,19 +403,11 @@ private struct AuthenticatedAppView: View {
     private func navigateCommand(_ name: String, id: String?) async throws {
         switch name {
         case "library.open":
-            navigationPath = NavigationPath()
-            selectedTab = .library
-            commandSession.openLibrary?()
             commandSession.reader = nil
             commandSession.bookmarkID = nil
-            for _ in 0..<100 {
-                if let library = commandSession.library {
-                    await library.reload(query: LibraryQuery())
-                    commandSession.route = "library"
-                    return
-                }
-                try await Task.sleep(for: .milliseconds(20))
-            }
+            guard let queryLibrary = commandSession.queryLibrary else { throw CommandError("library_unavailable") }
+            try await queryLibrary(LibraryQuery())
+            return
         case "bookmark.open":
             guard let id else { throw CommandError("bookmark_id_required") }
             let bookmark = try await client.getBookmark(id: id)

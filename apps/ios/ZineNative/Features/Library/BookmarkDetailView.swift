@@ -106,6 +106,7 @@ struct BookmarkDetailContent: Equatable {
 struct BookmarkDetailView: View {
     @Environment(\.nativeCommandSession) private var commandSession
     @State private var showsReader = false
+    @State private var showsTagEditor = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.displayScale) private var displayScale
@@ -261,6 +262,20 @@ struct BookmarkDetailView: View {
             commandSession?.bookmarkID = content.id
             commandSession?.route = "bookmark"
             commandSession?.openReader = { showsReader = true }
+            commandSession?.detailBookmark = {
+                guard var value = bookmark else { return nil }
+                value.state = isBookmarked ? "BOOKMARKED" : "ARCHIVED"
+                return value
+            }
+            commandSession?.setDetailTags = saveDetailTags
+            commandSession?.setDetailBookmarked = setBookmarked
+            commandSession?.refreshDetail = {
+                guard await hydrateBookmark(force: true) else { throw CommandError("bookmark_refresh_failed") }
+            }
+        }
+        .sheet(isPresented: $showsTagEditor) {
+            ArticleTagEditorView(bookmarkID: content.id, initialTags: content.tags, client: client,
+                saveTags: { names in try await saveDetailTags(names).value }, onSaved: updateTags)
         }
         .task(id: content.id) {
             await hydrateBookmark()
@@ -458,23 +473,16 @@ struct BookmarkDetailView: View {
     }
 
     private var tagsMenu: some View {
-        let tags = bookmark?.tags ?? []
+        Button { showsTagEditor = true } label: { actionIcon(systemName: "tag") }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Edit tags")
+            .actionRowHaptic()
+    }
 
-        return Menu {
-            if tags.isEmpty {
-                Button("No tags") {}
-                    .disabled(true)
-            } else {
-                ForEach(tags) { tag in
-                    Button(tag.name) {}
-                        .disabled(true)
-                }
-            }
-        } label: {
-            actionIcon(systemName: "tag")
-        }
-        .accessibilityLabel(tags.isEmpty ? "No tags" : "View tags")
-        .actionRowHaptic()
+    private func saveDetailTags(_ names: [String]) async throws -> NativeMutationReceipt<[BookmarkTag]> {
+        let receipt = try await client.setTagsWithReceipt(id: content.id, tags: names, bookmark: bookmark)
+        updateTags(receipt.value)
+        return receipt
     }
 
     private var moreMenu: some View {
@@ -652,10 +660,11 @@ struct BookmarkDetailView: View {
         .foregroundStyle(ZineTheme.primaryText.opacity(0.72))
     }
 
-    private func hydrateBookmark() async {
+    @discardableResult
+    private func hydrateBookmark(force: Bool = false) async -> Bool {
         do {
             var refreshed = try await client.getBookmark(id: content.id)
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else { return false }
             finishedState.hydrate(
                 isFinished: refreshed.isFinished,
                 finishedAt: refreshed.finishedAt
@@ -663,13 +672,15 @@ struct BookmarkDetailView: View {
             refreshed.isFinished = finishedState.isFinished
             refreshed.finishedAt = finishedState.finishedAt
             bookmark = refreshed
-            if !hasToggledBookmark {
+            if force || !hasToggledBookmark {
+                hasToggledBookmark = false
                 isBookmarked = refreshed.state == "BOOKMARKED"
             }
+            return true
         } catch is CancellationError {
-            return
+            return false
         } catch {
-            return
+            return false
         }
     }
 
@@ -733,28 +744,33 @@ struct BookmarkDetailView: View {
     }
 
     private func toggleBookmark() async {
-        guard let bookmark, !isSavingBookmark else { return }
+        do { _ = try await setBookmarked(!isBookmarked) }
+        catch { errorMessage = error.localizedDescription }
+    }
 
+    private func setBookmarked(_ newValue: Bool) async throws -> NativeMutationDelivery {
+        guard let bookmark, !isSavingBookmark else { throw CommandError("bookmark_busy_or_unavailable") }
+        guard newValue != isBookmarked else { throw CommandError(newValue ? "already_bookmarked" : "already_archived") }
         let previousValue = isBookmarked
-        let newValue = !previousValue
         hasToggledBookmark = true
         isSavingBookmark = true
         isBookmarked = newValue
         onBookmarkChange(bookmark, newValue, .optimistic)
-
         defer { isSavingBookmark = false }
-
         do {
+            let delivery: NativeMutationDelivery
             if newValue {
                 try await client.bookmarkItem(id: bookmark.id)
+                delivery = .serverCommitted
             } else {
-                try await client.archiveBookmark(id: bookmark.id, bookmark: bookmark)
+                delivery = try await client.archiveBookmarkWithReceipt(id: bookmark.id, bookmark: bookmark)
             }
             onBookmarkCommit(bookmark, newValue)
+            return delivery
         } catch {
             isBookmarked = previousValue
             onBookmarkChange(bookmark, previousValue, .rollback)
-            errorMessage = error.localizedDescription
+            throw error
         }
     }
 

@@ -18,6 +18,46 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(results.last?.status, "failed")
         XCTAssertEqual(results.last?.state.libraryIDs, ["article-1"])
     }
+    @MainActor
+    func testReaderRestartAndMissingContentRecovery() async throws {
+        let data = try await NativeScenario.run("reader-recovery")
+        let results = try JSONDecoder().decode([NativeCommandResult].self, from: data)
+        XCTAssertTrue(
+            results.contains { $0.state.readerContentSource == "cache" && $0.state.progressFraction == 0.63 })
+        XCTAssertTrue(results.contains { $0.state.readerPhase == "unavailable" })
+        XCTAssertEqual(results.last?.state.pendingMutations, 0)
+    }
+
+    @MainActor
+    func testLibrarySearchPaginationAndUnfinishedRestoration() async throws {
+        let data = try await NativeScenario.run("library-workflows")
+        let results = try JSONDecoder().decode([NativeCommandResult].self, from: data)
+        XCTAssertEqual(results.last?.state.libraryIDs, ["item-4"])
+        XCTAssertEqual(results.last?.status, "local_pending")
+    }
+
+    @MainActor
+    func testBookmarkLifecycleAndRestoreAfterOfflineArchive() async throws {
+        let data = try await NativeScenario.run("bookmark-lifecycle")
+        let results = try JSONDecoder().decode([NativeCommandResult].self, from: data)
+        XCTAssertEqual(results.last?.state.saveStatus, "rebookmarked")
+        XCTAssertTrue(results.contains { $0.status == "local_pending" })
+    }
+
+    @MainActor
+    func testSyncCompletionFailuresAndResume() async throws {
+        let data = try await NativeScenario.run("sync-workflows")
+        let results = try JSONDecoder().decode([NativeCommandResult].self, from: data)
+        XCTAssertTrue(
+            results.contains { $0.state.syncJob?.itemsFound == 1 && $0.state.libraryIDs == ["article-1"] })
+        XCTAssertTrue(results.contains { $0.error == "sync_wait_timed_out_job_continues" })
+        XCTAssertTrue(
+            results.contains {
+                $0.state.syncJob?.failed == 0 && $0.state.syncJob?.errors.isEmpty == false
+                    && $0.status == "failed"
+            })
+    }
+
     func testCapabilityAndExpiry() {
         let identity = BridgeIdentity(
             session: "session", capability: "secret", simulator: "sim",

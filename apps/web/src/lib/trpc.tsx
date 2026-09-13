@@ -1,3 +1,4 @@
+import { resolveAuthMode, type AuthMode } from './auth-mode';
 import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ClerkProvider, useAuth, useClerk } from '@clerk/clerk-react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -19,7 +20,7 @@ import {
 
 export const trpc: CreateTRPCReact<AppRouter, unknown> = createTRPCReact<AppRouter>();
 
-export type AuthMode = 'clerk' | 'development-bypass' | 'disabled';
+export type { AuthMode } from './auth-mode';
 
 type AppSessionValue = {
   isLoaded: boolean;
@@ -33,15 +34,12 @@ type AuthAvailabilityValue = {
   isEnabled: boolean;
 };
 
-const isLocalPreview =
-  typeof window !== 'undefined' &&
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-
-const AUTH_MODE: AuthMode = CLERK_PUBLISHABLE_KEY
-  ? 'clerk'
-  : isLocalPreview
-    ? 'development-bypass'
-    : 'disabled';
+const AUTH_MODE = resolveAuthMode({
+  publishableKey: CLERK_PUBLISHABLE_KEY,
+  hostname: typeof window === 'undefined' ? '' : window.location.hostname,
+  developmentBuild: import.meta.env.DEV,
+  testBypass: import.meta.env.VITE_TEST_AUTH_BYPASS,
+});
 
 const defaultSession: AppSessionValue = {
   isLoaded: true,

@@ -138,15 +138,15 @@ struct LibraryView: View {
             .onChange(of: store.items) { _, _ in commandSession?.recordUIChange("library.items") }
             .onAppear {
                 isVisible = true
-                if !isSearchMode {
-                    commandSession?.library = store
-                    commandSession?.openLibrary = {
-                        showsFinished = false
-                        provider = nil
-                        contentType = nil
-                    }
-                    commandSession?.route = "library"
+                commandSession?.library = store
+                commandSession?.applyLibraryQuery = { requested in
+                    searchText?.wrappedValue = requested.search
+                    showsFinished = requested.isFinished
+                    provider = requested.provider
+                    contentType = requested.contentType
+                    await store.reload(query: requested)
                 }
+                commandSession?.route = isSearchMode ? "search" : "library"
             }
             .onDisappear { isVisible = false }
             .refreshable {

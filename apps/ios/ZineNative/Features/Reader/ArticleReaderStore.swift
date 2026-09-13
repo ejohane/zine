@@ -35,6 +35,7 @@ final class ArticleProgressWriteQueue {
 @MainActor
 @Observable
 final class ArticleReaderStore {
+    private(set) var contentSource: String?
     private(set) var phase: ArticleReaderPhase
     private var finishedState: OptimisticFinishedState
 
@@ -93,6 +94,23 @@ final class ArticleReaderStore {
         finishedState.isUpdating
     }
 
+    var phaseName: String {
+        switch phase {
+        case .loading: "loading"
+        case .preparing: "preparing"
+        case .ready: "ready"
+        case .unavailable: "unavailable"
+        case .failed: "failed"
+        }
+    }
+
+    var loadError: String? {
+        switch phase {
+        case .unavailable(let message), .failed(let message): message
+        default: nil
+        }
+    }
+
     var readyDocument: ArticleReaderDocument? {
         guard case let .ready(document) = phase else { return nil }
         return document
@@ -105,14 +123,17 @@ final class ArticleReaderStore {
 
         if let pendingProgress = await client.pendingArticleProgress(id: metadata.bookmarkID) {
             initialProgressFraction = pendingProgress
+            progressFraction = pendingProgress
         }
 
         if let cached = await client.cachedArticleContent(id: metadata.bookmarkID),
            cached.readableContent != nil
         {
+            contentSource = "cache"
             phase = .ready(ArticleReaderDocument(metadata: metadata, response: cached))
             hasReadableCache = true
         } else {
+            contentSource = nil
             phase = .loading
         }
 
@@ -120,6 +141,7 @@ final class ArticleReaderStore {
             let current = try await client.getArticleContent(id: metadata.bookmarkID)
             guard !Task.isCancelled, generation == loadGeneration else { return }
             if await acceptIfReadable(current) { return }
+            if hasReadableCache { return }
 
             phase = .preparing
             let requested = try await client.requestArticleContent(id: metadata.bookmarkID)
@@ -226,6 +248,7 @@ final class ArticleReaderStore {
     private func acceptIfReadable(_ response: ArticleContentResponse) async -> Bool {
         guard response.readableContent != nil else { return false }
         await client.cacheArticleContent(response, id: metadata.bookmarkID)
+        contentSource = "network"
         phase = .ready(ArticleReaderDocument(metadata: metadata, response: response))
         return true
     }

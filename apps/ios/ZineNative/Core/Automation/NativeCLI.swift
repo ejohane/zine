@@ -5,11 +5,22 @@
         @MainActor
         public static func run(_ arguments: [String]) async throws -> Data {
             if arguments.count == 3, arguments[0...1] == ["scenario", "run"] {
+                if arguments[2] == "all" {
+                    var suite: [String: [NativeCommandResult]] = [:]
+                    for name in [
+                        "reader-offline", "reader-rollback", "reader-recovery", "library-workflows",
+                        "bookmark-lifecycle", "sync-workflows",
+                    ] {
+                        suite[name] = try JSONDecoder().decode(
+                            [NativeCommandResult].self, from: await NativeScenario.run(name))
+                    }
+                    return try JSONEncoder().encode(suite)
+                }
                 return try await NativeScenario.run(arguments[2])
             }
             guard arguments.count >= 3, arguments[0] == "remote" else {
                 throw CommandError(
-                    "usage: scenario run reader-offline|reader-rollback; remote SIMULATOR identity; remote SIMULATOR COMMAND --expect-session SESSION [--id ID] [--fraction 0.4] [--tags JSON_ARRAY]"
+                    "usage: scenario run all|reader-offline|reader-rollback|reader-recovery|library-workflows|bookmark-lifecycle|sync-workflows; remote SIMULATOR identity; remote SIMULATOR COMMAND --expect-session SESSION [--id ID] [--fraction 0.4] [--tags JSON_ARRAY]"
                 )
             }
             let simulator = arguments[1]
@@ -58,12 +69,46 @@
                 throw CommandError("another_command_is_running")
             }
             defer { try? handle.close() }
+            if arguments[2] == "app.restart" {
+                for action in ["terminate", "launch"] {
+                    let process = Process()
+                    process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+                    process.arguments = ["simctl", action, simulator, "app.zine.native"]
+                    var environment = ProcessInfo.processInfo.environment
+                    environment["SIMCTL_CHILD_ZINE_AGENT_BRIDGE"] = "1"
+                    process.environment = environment
+                    process.standardOutput = FileHandle.nullDevice
+                    try process.run()
+                    process.waitUntilExit()
+                    guard process.terminationStatus == 0 else {
+                        throw CommandError("restart_" + action + "_failed")
+                    }
+                }
+                let deadline = Date().addingTimeInterval(30)
+                while Date() < deadline {
+                    if let data = try? Data(contentsOf: directory.appending(path: "identity.json")),
+                        let fresh = try? JSONDecoder().decode(BridgeIdentity.self, from: data),
+                        fresh.session != identity.session, fresh.simulator == simulator,
+                        fresh.worktree == identity.worktree, fresh.build == identity.build,
+                        fresh.endpoint == identity.endpoint, fresh.expiresAt > Date()
+                    {
+                        return try await run(["remote", simulator, "identity"])
+                    }
+                    try await Task.sleep(for: .milliseconds(100))
+                }
+                throw CommandError("restart_bridge_unavailable_check_sign_in")
+            }
             let tags = try option("--tags").map {
                 try JSONDecoder().decode([String].self, from: Data($0.utf8))
             }
+            let query = try option("--query").map {
+                try JSONDecoder().decode(LibraryQuery.self, from: Data($0.utf8))
+            }
             let command = NativeCommand(
                 name: arguments[2], bookmarkID: option("--id"),
-                fraction: option("--fraction").flatMap(Double.init), tags: tags)
+                fraction: option("--fraction").flatMap(Double.init), tags: tags, query: query,
+                isFinished: option("--finished").flatMap(Bool.init), url: option("--url"),
+                jobID: option("--job"), timeout: option("--timeout").flatMap(Double.init))
             let request = BridgeRequest(
                 session: identity.session, capability: identity.capability, command: command)
             try JSONEncoder().encode(request).write(

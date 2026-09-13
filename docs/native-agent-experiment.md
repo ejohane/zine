@@ -1,5 +1,8 @@
 # Native agent experiment 1
 
+The initial slice below is now extended by [four workflow passes](native-agent-workflows.md),
+including the complete command reference and regression suite.
+
 This experiment exposes the existing native Library and reader business logic to a
 macOS command line and to a deliberately enabled local Simulator session. It covers
 Library → bookmark detail → reader → progress → replace tags → complete → reload

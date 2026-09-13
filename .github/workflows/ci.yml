@@ -68,6 +68,9 @@ jobs:
       - name: Run worker tests
         run: bun run test:worker:ci
 
+      - name: Test local development lifecycle and data provisioning
+        run: bun run test:local-development
+
   test-x-archive:
     name: X Archive Tests
     runs-on: ubuntu-latest
