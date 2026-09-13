@@ -6,7 +6,6 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
-  renameSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -16,6 +15,7 @@ import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { promisify } from 'node:util';
 import { Database } from 'bun:sqlite';
+import { replaceLocalState } from './local-state.mjs';
 
 const REPO_ROOT = resolve(dirname(new URL(import.meta.url).pathname), '..');
 const WORKER_DIR = join(REPO_ROOT, 'apps/worker');
@@ -34,7 +34,14 @@ const PROD_ENV = 'production';
 const PROD_ARTICLE_BUCKET = 'zine-article-content-prod';
 const LOCAL_ARTICLE_BUCKET = 'zine-article-content-dev';
 const PROD_USER_ID = 'user_31ejjz59G6mTX1SIyErOi0fwu4A';
-const LOCAL_USER_ID = 'dev-user-001';
+export function resolveLocalUserId(value = process.env.ZINE_LOCAL_USER_ID) {
+  const userId = value ?? PROD_USER_ID;
+  if (!/^user_[A-Za-z0-9]+$/.test(userId)) {
+    throw new Error('ZINE_LOCAL_USER_ID must be the authenticated Clerk user ID (user_...).');
+  }
+  return userId;
+}
+const LOCAL_USER_ID = resolveLocalUserId();
 const LOCAL_EMAIL = 'dev@example.com';
 const ARTICLE_BODY_TRANSFER_CONCURRENCY = 6;
 const LOCAL_R2_RESTORE_CONCURRENCY = 1;
@@ -137,11 +144,11 @@ async function runCapturedAsync(command, args, options = {}) {
   }
 }
 
-function assertLocalDevStackStopped() {
+export function assertLocalDevStackStopped() {
   if (skipRestore) return;
 
   const result = spawnSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8' });
-  if (result.status !== 0) return;
+  if (result.status !== 0) throw new Error('Cannot determine whether the local Worker is stopped.');
 
   const runningWrangler = result.stdout
     .split('\n')
@@ -737,15 +744,21 @@ SELECT type, name, tbl_name, sql
 function installStagedLocalState() {
   if (skipRestore) return;
 
-  if (existsSync(STATE_DIR)) {
-    mkdirSync(BACKUP_DIR, { recursive: true });
-    const stamp = new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-');
-    const backupPath = join(BACKUP_DIR, `state-${stamp}`);
-    renameSync(STATE_DIR, backupPath);
-    console.log(`Backed up existing local Wrangler state to ${backupPath}`);
-  }
-
-  renameSync(STAGED_STATE_DIR, STATE_DIR);
+  writeFileSync(
+    join(STAGED_STATE_DIR, 'zine-sanitized-snapshot.json'),
+    JSON.stringify(
+      {
+        userId: LOCAL_USER_ID,
+        includeArticleBodies,
+        createdAt: new Date().toISOString(),
+      },
+      null,
+      2
+    )
+  );
+  assertLocalDevStackStopped();
+  const backupPath = replaceLocalState(STAGED_STATE_DIR, STATE_DIR, BACKUP_DIR);
+  if (backupPath) console.log(`Backed up existing local Wrangler state to ${backupPath}`);
   console.log('Installed the staged local Wrangler state.');
 }
 
@@ -844,6 +857,7 @@ async function main() {
 
 if (import.meta.main) {
   main().catch((error) => {
+    cleanupRawArtifacts();
     console.error(error instanceof Error ? error.message : error);
     process.exit(1);
   });

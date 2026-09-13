@@ -8,7 +8,13 @@
     "dev": {
       "cache": false,
       "persistent": true,
-      "env": ["WORKER_PORT", "WORKER_INSPECTOR_PORT", "X_ARCHIVE_INSPECTOR_PORT", "WEB_PORT"]
+      "env": [
+        "WORKER_PORT",
+        "WORKER_INSPECTOR_PORT",
+        "X_ARCHIVE_INSPECTOR_PORT",
+        "X_ARCHIVE_PORT",
+        "WEB_PORT"
+      ]
     },
     "lint": {
       "dependsOn": ["^build"]

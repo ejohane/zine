@@ -47,6 +47,8 @@ export interface Bindings {
   CLERK_SECRET_KEY?: string;
   /** Clerk JWKS URL for token verification */
   CLERK_JWKS_URL?: string;
+  /** Only honored with ENVIRONMENT=test; never enables development or production bypass. */
+  TEST_AUTH_BYPASS?: string;
   /** Clerk webhook signing secret for Svix verification */
   CLERK_WEBHOOK_SECRET?: string;
   /** AES-256 encryption key for OAuth tokens (hex string) */

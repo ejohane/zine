@@ -90,6 +90,7 @@ if [[ "${ZINE_SKIP_IOS_BUILD:-0}" != "1" ]]; then
     -destination "platform=iOS Simulator,id=$simulator_udid" \
     -derivedDataPath "$derived_data_path" \
     -quiet \
+    "ZINE_API_BASE_URL=${ZINE_LOCAL_API_URL:?Start with bun run dev:worktree to select a local API}" \
     build &
   build_pid=$!
   wait "$build_pid"
@@ -103,6 +104,13 @@ if [[ "${ZINE_SKIP_IOS_BUILD:-0}" != "1" ]]; then
   xcrun simctl install "$simulator_udid" "$app_path"
 fi
 
+installed_app_path="$(xcrun simctl get_app_container "$simulator_udid" "$bundle_id" app)"
+installed_api_url="$(/usr/libexec/PlistBuddy -c 'Print :ZINEAPIBaseURL' "$installed_app_path/Info.plist")"
+if [[ "$installed_api_url" != "${ZINE_LOCAL_API_URL:?Start with bun run dev:worktree}" ]]; then
+  echo "Installed app API does not match this local stack. Rebuild without ZINE_SKIP_IOS_BUILD." >&2
+  exit 1
+fi
+echo "Verified installed native API: $installed_api_url"
 xcrun simctl launch --terminate-running-process "$simulator_udid" "$bundle_id"
 
 echo "Starting the Zine simulator preview for $simulator_name ($simulator_udid)."
