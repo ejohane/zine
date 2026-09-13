@@ -110,3 +110,49 @@ Simulator commands against the authenticated local app.
 See [workflow coverage and commands](../../docs/native-agent-workflows.md) for the expanded CLI.
 
 Local manual verification uses real Clerk login and sanitized local D1/R2. See [the authenticated local workflow](../../docs/local-development.md). `dev:worktree` passes its selected local API URL as a build setting, overriding production defaults.
+
+## Immersive reader
+
+The reader shows its top controls on entry and whenever it is at the beginning.
+The article header starts below those controls. The document itself scrolls
+through the top and bottom screen edges; header clearance scrolls away with it.
+Away from the top, a single tap on ordinary content toggles the controls;
+sustained upward scrolling reveals them and downward scrolling hides them.
+Links and WebKit text selection keep their native interactions. VoiceOver keeps
+the controls available, and Reduce Motion disables the chrome transition.
+Appearance and tagging use native sheets. A settled scroll to the bottom opens
+a completion sheet once per visit, with saving, confirmation, and retry states.
+The bottom tag, links, and completion controls share the top controls’ scroll and tap
+visibility. The completion control opens the sheet at any point. The inline end action can also reopen it after dismissal. Completion remains
+reversible in the More menu.
+
+Appearance persists in local preferences (System, Charter, or Georgia, plus text
+scale) and combines with Dynamic Type. Legacy size presets migrate on first use.
+Changing appearance updates CSS in place instead of reloading the article.
+
+Reading positions are local to the account and device, stored as protected
+`.json.position` files alongside the article cache. A content hash, text-node
+index, character offset, text quote, and viewport position restore the passage
+across font reflow and late image layout. An incompatible document falls back to
+its saved fraction. Existing queued server progress and save-and-complete behavior
+remain unchanged. The reader's own script runs in a separate `WKContentWorld`;
+article JavaScript remains disabled and the restrictive content policy remains.
+
+The routing fixture above now includes a long synthetic article, a source link,
+and local tag/completion responses. Its reading position persists in a separate
+fixture account cache. Use `-screenshot-light-mode` or `-screenshot-dark-mode` for
+explicit appearance coverage. These fixtures do not establish production API or
+authentication health.
+
+Focused reader checks:
+
+```sh
+xcodebuild -project apps/ios/ZineNative.xcodeproj -scheme ZineNative \
+  -destination 'platform=iOS Simulator,name=iPhone 17 — Zine' \
+  -parallel-testing-enabled NO \
+  -only-testing:ZineNativeTests/ArticleReaderTests \
+  -only-testing:ZineNativeTests/ArticleReaderWebTests \
+  -only-testing:ZineNativeTests/ZineThemeTests test
+```
+
+The reader’s Links control opens a sheet of unique web destinations from the article body, in article order, with linked text, surrounding context, and domain. Each row can save its destination to Zine and fills the bookmark immediately, rolling back with retry feedback if the request fails. Successful saves refresh Home and Library through the app’s bookmark-save event. It excludes direct media/assets, downloads, same-article anchors, and navigation regions, and opens destinations using the system URL handler. No preview metadata is fetched.

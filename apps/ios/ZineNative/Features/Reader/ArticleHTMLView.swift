@@ -62,49 +62,12 @@ private final class ArticleReaderWebView: WKWebView {
     }
 }
 
-struct ArticleReaderChromeOffsetTracker {
-    static let maximumOffset: CGFloat = 56
-
-    private(set) var offset: CGFloat = 0
-    private var lastScrollOffset: CGFloat?
-
-    mutating func begin(at scrollOffset: CGFloat) {
-        lastScrollOffset = max(scrollOffset, 0)
-    }
-
-    mutating func update(scrollOffset: CGFloat) -> CGFloat? {
-        let scrollOffset = max(scrollOffset, 0)
-
-        if scrollOffset == 0 {
-            lastScrollOffset = 0
-            return setOffset(0)
-        }
-
-        guard let lastScrollOffset else {
-            self.lastScrollOffset = scrollOffset
-            return nil
-        }
-
-        self.lastScrollOffset = scrollOffset
-        return setOffset(offset + scrollOffset - lastScrollOffset)
-    }
-
-    mutating func end() {
-        lastScrollOffset = nil
-    }
-
-    private mutating func setOffset(_ value: CGFloat) -> CGFloat? {
-        let value = min(max(value, 0), Self.maximumOffset)
-        guard value != offset else { return nil }
-        offset = value
-        return value
-    }
-}
-
 enum ArticleHTMLDocumentBuilder {
     static func makeHTML(
         for document: ArticleReaderDocument,
-        fontScale: Double = ArticleReaderFontSize.standard.scale
+        fontScale: Double = ArticleReaderFontSize.standard.scale,
+        fontFamily: ArticleReaderFontFamily = .system,
+        topContentInset: CGFloat = 0
     ) -> String {
         let metadata = document.metadata
         let readingTime = metadata.readingTimeMinutes.map { "\($0) min read" }
@@ -116,7 +79,6 @@ enum ArticleHTMLDocumentBuilder {
             .compactMap { $0 }
             .joined(separator: "<span aria-hidden=\"true\">·</span>")
         let body = document.response.readableContent ?? ""
-        let topPadding = 32 + ArticleReaderChromeOffsetTracker.maximumOffset
 
         return """
         <!doctype html>
@@ -128,21 +90,25 @@ enum ArticleHTMLDocumentBuilder {
           <style>
             :root {
               color-scheme: light dark;
+              --reader-top-inset: \(topContentInset)px;
               --reader-font-scale: \(fontScale);
+              --reader-font-family: \(fontFamily.css);
             }
             * { box-sizing: border-box; }
             html { -webkit-text-size-adjust: 100%; }
             body {
               margin: 0 auto;
               max-width: 760px;
-              padding: \(topPadding)px 22px 96px;
-              background: #ffffff;
-              color: #151719;
+              padding: calc(var(--reader-top-inset) + 72px) 22px 0;
+              background: #\(ZineTheme.Role.surface.lightHex);
+              color: #\(ZineTheme.Role.readerBodyText.lightHex);
               font: -apple-system-body;
               font-size: calc(17px * var(--reader-font-scale));
+              font-family: var(--reader-font-family);
               line-height: 1.66;
               overflow-wrap: anywhere;
             }
+            h1, h2, h3, h4, h5, h6 { color: #\(ZineTheme.Role.primaryText.lightHex); }
             header { margin: 6px 0 24px; }
             h1 {
               margin: 0 0 14px;
@@ -155,13 +121,13 @@ enum ArticleHTMLDocumentBuilder {
             .title-rule {
               margin: 14px 0 0;
               border: 0;
-              border-top: 1px solid #cfd4da;
+              border-top: 1px solid #\(ZineTheme.Role.border.lightHex);
             }
             .meta {
               display: flex;
               align-items: center;
               gap: 8px;
-              color: #5d646c;
+              color: #\(ZineTheme.Role.secondaryText.lightHex);
               font: -apple-system-subheadline;
               font-size: calc(15px * var(--reader-font-scale));
               line-height: 1.4;
@@ -178,7 +144,7 @@ enum ArticleHTMLDocumentBuilder {
               border-radius: 50%;
               object-fit: cover;
               flex: 0 0 auto;
-              background: #e9edf0;
+              background: #\(ZineTheme.Role.raised.lightHex);
             }
             main > :first-child { margin-top: 0; }
             p, ul, ol, blockquote, pre, figure { margin: 0 0 1.25em; }
@@ -214,7 +180,7 @@ enum ArticleHTMLDocumentBuilder {
             figure { margin-left: 0; margin-right: 0; }
             figcaption {
               margin-top: -0.8em;
-              color: #5d646c;
+              color: #\(ZineTheme.Role.secondaryText.lightHex);
               font-size: calc(14px * var(--reader-font-scale));
               line-height: 1.45;
               text-align: center;
@@ -222,8 +188,8 @@ enum ArticleHTMLDocumentBuilder {
             blockquote {
               margin-left: 0;
               padding-left: 18px;
-              border-left: 3px solid #ef661f;
-              color: #5d646c;
+              border-left: 3px solid #\(ZineTheme.Role.brandAccent.lightHex);
+              color: #\(ZineTheme.Role.secondaryText.lightHex);
             }
             pre, code {
               font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -233,20 +199,29 @@ enum ArticleHTMLDocumentBuilder {
               padding: 15px;
               overflow-x: auto;
               white-space: pre-wrap;
-              background: #e9edf0;
+              background: #\(ZineTheme.Role.raised.lightHex);
               border-radius: 12px;
             }
-            a { color: #b64012; text-decoration-thickness: 0.08em; }
-            hr { border: 0; border-top: 1px solid #cfd4da; margin: 2em 0; }
+            a { color: #\(ZineTheme.Role.inlineLink.lightHex); text-decoration-thickness: 0.08em; }
+            hr { border: 0; border-top: 1px solid #\(ZineTheme.Role.border.lightHex); margin: 2em 0; }
             ::selection { background: rgba(239, 102, 31, 0.24); }
+            #zine-reader-end { margin-top: 48px; padding: 24px 0 0; border-top: 1px solid #\(ZineTheme.Role.border.lightHex); }
+            #zine-reader-end button {
+              font: inherit; font-weight: 600; color: #\(ZineTheme.Role.inlineLink.lightHex); background: transparent;
+              border: 0; padding: 10px 0; min-height: 44px; text-align: left;
+            }
+            #zine-reader-end button:disabled { opacity: 0.5; }
             @media (prefers-color-scheme: dark) {
-              body { background: #14171a; color: #f5f7f8; }
-              .meta, figcaption { color: #b2bac2; }
-              .creator-avatar { background: #20252a; }
-              blockquote { color: #b2bac2; border-left-color: #ef661f; }
-              pre { background: #20252a; }
-              a { color: #ffad7c; }
-              hr, .title-rule { border-top-color: #343a40; }
+              body { background: #\(ZineTheme.Role.surface.darkHex); color: #\(ZineTheme.Role.readerBodyText.darkHex); }
+              h1, h2, h3, h4, h5, h6 { color: #\(ZineTheme.Role.primaryText.darkHex); }
+              .meta, figcaption { color: #\(ZineTheme.Role.secondaryText.darkHex); }
+              .creator-avatar { background: #\(ZineTheme.Role.raised.darkHex); }
+              blockquote { color: #\(ZineTheme.Role.secondaryText.darkHex); border-left-color: #\(ZineTheme.Role.brandAccent.lightHex); }
+              pre { background: #\(ZineTheme.Role.raised.darkHex); }
+              a { color: #\(ZineTheme.Role.inlineLink.darkHex); }
+              #zine-reader-end { border-color: #\(ZineTheme.Role.border.darkHex); }
+              #zine-reader-end button { color: #\(ZineTheme.Role.inlineLink.darkHex); }
+              hr, .title-rule { border-top-color: #\(ZineTheme.Role.border.darkHex); }
             }
             @media (max-width: 420px) {
               body { padding-left: 20px; padding-right: 20px; }
@@ -260,6 +235,9 @@ enum ArticleHTMLDocumentBuilder {
             <hr class="title-rule" aria-hidden="true">
           </header>
           <main>\(body)</main>
+          <footer id="zine-reader-end" aria-label="Article completion">
+            <button type="button">Mark Complete</button>
+          </footer>
         </body>
         </html>
         """
@@ -287,22 +265,22 @@ enum ArticleHTMLDocumentBuilder {
 struct ArticleHTMLView: UIViewRepresentable {
     let document: ArticleReaderDocument
     let initialProgress: Double
+    let initialPosition: ArticleReadingPosition?
     let fontScale: Double
+    let fontFamily: ArticleReaderFontFamily
+    let isFinished: Bool
+    let isUpdatingFinished: Bool
     let onProgressChanged: (Double) -> Void
     let onScrollSettled: (Double) -> Void
-    let onChromeOffsetChanged: (CGFloat) -> Void
+    let onChromeVisibilityChanged: (Bool) -> Void
+    let onPositionChanged: (ArticleReadingPosition) -> Void
+    let onToggleFinished: () -> Void
     let onOpenURL: (URL) -> Void
+    var topContentInset: CGFloat = 0
+    var onReachedEnd: () -> Void = {}
+    var onLinksLoaded: (Result<[ArticleReaderLink], Error>) -> Void = { _ in }
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(
-            initialProgress: initialProgress,
-            fontScale: fontScale,
-            onProgressChanged: onProgressChanged,
-            onScrollSettled: onScrollSettled,
-            onChromeOffsetChanged: onChromeOffsetChanged,
-            onOpenURL: onOpenURL
-        )
-    }
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
@@ -311,71 +289,63 @@ struct ArticleHTMLView: UIViewRepresentable {
         preferences.preferredContentMode = .mobile
         configuration.defaultWebpagePreferences = preferences
         configuration.websiteDataStore = .nonPersistent()
-
+        configuration.userContentController.add(context.coordinator, contentWorld: ArticleReaderScript.world, name: "reader")
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: ArticleReaderScript.source, injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true, in: ArticleReaderScript.world
+        ))
         let webView = ArticleReaderWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         webView.scrollView.delegate = context.coordinator
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.scrollView.keyboardDismissMode = .interactive
+        webView.scrollView.showsVerticalScrollIndicator = false
+        webView.scrollView.alwaysBounceVertical = true
         webView.isOpaque = false
         webView.backgroundColor = .clear
         webView.scrollView.backgroundColor = .clear
+        webView.accessibilityCustomActions = [UIAccessibilityCustomAction(
+            name: "Show or hide reader controls", target: context.coordinator,
+            selector: #selector(Coordinator.toggleChrome)
+        )]
         webView.onNavigationControllerAvailable = { [weak coordinator = context.coordinator, weak webView] navigationController in
             guard let webView else { return }
-            coordinator?.enableInteractivePop(
-                in: navigationController,
-                alongside: webView.scrollView.panGestureRecognizer
-            )
+            coordinator?.enableInteractivePop(in: navigationController, alongside: webView.scrollView.panGestureRecognizer)
         }
-        context.coordinator.loadInitial(document, in: webView)
+        context.coordinator.load(document, in: webView)
         return webView
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
-        context.coordinator.update(document, fontScale: fontScale, in: webView)
+        context.coordinator.update(self, in: webView)
     }
 
     static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
+        coordinator.capturePosition(in: webView)
         coordinator.restoreInteractivePopConfiguration()
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "reader", contentWorld: ArticleReaderScript.world)
         (webView as? ArticleReaderWebView)?.onNavigationControllerAvailable = nil
         webView.navigationDelegate = nil
         webView.scrollView.delegate = nil
     }
 
     @MainActor
-    final class Coordinator: NSObject, WKNavigationDelegate, UIScrollViewDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, UIScrollViewDelegate, WKScriptMessageHandler {
         private struct PopGestureConfiguration {
             let gesture: UIGestureRecognizer
             let originalDelegate: (any UIGestureRecognizerDelegate)?
             let wasEnabled: Bool
         }
-
-        private let initialProgress: Double
-        private var fontScale: Double
-        private let onProgressChanged: (Double) -> Void
-        private let onScrollSettled: (Double) -> Void
-        private let onChromeOffsetChanged: (CGFloat) -> Void
-        private let onOpenURL: (URL) -> Void
-        private var isRestoringProgress = false
-        private var chromeOffsetTracker = ArticleReaderChromeOffsetTracker()
+        private var parent: ArticleHTMLView
+        private var chrome = ArticleReaderChromeState()
+        private var endState = ArticleReaderEndState()
         private var popGestureConfigurations: [PopGestureConfiguration] = []
-        fileprivate var loadedContentHash: String?
+        private var loadedHash: String?
+        private weak var webView: WKWebView?
+        private var ready = false
+        private var latestPosition: ArticleReadingPosition?
 
-        init(
-            initialProgress: Double,
-            fontScale: Double,
-            onProgressChanged: @escaping (Double) -> Void,
-            onScrollSettled: @escaping (Double) -> Void,
-            onChromeOffsetChanged: @escaping (CGFloat) -> Void,
-            onOpenURL: @escaping (URL) -> Void
-        ) {
-            self.initialProgress = min(max(initialProgress, 0), 1)
-            self.fontScale = fontScale
-            self.onProgressChanged = onProgressChanged
-            self.onScrollSettled = onScrollSettled
-            self.onChromeOffsetChanged = onChromeOffsetChanged
-            self.onOpenURL = onOpenURL
-        }
+        init(_ parent: ArticleHTMLView) { self.parent = parent }
 
         func enableInteractivePop(
             in navigationController: UINavigationController,
@@ -413,152 +383,160 @@ struct ArticleHTMLView: UIViewRepresentable {
             popGestureConfigurations.removeAll()
         }
 
-        func loadInitial(_ document: ArticleReaderDocument, in webView: WKWebView) {
-            loadedContentHash = document.contentHash
-            pendingRestoreProgress = initialProgress
-            isRestoringProgress = initialProgress > 0
+        func load(_ document: ArticleReaderDocument, in webView: WKWebView) {
+            self.webView = webView
+            ready = false
+            loadedHash = document.contentHash
             webView.loadHTMLString(
-                ArticleHTMLDocumentBuilder.makeHTML(for: document, fontScale: fontScale),
+                ArticleHTMLDocumentBuilder.makeHTML(for: document, fontScale: parent.fontScale, fontFamily: parent.fontFamily, topContentInset: parent.topContentInset),
                 baseURL: document.metadata.canonicalURL
             )
         }
 
-        func update(
-            _ document: ArticleReaderDocument,
-            fontScale newFontScale: Double,
-            in webView: WKWebView
-        ) {
-            let contentChanged = loadedContentHash != document.contentHash
-            let fontScaleChanged = fontScale != newFontScale
-            guard contentChanged || fontScaleChanged else { return }
-
-            let restoreProgress: Double
-            if contentChanged {
-                restoreProgress = initialProgress
-            } else if isRestoringProgress, let pendingRestoreProgress {
-                restoreProgress = pendingRestoreProgress
-            } else {
-                restoreProgress = progress(in: webView.scrollView)
-            }
-            pendingRestoreProgress = restoreProgress
-            isRestoringProgress = restoreProgress > 0
-            loadedContentHash = document.contentHash
-            fontScale = newFontScale
-            webView.loadHTMLString(
-                ArticleHTMLDocumentBuilder.makeHTML(for: document, fontScale: newFontScale),
-                baseURL: document.metadata.canonicalURL
-            )
+        func update(_ next: ArticleHTMLView, in webView: WKWebView) {
+            let appearanceChanged = parent.fontScale != next.fontScale || parent.fontFamily != next.fontFamily
+            let layoutChanged = parent.topContentInset != next.topContentInset
+            let completionChanged = parent.isFinished != next.isFinished || parent.isUpdatingFinished != next.isUpdatingFinished
+            parent = next
+            if loadedHash != next.document.contentHash { load(next.document, in: webView); return }
+            guard ready else { return }
+            if layoutChanged { run("window.zineReader.layout(\(parent.topContentInset));", in: webView) }
+            if appearanceChanged { applyAppearance(in: webView) }
+            if completionChanged { applyCompletion(in: webView) }
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation?) {
-            let progress = pendingRestoreProgress ?? 0
-            pendingRestoreProgress = nil
-            guard progress > 0 else {
-                isRestoringProgress = false
-                return
+            ready = true
+            let hash = loadedHash
+            webView.evaluateJavaScript("window.zineReader.links()", in: nil, in: ArticleReaderScript.world) { [weak self] result in
+                guard let self, loadedHash == hash else { return }
+                parent.onLinksLoaded(result.map { value in
+                    (value as? [[String: String]] ?? []).compactMap { item in
+                        guard let rawURL = item["url"], let url = URL(string: rawURL),
+                              ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+                              let title = item["title"] else { return nil }
+                        return ArticleReaderLink(url: url, title: title, context: item["context"] ?? "")
+                    }
+                })
             }
-            restoreProgress(progress, in: webView)
+            let position = latestPosition ?? parent.initialPosition
+            let fallback = position?.fraction ?? parent.initialProgress
+            let json: String
+            if let position, position.contentHash == loadedHash,
+               let data = try? JSONEncoder().encode(position), let encoded = String(data: data, encoding: .utf8) {
+                json = encoded
+            } else {
+                json = "{nodeIndex:-1, fraction:\(fallback)}"
+            }
+            run("window.zineReader.restore(\(json));", in: webView)
+            applyAppearance(in: webView)
+            applyCompletion(in: webView)
         }
 
-        func webView(
-            _ webView: WKWebView,
-            decidePolicyFor navigationAction: WKNavigationAction,
-            decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
-        ) {
-            guard navigationAction.navigationType == .linkActivated,
-                  let url = navigationAction.request.url
-            else {
-                decisionHandler(.allow)
-                return
+        private func applyAppearance(in webView: WKWebView) {
+            run("window.zineReader.appearance(\(parent.fontScale), '\(parent.fontFamily.css)');", in: webView)
+        }
+
+        private func applyCompletion(in webView: WKWebView) {
+            run("window.zineReader.completion(\(parent.isFinished), \(parent.isUpdatingFinished));", in: webView)
+        }
+
+        private func run(_ script: String, in webView: WKWebView) {
+            webView.evaluateJavaScript(script, in: nil, in: ArticleReaderScript.world, completionHandler: nil)
+        }
+
+        @objc func toggleChrome() -> Bool {
+            chrome.toggle(at: webView?.scrollView.contentOffset.y ?? 0)
+            parent.onChromeVisibilityChanged(chrome.isVisible)
+            return true
+        }
+
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard message.frameInfo.isMainFrame, let body = message.body as? [String: Any] else { return }
+            switch body["type"] as? String {
+            case "toggle": _ = toggleChrome()
+            case "complete": parent.onToggleFinished()
+            case "position": acceptPosition(body)
+            default: break
+            }
+        }
+
+        private func acceptPosition(_ body: [String: Any]) {
+            guard let nodeIndex = body["nodeIndex"] as? Int,
+                  let offset = body["offset"] as? Int,
+                  let quote = body["quote"] as? String,
+                  let viewportY = body["viewportY"] as? Double,
+                  let fraction = body["fraction"] as? Double,
+                  let loadedHash else { return }
+            let position = ArticleReadingPosition(contentHash: loadedHash, nodeIndex: nodeIndex, offset: offset,
+                quote: quote, viewportY: viewportY, fraction: fraction)
+            latestPosition = position
+            parent.onPositionChanged(position)
+            parent.onProgressChanged(fraction)
+        }
+
+        func capturePosition(in webView: WKWebView) {
+            guard ready else { return }
+            webView.evaluateJavaScript("window.zineReader.capture()", in: nil, in: ArticleReaderScript.world) { [self] result in
+                if case let .success(body as [String: Any]) = result { acceptPosition(body) }
+            }
+        }
+
+        func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
+                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            guard action.navigationType == .linkActivated, let url = action.request.url else {
+                decisionHandler(.allow); return
+            }
+            // Keep article footnotes in the document; ordinary links retain their existing external behavior.
+            if url.fragment != nil, url.deletingFragment == parent.document.metadata.canonicalURL.deletingFragment {
+                decisionHandler(.allow); return
             }
             decisionHandler(.cancel)
-            onOpenURL(url)
+            parent.onOpenURL(url)
         }
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
-            guard !isRestoringProgress else { return }
-            let maximumOffset = max(scrollView.contentSize.height - scrollView.bounds.height, 1)
-            let fraction = min(max(scrollView.contentOffset.y / maximumOffset, 0), 1)
-            onProgressChanged(fraction)
-
-            guard scrollView.isDragging || scrollView.isDecelerating else { return }
-            if let offset = chromeOffsetTracker.update(scrollOffset: scrollView.contentOffset.y) {
-                onChromeOffsetChanged(offset)
+            guard ready else { return }
+            let maximum = max(scrollView.contentSize.height - scrollView.bounds.height, 0)
+            let offset = min(max(scrollView.contentOffset.y, 0), maximum)
+            // Include status-bar scroll-to-top and restoration at the beginning.
+            if offset <= 1, let visible = chrome.update(offset: offset) {
+                parent.onChromeVisibilityChanged(visible)
             }
+            guard scrollView.isDragging || scrollView.isDecelerating else { return }
+            parent.onProgressChanged(progress(in: scrollView))
+            if let visible = chrome.update(offset: offset) { parent.onChromeVisibilityChanged(visible) }
         }
 
         func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
-            progressRestorationGeneration += 1
-            progressRestorationTask?.cancel()
-            progressRestorationTask = nil
-            isRestoringProgress = false
-            chromeOffsetTracker.begin(at: scrollView.contentOffset.y)
+            if let webView { run("window.zineReader.release();", in: webView) }
+            let maximum = max(scrollView.contentSize.height - scrollView.bounds.height, 0)
+            chrome.begin(at: min(max(0, scrollView.contentOffset.y), maximum))
         }
 
-        func scrollViewDidEndDragging(
-            _ scrollView: UIScrollView,
-            willDecelerate decelerate: Bool
-        ) {
-            if !decelerate {
-                chromeOffsetTracker.end()
-                onScrollSettled(progress(in: scrollView))
-            }
+        func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+            if !decelerate { settled(scrollView) }
         }
-
-        func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
-            chromeOffsetTracker.end()
-            onScrollSettled(progress(in: scrollView))
+        func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) { settled(scrollView) }
+        private func settled(_ scrollView: UIScrollView) {
+            chrome.end()
+            parent.onScrollSettled(progress(in: scrollView))
+            if endState.settled(
+                offset: scrollView.contentOffset.y,
+                maximum: scrollView.contentSize.height - scrollView.bounds.height
+            ) { parent.onReachedEnd() }
+            if let webView { capturePosition(in: webView) }
         }
-
-        private var pendingRestoreProgress: Double?
-        private var progressRestorationTask: Task<Void, Never>?
-        private var progressRestorationGeneration = 0
-
-        private func restoreProgress(_ progress: Double, in webView: WKWebView) {
-            progressRestorationGeneration += 1
-            let generation = progressRestorationGeneration
-            progressRestorationTask?.cancel()
-            isRestoringProgress = true
-            progressRestorationTask = Task { @MainActor [weak self, weak webView] in
-                guard let self, let webView else { return }
-                defer {
-                    if generation == progressRestorationGeneration {
-                        isRestoringProgress = false
-                        progressRestorationTask = nil
-                    }
-                }
-
-                for delayMilliseconds in [0, 120, 300, 600] {
-                    if delayMilliseconds > 0 {
-                        do {
-                            try await Task.sleep(for: .milliseconds(delayMilliseconds))
-                        } catch {
-                            return
-                        }
-                    } else {
-                        await Task.yield()
-                    }
-
-                    guard !Task.isCancelled,
-                          generation == progressRestorationGeneration
-                    else { return }
-                    let scrollView = webView.scrollView
-                    let maximumOffset = max(
-                        scrollView.contentSize.height - scrollView.bounds.height,
-                        0
-                    )
-                    scrollView.setContentOffset(
-                        CGPoint(x: 0, y: maximumOffset * progress),
-                        animated: false
-                    )
-                    chromeOffsetTracker.end()
-                }
-            }
-        }
-
         private func progress(in scrollView: UIScrollView) -> Double {
-            let maximumOffset = max(scrollView.contentSize.height - scrollView.bounds.height, 1)
-            return min(max(scrollView.contentOffset.y / maximumOffset, 0), 1)
+            min(max(scrollView.contentOffset.y / max(scrollView.contentSize.height - scrollView.bounds.height, 1), 0), 1)
         }
+    }
+}
+
+private extension URL {
+    var deletingFragment: URL {
+        var components = URLComponents(url: self, resolvingAgainstBaseURL: true)
+        components?.fragment = nil
+        return components?.url ?? self
     }
 }

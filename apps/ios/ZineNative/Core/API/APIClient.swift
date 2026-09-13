@@ -1,5 +1,9 @@
 import Foundation
 
+extension Notification.Name {
+    static let zineBookmarkSaved = Notification.Name("app.zine.bookmarkSaved")
+}
+
 struct LibraryQuery: Hashable, Codable {
     var search = ""
     var isFinished = false
@@ -168,6 +172,9 @@ struct APIClient {
         let result: EditorialBookmarkSaveResult = try await send(request)
         for mutation in archives where mutation.bookmarkID == result.bookmark.userItemId {
             await bookmarkMutationOutbox?.remove(mutation)
+        }
+        await MainActor.run {
+            NotificationCenter.default.post(name: .zineBookmarkSaved, object: nil)
         }
         return result
     }
@@ -623,6 +630,14 @@ struct APIClient {
 
     func cacheArticleContent(_ response: ArticleContentResponse, id: String) async {
         await articleBodyCache?.save(response, bookmarkID: id)
+    }
+
+    func articleReadingPosition(id: String) async -> ArticleReadingPosition? {
+        await articleBodyCache?.readingPosition(bookmarkID: id)
+    }
+
+    func saveArticleReadingPosition(id: String, position: ArticleReadingPosition) async {
+        await articleBodyCache?.saveReadingPosition(position, bookmarkID: id)
     }
 
     func pendingArticleProgress(id: String) async -> Double? {

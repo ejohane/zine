@@ -46,6 +46,7 @@ final class ArticleReaderStore {
     private(set) var progressFraction: Double
 
     let metadata: ArticleReaderMetadata
+    private(set) var initialReadingPosition: ArticleReadingPosition?
     private(set) var initialProgressFraction: Double
 
     private let client: APIClient
@@ -120,6 +121,8 @@ final class ArticleReaderStore {
         loadGeneration += 1
         let generation = loadGeneration
         var hasReadableCache = false
+
+        initialReadingPosition = await client.articleReadingPosition(id: metadata.bookmarkID)
 
         if let pendingProgress = await client.pendingArticleProgress(id: metadata.bookmarkID) {
             initialProgressFraction = pendingProgress

@@ -7,6 +7,7 @@ enum ZineTheme {
         case surface
         case raised
         case primaryText
+        case readerBodyText
         case secondaryText
         case border
         case brandAccent
@@ -20,6 +21,7 @@ enum ZineTheme {
             case .surface: "FFFFFF"
             case .raised: "E9EDF0"
             case .primaryText: "151719"
+            case .readerBodyText: "151719"
             case .secondaryText: "5D646C"
             case .border: "CFD4DA"
             case .brandAccent: "EF661F"
@@ -35,6 +37,7 @@ enum ZineTheme {
             case .surface: "14171A"
             case .raised: "20252A"
             case .primaryText: "F5F7F8"
+            case .readerBodyText: "D8DCE0"
             case .secondaryText: "B2BAC2"
             case .border: "343A40"
             case .brandAccent: "EF661F"
@@ -49,6 +52,7 @@ enum ZineTheme {
     static let surface = color(.surface)
     static let raised = color(.raised)
     static let primaryText = color(.primaryText)
+    static let readerBodyText = color(.readerBodyText)
     static let secondaryText = color(.secondaryText)
     static let border = color(.border)
     static let brandAccent = color(.brandAccent)
