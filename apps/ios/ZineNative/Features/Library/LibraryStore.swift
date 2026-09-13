@@ -14,17 +14,20 @@ final class LibraryStore {
     private let client: APIClient
     private let cache: LibraryCache
     private let onContentChanged: () -> Void
+    private let prefetch: ([URL]) -> Void
     private var activeQuery = LibraryQuery()
     private var unbookmarkedIndices: [String: Int] = [:]
 
     init(
         client: APIClient,
         cache: LibraryCache,
-        onContentChanged: @escaping () -> Void = {}
+        onContentChanged: @escaping () -> Void = {},
+        prefetch: @escaping ([URL]) -> Void = { _ in }
     ) {
         self.client = client
         self.cache = cache
         self.onContentChanged = onContentChanged
+        self.prefetch = prefetch
     }
 
     func reset() {
@@ -182,7 +185,7 @@ final class LibraryStore {
             .flatMap { [$0.thumbnailUrl, $0.creatorImageUrl].compactMap { $0 } }
             .filter { seenURLs.insert($0).inserted }
 
-        AppImagePipeline.prefetch(urls)
+        prefetch(urls)
     }
 
     private func persistCurrentState() {

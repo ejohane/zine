@@ -9,6 +9,8 @@
   ],
   "scripts": {
     "build": "turbo run build",
+    "native:agent": "swift run --package-path apps/ios zine-native",
+    "test:native:core": "swift test --package-path apps/ios",
     "ios:preview": "bash ./scripts/ios-simulator-preview.sh",
     "dev": "turbo run dev",
     "dev:web": "bun run --cwd apps/web dev",

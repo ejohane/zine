@@ -370,13 +370,17 @@ struct APIClient {
         )
     }
 
-    func setFinished(
+    func setFinished(id: String, isFinished: Bool, bookmark: Bookmark? = nil) async throws -> FinishedStateResponse.FinishedBookmark {
+        try await setFinishedWithReceipt(id: id, isFinished: isFinished, bookmark: bookmark).value
+    }
+
+    func setFinishedWithReceipt(
         id: String,
         isFinished: Bool,
         bookmark: Bookmark? = nil
-    ) async throws -> FinishedStateResponse.FinishedBookmark {
+    ) async throws -> NativeMutationReceipt<FinishedStateResponse.FinishedBookmark> {
         guard let bookmarkMutationOutbox else {
-            return try await sendFinished(id: id, isFinished: isFinished)
+            return NativeMutationReceipt(value: try await sendFinished(id: id, isFinished: isFinished), delivery: .serverCommitted)
         }
         let mutation = await bookmarkMutationOutbox.stageFinished(
             bookmarkID: id,
@@ -387,14 +391,14 @@ struct APIClient {
         do {
             let response = try await sendFinished(id: id, isFinished: isFinished)
             await bookmarkMutationOutbox.remove(mutation)
-            return response
+            return NativeMutationReceipt(value: response, delivery: .serverCommitted)
         } catch where error.isRetryableOfflineMutationFailure {
-            return FinishedStateResponse.FinishedBookmark(
+            return NativeMutationReceipt(value: FinishedStateResponse.FinishedBookmark(
                 id: id,
                 itemId: bookmark?.itemId ?? id,
                 isFinished: isFinished,
                 finishedAt: isFinished ? mutation.createdAt : nil
-            )
+            ), delivery: .localPending)
         } catch {
             await bookmarkMutationOutbox.remove(mutation)
             throw error
@@ -428,13 +432,18 @@ struct APIClient {
         }
     }
 
-    func setTags(
+    func setTags(id: String, tags: [String], bookmark: Bookmark? = nil) async throws -> [BookmarkTag] {
+        try await setTagsWithReceipt(id: id, tags: tags, bookmark: bookmark).value
+    }
+
+    func setTagsWithReceipt(
         id: String,
         tags: [String],
         bookmark: Bookmark? = nil
-    ) async throws -> [BookmarkTag] {
+    ) async throws -> NativeMutationReceipt<[BookmarkTag]> {
+        let tags = try ReaderTagNames.validate(tags)
         guard let bookmarkMutationOutbox else {
-            return try await sendTags(id: id, tags: tags)
+            return NativeMutationReceipt(value: try await sendTags(id: id, tags: tags), delivery: .serverCommitted)
         }
         let mutation = await bookmarkMutationOutbox.stageTags(
             bookmarkID: id,
@@ -446,9 +455,9 @@ struct APIClient {
             let response = try await sendTags(id: id, tags: tags)
             await bookmarkMutationOutbox.cacheKnownTags(response)
             await bookmarkMutationOutbox.remove(mutation)
-            return response
+            return NativeMutationReceipt(value: response, delivery: .serverCommitted)
         } catch where error.isRetryableOfflineMutationFailure {
-            return OfflineBookmarkMutationOutbox.localTags(for: tags)
+            return NativeMutationReceipt(value: OfflineBookmarkMutationOutbox.localTags(for: tags), delivery: .localPending)
         } catch {
             await bookmarkMutationOutbox.remove(mutation)
             throw error
@@ -611,10 +620,12 @@ struct APIClient {
         }
     }
 
-    func flushPendingBookmarkMutations() async {
-        guard let bookmarkMutationOutbox else { return }
+    @discardableResult
+    func flushPendingBookmarkMutations() async -> [String] {
+        var failures: [String] = []
+        guard let bookmarkMutationOutbox else { return failures }
         for mutation in await bookmarkMutationOutbox.pendingMutations() {
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else { return failures }
             do {
                 switch mutation.kind {
                 case .finished:
@@ -639,12 +650,14 @@ struct APIClient {
                 }
                 await bookmarkMutationOutbox.remove(mutation)
             } catch where error.isRetryableOfflineMutationFailure {
-                return
+                return failures
             } catch {
-                // A permanent rejection must not poison the rest of the outbox.
+                // Return rejected identities so command callers cannot report them as committed.
+                failures.append(mutation.bookmarkID + ":" + mutation.kind.rawValue)
                 await bookmarkMutationOutbox.remove(mutation)
             }
         }
+        return failures
     }
 
     func overlayLibraryBookmarks(_ bookmarks: [Bookmark], query: LibraryQuery) async -> [Bookmark] {
@@ -655,6 +668,14 @@ struct APIClient {
     func pendingBookmarkMutationCount() async -> Int {
         guard let bookmarkMutationOutbox else { return 0 }
         return await bookmarkMutationOutbox.pendingMutations().count
+    }
+
+    func hasPendingBookmarkMutation(id: String, kind: OfflineBookmarkMutationKind) async -> Bool {
+        await bookmarkMutationOutbox?.pendingMutations().contains { $0.bookmarkID == id && $0.kind == kind } ?? false
+    }
+
+    func pendingProgressCount() async -> Int {
+        await articleBodyCache?.allPendingProgress().count ?? 0
     }
 
     func cacheTagsForOffline() async {

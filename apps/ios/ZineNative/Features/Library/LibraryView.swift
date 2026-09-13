@@ -10,6 +10,7 @@ struct LibraryView: View {
     let onTitleCollapseProgressChanged: (CGFloat) -> Void
     let transitionNamespace: Namespace.ID
 
+    @Environment(\.nativeCommandSession) private var commandSession
     @State private var store: LibraryStore
     @State private var showsFinished = false
     @State private var provider: Provider?
@@ -40,7 +41,8 @@ struct LibraryView: View {
         _store = State(initialValue: LibraryStore(
             client: client,
             cache: cache,
-            onContentChanged: onContentChanged
+            onContentChanged: onContentChanged,
+            prefetch: AppImagePipeline.prefetch
         ))
     }
 
@@ -133,7 +135,19 @@ struct LibraryView: View {
             .onChange(of: tabReselection) {
                 handleTabReselection(using: proxy)
             }
-            .onAppear { isVisible = true }
+            .onChange(of: store.items) { _, _ in commandSession?.recordUIChange("library.items") }
+            .onAppear {
+                isVisible = true
+                if !isSearchMode {
+                    commandSession?.library = store
+                    commandSession?.openLibrary = {
+                        showsFinished = false
+                        provider = nil
+                        contentType = nil
+                    }
+                    commandSession?.route = "library"
+                }
+            }
             .onDisappear { isVisible = false }
             .refreshable {
                 await store.reload(query: query)

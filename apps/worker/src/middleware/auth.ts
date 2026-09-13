@@ -16,12 +16,12 @@ import { users } from '../db/schema';
 const DEFAULT_CLERK_JWKS_URL = 'https://clerk.myzine.app/.well-known/jwks.json';
 
 /**
- * Development user ID used when auth is bypassed
+ * Synthetic user ID used only by explicitly opted-in isolated tests
  */
 export const DEV_USER_ID = 'dev-user-001';
 
 /**
- * Flag to track if we've already ensured the dev user exists
+ * Flag to track if we've already ensured the isolated test user exists
  * (avoids unnecessary DB queries on every request)
  */
 let devUserEnsured = false;
@@ -49,7 +49,7 @@ function createAuthError(message: string, code: string, requestId: string): Auth
 }
 
 function shouldUseDevelopmentAuthBypass(env: Env['Bindings']): boolean {
-  return env.ENVIRONMENT === 'development' && !env.CLERK_JWKS_URL;
+  return env.ENVIRONMENT === 'test' && env.TEST_AUTH_BYPASS === 'true';
 }
 
 export function getDevelopmentAuthBypassUserId(env: Env['Bindings']): string | null {
@@ -102,7 +102,7 @@ export function authMiddleware(): MiddlewareHandler<Env> {
       return c.json(createAuthError(message, code, requestId), status);
     };
 
-    // Development bypass: use mock user ID when no auth is configured
+    // Explicit isolated-test bypass; development and production always verify JWTs.
     if (shouldUseDevelopmentAuthBypass(c.env)) {
       // Ensure dev user exists in database (only once per process)
       if (!devUserEnsured) {

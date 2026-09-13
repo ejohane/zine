@@ -104,6 +104,8 @@ struct BookmarkDetailContent: Equatable {
 }
 
 struct BookmarkDetailView: View {
+    @Environment(\.nativeCommandSession) private var commandSession
+    @State private var showsReader = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.displayScale) private var displayScale
@@ -198,6 +200,29 @@ struct BookmarkDetailView: View {
         self.onExternalOpen = onExternalOpen
     }
 
+    private var readerDestination: some View {
+        ArticleReaderView(
+            metadata: ArticleReaderMetadata(
+                bookmarkID: content.id,
+                title: content.title,
+                creator: content.creator,
+                creatorImageURL: content.creatorImageUrl,
+                canonicalURL: content.canonicalUrl,
+                readingTimeMinutes: content.readingTimeMinutes,
+                initialProgress: content.progress,
+                isFinished: finishedState.isFinished,
+                tags: content.tags
+            ),
+            client: client,
+            onRead: { onExternalOpen(bookmark) },
+            onProgressSaved: updateReadingProgress,
+            onFinishedChanged: updateFinishedState,
+            onFinishedCommit: commitFinishedState,
+            onTagsChanged: updateTags
+        )
+
+    }
+
     private var content: BookmarkDetailContent {
         bookmark.map { BookmarkDetailContent(bookmark: $0) } ?? initialContent
     }
@@ -231,6 +256,12 @@ struct BookmarkDetailView: View {
         }
         .toolbarVisibility(.hidden, for: .navigationBar)
         .zinePushedDestinationChrome()
+        .navigationDestination(isPresented: $showsReader) { readerDestination }
+        .onAppear {
+            commandSession?.bookmarkID = content.id
+            commandSession?.route = "bookmark"
+            commandSession?.openReader = { showsReader = true }
+        }
         .task(id: content.id) {
             await hydrateBookmark()
         }
@@ -329,27 +360,7 @@ struct BookmarkDetailView: View {
             Spacer(minLength: 0)
 
             if content.provider.opensInZineReader(contentType: content.contentType) {
-                NavigationLink {
-                    ArticleReaderView(
-                        metadata: ArticleReaderMetadata(
-                            bookmarkID: content.id,
-                            title: content.title,
-                            creator: content.creator,
-                            creatorImageURL: content.creatorImageUrl,
-                            canonicalURL: content.canonicalUrl,
-                            readingTimeMinutes: content.readingTimeMinutes,
-                            initialProgress: content.progress,
-                            isFinished: finishedState.isFinished,
-                            tags: content.tags
-                        ),
-                        client: client,
-                        onRead: { onExternalOpen(bookmark) },
-                        onProgressSaved: updateReadingProgress,
-                        onFinishedChanged: updateFinishedState,
-                        onFinishedCommit: commitFinishedState,
-                        onTagsChanged: updateTags
-                    )
-                } label: {
+                Button { showsReader = true } label: {
                     Image(systemName: "book.pages")
                         .resizable()
                         .scaledToFit()

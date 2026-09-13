@@ -98,3 +98,9 @@ The app and extension share the Clerk session through the
 to open Zine and sign in before trying the share action again. The share modal
 loads the user’s existing tags and supports selecting or creating tags before
 saving the bookmark.
+
+## Native agent experiment
+
+See [the first native agent experiment](../../docs/native-agent-experiment.md) for
+shared desktop tests, deterministic offline scenarios, and explicitly enabled
+Simulator commands against the authenticated local app.

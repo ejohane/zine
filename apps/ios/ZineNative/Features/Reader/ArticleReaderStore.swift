@@ -38,6 +38,12 @@ final class ArticleReaderStore {
     private(set) var phase: ArticleReaderPhase
     private var finishedState: OptimisticFinishedState
 
+    private(set) var lastTagDelivery: NativeMutationDelivery?
+    private(set) var lastFinishedDelivery: NativeMutationDelivery?
+    private(set) var lastProgressDelivery: NativeMutationDelivery?
+    private(set) var tags: [BookmarkTag]
+    private(set) var progressFraction: Double
+
     let metadata: ArticleReaderMetadata
     private(set) var initialProgressFraction: Double
 
@@ -51,6 +57,8 @@ final class ArticleReaderStore {
         initialPhase: ArticleReaderPhase = .loading
     ) {
         self.metadata = metadata
+        tags = metadata.tags
+        progressFraction = metadata.initialProgress?.fraction ?? 0
         self.client = client
         let bookmarkID = metadata.bookmarkID
         progressWriteQueue = ArticleProgressWriteQueue { fraction in
@@ -133,9 +141,13 @@ final class ArticleReaderStore {
 
     func persistProgress(_ fraction: Double) async -> BookmarkProgress? {
         let clamped = min(max(fraction, 0), 1)
+        progressFraction = clamped
         await client.stageArticleProgress(id: metadata.bookmarkID, fraction: clamped)
         if await progressWriteQueue.enqueue(clamped) {
+            lastProgressDelivery = .serverCommitted
             await client.markArticleProgressSynced(id: metadata.bookmarkID, fraction: clamped)
+        } else {
+            lastProgressDelivery = .localPending
         }
 
         return BookmarkProgress(
@@ -145,19 +157,32 @@ final class ArticleReaderStore {
         )
     }
 
+    func setTags(_ names: [String]) async throws -> [BookmarkTag] {
+        let receipt = try await client.setTagsWithReceipt(id: metadata.bookmarkID, tags: names)
+        lastTagDelivery = receipt.delivery
+        tags = receipt.value
+        return receipt.value
+    }
+
+    func reconcile(_ bookmark: Bookmark) {
+        finishedState.accept(isFinished: bookmark.isFinished, finishedAt: bookmark.finishedAt)
+        tags = bookmark.tags
+    }
+
     func beginFinishedToggle() -> OptimisticFinishedState.Mutation? {
         finishedState.beginToggle()
     }
 
     func persistFinishedToggle(_ mutation: OptimisticFinishedState.Mutation) async -> Bool {
         do {
-            let result = try await client.setFinished(
+            let receipt = try await client.setFinishedWithReceipt(
                 id: metadata.bookmarkID,
                 isFinished: mutation.requestedIsFinished
             )
+            lastFinishedDelivery = receipt.delivery
             finishedState.accept(
-                isFinished: result.isFinished,
-                finishedAt: result.finishedAt
+                isFinished: receipt.value.isFinished,
+                finishedAt: receipt.value.finishedAt
             )
             return true
         } catch is CancellationError {

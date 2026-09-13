@@ -37,3 +37,14 @@ struct FinishedStateResponse: Decodable {
 struct BookmarkTagsResponse: Decodable {
     let tags: [BookmarkTag]
 }
+
+// Receipts describe this request, independently of concurrent outbox replay.
+enum NativeMutationDelivery: String {
+    case serverCommitted = "server_committed"
+    case localPending = "local_pending"
+}
+
+struct NativeMutationReceipt<Value> {
+    let value: Value
+    let delivery: NativeMutationDelivery
+}

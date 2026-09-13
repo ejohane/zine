@@ -1,6 +1,10 @@
 import Foundation
 import XCTest
+#if canImport(ZineCore)
+@testable import ZineCore
+#else
 @testable import ZineNative
+#endif
 
 final class OfflineBookmarkMutationOutboxTests: XCTestCase {
     override func setUp() {

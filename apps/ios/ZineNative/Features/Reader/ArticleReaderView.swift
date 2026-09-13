@@ -15,6 +15,7 @@ private enum ArticleReaderSheet: String, Identifiable {
 }
 
 struct ArticleReaderView: View {
+    @Environment(\.nativeCommandSession) private var commandSession
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
@@ -30,7 +31,6 @@ struct ArticleReaderView: View {
     @State private var readerChromeOffset: CGFloat = 0
     @State private var showsEndActions: Bool
     @State private var presentedSheet: ArticleReaderSheet?
-    @State private var readerTags: [BookmarkTag]
     @State private var actionErrorMessage: String?
 
     private let onRead: () -> Void
@@ -65,7 +65,6 @@ struct ArticleReaderView: View {
         _showsEndActions = State(
             initialValue: ArticleReaderEndActions.shouldReveal(for: initialProgress)
         )
-        _readerTags = State(initialValue: metadata.tags)
         self.onRead = onRead
         self.onProgressSaved = onProgressSaved
         self.onFinishedChanged = onFinishedChanged
@@ -95,6 +94,22 @@ struct ArticleReaderView: View {
         .toolbarVisibility(.hidden, for: .navigationBar)
         .zinePushedDestinationChrome()
         .task(id: store.metadata.bookmarkID) {
+            commandSession?.reader = store
+            commandSession?.route = "reader"
+            commandSession?.bookmarkID = store.metadata.bookmarkID
+            commandSession?.progressSaved = { progress in
+                lastPersistedProgress = progress.fraction
+                scrollProgress = progress.fraction
+                onProgressSaved(progress)
+            }
+            commandSession?.tagsSaved = { tags in
+                onTagsChanged(tags)
+            }
+            commandSession?.complete = persistFinishedToggle
+            commandSession?.reconciled = { bookmark in
+                onFinishedChanged(bookmark.isFinished, .rollback)
+                onTagsChanged(bookmark.tags)
+            }
             guard loadsOnAppear else { return }
             await store.load()
         }
@@ -120,6 +135,9 @@ struct ArticleReaderView: View {
             }
             recordOpenIfNeeded()
         }
+        .onChange(of: store.tags) { _, _ in commandSession?.recordUIChange("reader.tags") }
+        .onChange(of: store.isFinished) { _, _ in commandSession?.recordUIChange("reader.finished") }
+        .onChange(of: store.progressFraction) { _, _ in commandSession?.recordUIChange("reader.progress") }
         .onChange(of: scenePhase) { _, phase in
             guard phase != .active else { return }
             flushProgress()
@@ -127,16 +145,22 @@ struct ArticleReaderView: View {
         .onDisappear {
             readerChromeOffset = 0
             flushProgress()
+            if commandSession?.reader === store {
+                commandSession?.reader = nil
+                commandSession?.progressSaved = nil
+                commandSession?.tagsSaved = nil
+                commandSession?.complete = nil
+            }
         }
         .sheet(item: $presentedSheet) { destination in
             switch destination {
             case .tags:
                 ArticleTagEditorView(
                     bookmarkID: store.metadata.bookmarkID,
-                    initialTags: readerTags,
+                    initialTags: store.tags,
                     client: client,
+                    saveTags: store.setTags,
                     onSaved: { tags in
-                        readerTags = tags
                         onTagsChanged(tags)
                     }
                 )
@@ -323,7 +347,7 @@ struct ArticleReaderView: View {
                     presentedSheet = .tags
                 } label: {
                     Label(
-                        readerTags.isEmpty ? "Add tags" : "Edit tags",
+                        store.tags.isEmpty ? "Add tags" : "Edit tags",
                         systemImage: "tag"
                     )
                     .frame(maxWidth: .infinity)
@@ -388,17 +412,19 @@ struct ArticleReaderView: View {
     }
 
     private func toggleFinished() {
-        guard let mutation = store.beginFinishedToggle() else { return }
-        onFinishedChanged(store.isFinished, .optimistic)
+        Task { _ = await persistFinishedToggle() }
+    }
 
-        Task {
-            guard await store.persistFinishedToggle(mutation) else {
-                onFinishedChanged(store.isFinished, .rollback)
-                actionErrorMessage = "Zine couldn’t change the completion state. Check your connection and try again."
-                return
-            }
-            onFinishedCommit(store.isFinished)
+    private func persistFinishedToggle() async -> Bool {
+        guard let mutation = store.beginFinishedToggle() else { return false }
+        onFinishedChanged(store.isFinished, .optimistic)
+        guard await store.persistFinishedToggle(mutation) else {
+            onFinishedChanged(store.isFinished, .rollback)
+            actionErrorMessage = "Zine couldn’t change the completion state. Check your connection and try again."
+            return false
         }
+        onFinishedCommit(store.isFinished)
+        return true
     }
 
     private func updateScrollProgress(_ progress: Double) {
@@ -425,16 +451,19 @@ private struct ArticleTagEditorView: View {
 
     private let bookmarkID: String
     private let client: APIClient
+    private let saveTags: ([String]) async throws -> [BookmarkTag]
     private let onSaved: ([BookmarkTag]) -> Void
 
     init(
         bookmarkID: String,
         initialTags: [BookmarkTag],
         client: APIClient,
+        saveTags: @escaping ([String]) async throws -> [BookmarkTag],
         onSaved: @escaping ([BookmarkTag]) -> Void
     ) {
         self.bookmarkID = bookmarkID
         self.client = client
+        self.saveTags = saveTags
         self.onSaved = onSaved
         _availableTags = State(initialValue: initialTags)
         _selectedTagNames = State(initialValue: initialTags.map(\.name))
@@ -629,7 +658,7 @@ private struct ArticleTagEditorView: View {
         defer { isSaving = false }
 
         do {
-            let tags = try await client.setTags(id: bookmarkID, tags: selectedTagNames)
+            let tags = try await saveTags(selectedTagNames)
             onSaved(tags)
             dismiss()
         } catch is CancellationError {
