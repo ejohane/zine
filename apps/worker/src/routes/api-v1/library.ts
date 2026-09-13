@@ -1,3 +1,5 @@
+import { TRPCError } from '@trpc/server';
+import { BookmarkSaveInputSchema, saveBookmark } from '../../bookmarks/save';
 import { ContentTypeSchema, ProviderSchema, UserItemState } from '@zine/shared';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -485,11 +487,26 @@ apiV1Routes.post('/bookmarks', apiAuth('bookmarks:write'), async (c) => {
   }
 
   try {
-    const bookmark = await caller.bookmarks.save({
+    const saveInput = BookmarkSaveInputSchema.safeParse({
       ...preview,
       url: parsedBody.data.url,
       tags: parsedBody.data.tags,
     });
+    if (!saveInput.success) {
+      throw new TRPCError({ code: 'BAD_REQUEST', cause: saveInput.error });
+    }
+    const userId = c.get('userId');
+    if (!userId) throw new TRPCError({ code: 'UNAUTHORIZED' });
+    const bookmark = await saveBookmark(
+      {
+        db: createDb(c.env.DB),
+        userId,
+        env: c.env,
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      saveInput.data
+    );
     await enrollSavedArticleBestEffort(
       c.env,
       { itemId: bookmark.itemId, contentType: preview.contentType },

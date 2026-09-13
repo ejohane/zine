@@ -1,3 +1,6 @@
+import { ContentType, Provider } from '@zine/shared';
+import { extractArticle } from '../lib/article-extractor';
+import { fetchLinkPreview } from '../lib/link-preview';
 import { expectLoggerErrorCalls } from '../test/mock-logger';
 import { applyD1Migrations, env } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
@@ -8,6 +11,9 @@ import { createDb } from '../db';
 import {
   bookmarkEnrichmentOutbox,
   apiTokens,
+  tags,
+  userItemTags,
+  creators,
   items,
   itemEnrichments,
   userPeople,
@@ -24,6 +30,8 @@ import type * as AuthModule from '../lib/auth';
 // These bookmark journeys never call YouTube. Keep its Node-only SDK out of the
 // unbundled test runtime; auth, routing, tRPC procedures, and D1 remain real.
 vi.mock('googleapis', () => ({ google: {} }));
+vi.mock('../lib/link-preview', () => ({ fetchLinkPreview: vi.fn() }));
+vi.mock('../lib/article-extractor', () => ({ extractArticle: vi.fn() }));
 
 // Clerk's remote verifier is the only auth boundary stubbed for the tRPC HTTP
 // tests. Middleware, procedures, REST PAT verification, and D1 are exercised.
@@ -856,5 +864,194 @@ describe('REST completion saves with durable enrichment and People', () => {
     expect(send).not.toHaveBeenCalled();
     expect(await db.select().from(bookmarkEnrichmentOutbox)).toHaveLength(0);
     expect(await db.select().from(userPeople)).toHaveLength(0);
+  });
+});
+
+describe.each(['REST', 'tRPC'])('%s manual bookmark save contract', (api) => {
+  const metadata = {
+    canonicalUrl: 'https://www.youtube.com/watch?v=save-contract',
+    title: 'Save contract',
+    provider: Provider.YOUTUBE,
+    contentType: ContentType.VIDEO,
+    providerId: 'save-contract',
+    thumbnailUrl: null,
+    creator: 'Contract Creator',
+    duration: 120,
+    source: 'opengraph' as const,
+  };
+  const send = vi.fn(async () => {});
+  const save = (overrides: Record<string, unknown> = {}, requestedTags?: string[]) => {
+    const preview = { ...metadata, ...overrides };
+    vi.mocked(fetchLinkPreview).mockResolvedValue(preview);
+    return app.request(
+      api === 'REST' ? '/api/v1/bookmarks' : '/trpc/bookmarks.save',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${api === 'REST' ? token : 'test-clerk-session'}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(
+          api === 'REST'
+            ? { url: preview.canonicalUrl, tags: requestedTags }
+            : { json: { ...preview, url: preview.canonicalUrl, tags: requestedTags } }
+        ),
+      },
+      { ...bindings, ENRICHMENT_QUEUE: { send } } as unknown as Bindings
+    );
+  };
+  const result = async (response: Response) => {
+    expect(response.status).toBe(200);
+    const json = (await response.json()) as {
+      bookmark: { itemId: string; userItemId: string; status: string };
+      result: { data: { json: { itemId: string; userItemId: string; status: string } } };
+    };
+    return api === 'REST' ? json.bookmark : json.result.data.json;
+  };
+  beforeEach(() => send.mockReset());
+
+  it('creates canonical content and a creator, merges normalized tags on duplicates, and preserves saved time', async () => {
+    const first = await result(await save({}, [' Design ', 'design']));
+    expect(first.status).toBe('created');
+    const before = await db.query.userItems.findFirst({
+      where: eq(userItems.id, first.userItemId),
+    });
+    expect(before).toMatchObject({ userId: 'owner', state: 'BOOKMARKED', isFinished: false });
+    const item = await db.query.items.findFirst({ where: eq(items.id, first.itemId) });
+    expect(item).toMatchObject({
+      providerId: 'save-contract',
+      title: 'Save contract',
+      duration: 120,
+    });
+    expect(await db.select().from(creators)).toMatchObject([
+      { id: item!.creatorId, name: 'Contract Creator' },
+    ]);
+    expect(send).toHaveBeenCalledTimes(1);
+    const repeat = await result(await save({}, ['API', 'design']));
+    expect(repeat).toEqual({ ...first, status: 'already_bookmarked' });
+    expect(
+      (await db.query.userItems.findFirst({ where: eq(userItems.id, first.userItemId) }))!
+        .bookmarkedAt
+    ).toBe(before!.bookmarkedAt);
+    expect(await db.select().from(userItemTags)).toHaveLength(2);
+    expect((await db.select().from(tags)).every((tag) => tag.userId === 'owner')).toBe(true);
+    expect(await db.select().from(items)).toHaveLength(2);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['INBOX', 'ARCHIVED'])(
+    'rebookmarks %s without changing finished state and recovers queue failures',
+    async (state) => {
+      await db
+        .update(userItems)
+        .set({ state, isFinished: true, finishedAt: now })
+        .where(eq(userItems.id, 'owner-bookmark'));
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date(now));
+      send.mockRejectedValueOnce(new Error('Queue unavailable'));
+      const first = await result(await save({ providerId: 'video' }, ['Saved']));
+      expect(first).toEqual({
+        itemId: 'item',
+        userItemId: 'owner-bookmark',
+        status: 'rebookmarked',
+      });
+      expect(
+        await db.query.userItems.findFirst({ where: eq(userItems.id, first.userItemId) })
+      ).toMatchObject({ state: 'BOOKMARKED', isFinished: true, finishedAt: now });
+      expect(await db.select().from(bookmarkEnrichmentOutbox)).toHaveLength(1);
+      vi.setSystemTime(new Date(Date.parse(now) + 5 * 60 * 1000));
+      expect((await result(await save({ providerId: 'video' }))).status).toBe('already_bookmarked');
+      expect(await db.select().from(bookmarkEnrichmentOutbox)).toHaveLength(0);
+      expect(send).toHaveBeenCalledTimes(2);
+      expect(await db.select().from(userItemConsumptionEvents)).toHaveLength(0);
+    }
+  );
+
+  it('rejects invalid preview metadata before creating content', async () => {
+    const response = await save({ title: '' });
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body).toMatchObject(
+      api === 'REST'
+        ? { code: 'BAD_REQUEST' }
+        : { error: { json: { data: { code: 'BAD_REQUEST' } } } }
+    );
+    expect(await db.select().from(items)).toHaveLength(1);
+    expect(await db.select().from(creators)).toHaveLength(0);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('stores extracted WEB article HTML and fills missing reading metadata', async () => {
+    vi.mocked(extractArticle).mockResolvedValueOnce({
+      title: 'Article',
+      author: null,
+      authorImageUrl: null,
+      siteName: null,
+      publishedAt: null,
+      thumbnailUrl: null,
+      excerpt: null,
+      wordCount: 600,
+      readingTimeMinutes: 3,
+      content: '<p>Contract article body</p>',
+      isArticle: true,
+    });
+    const saved = await result(
+      await save({
+        provider: 'WEB',
+        contentType: 'ARTICLE',
+        hasArticleContent: true,
+        wordCount: 800,
+      })
+    );
+    const item = await db.query.items.findFirst({ where: eq(items.id, saved.itemId) });
+    expect(item).toMatchObject({
+      wordCount: 800,
+      readingTimeMinutes: 3,
+      articleContentKey: `articles/${saved.itemId}.html`,
+    });
+    expect(await (await bindings.ARTICLE_CONTENT.get(item!.articleContentKey!))!.text()).toBe(
+      '<p>Contract article body</p>'
+    );
+  });
+
+  it('keeps article extraction best effort when the remote fetch fails', async () => {
+    vi.mocked(extractArticle).mockRejectedValueOnce(new Error('Article fetch unavailable'));
+    const saved = await result(
+      await save({ provider: 'WEB', contentType: 'ARTICLE', hasArticleContent: true })
+    );
+    expectLoggerErrorCalls([['Failed to extract/store article content']]);
+    expect(await db.query.items.findFirst({ where: eq(items.id, saved.itemId) })).toMatchObject({
+      articleContentKey: null,
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('normalizes Substack links into one canonical article', async () => {
+    const response = await result(
+      await save({
+        canonicalUrl: 'https://example.substack.com/p/test-post?utm_source=test',
+        provider: 'WEB',
+        contentType: 'ARTICLE',
+        providerId: 'original-id',
+      })
+    );
+    expect(await db.query.items.findFirst({ where: eq(items.id, response.itemId) })).toMatchObject({
+      provider: 'SUBSTACK',
+      contentType: 'ARTICLE',
+      canonicalUrl: 'https://example.substack.com/p/test-post',
+    });
+    expect(
+      (
+        await result(
+          await save({
+            canonicalUrl: 'https://example.substack.com/p/test-post',
+            provider: 'WEB',
+            contentType: 'ARTICLE',
+            providerId: 'another-id',
+          })
+        )
+      ).status
+    ).toBe('already_bookmarked');
+    expect(send).toHaveBeenCalledTimes(1);
   });
 });
