@@ -76,31 +76,43 @@ describe('authMiddleware', () => {
     mockVerifyClerkToken.mockReset();
   });
 
-  it('bypasses auth only for development without a configured Clerk JWKS URL', async () => {
+  it('bypasses auth only for explicitly configured isolated tests', async () => {
     const app = createTestApp();
     const req = new Request('http://localhost/protected');
 
-    const res = await app.fetch(req, createMockEnv({ ENVIRONMENT: 'development' }));
+    const res = await app.fetch(
+      req,
+      createMockEnv({ ENVIRONMENT: 'test', TEST_AUTH_BYPASS: 'true' })
+    );
 
     expect(res.status).toBe(200);
     expect((await res.json()) as AuthResponse).toEqual({ userId: 'dev-user-001' });
     expect(mockVerifyClerkToken).not.toHaveBeenCalled();
   });
 
-  it('requires an auth header outside development even when CLERK_JWKS_URL is unset', async () => {
-    const app = createTestApp();
-    const req = new Request('http://localhost/protected');
+  it.each(['development', 'production', 'test'])(
+    'requires authentication in %s even without JWKS configuration',
+    async (environment) => {
+      const app = createTestApp();
+      const req = new Request('http://localhost/protected');
 
-    const res = await app.fetch(req, createMockEnv({ ENVIRONMENT: 'production' }));
+      const res = await app.fetch(
+        req,
+        createMockEnv({
+          ENVIRONMENT: environment,
+          TEST_AUTH_BYPASS: environment === 'test' ? undefined : 'true',
+        })
+      );
 
-    expect(res.status).toBe(401);
-    expect(res.headers.get('X-Zine-Auth-Error')).toBe('MISSING_AUTH_HEADER');
-    expect((await res.json()) as AuthResponse).toMatchObject({
-      code: 'MISSING_AUTH_HEADER',
-      error: 'Authorization header is required',
-    });
-    expect(mockVerifyClerkToken).not.toHaveBeenCalled();
-  });
+      expect(res.status).toBe(401);
+      expect(res.headers.get('X-Zine-Auth-Error')).toBe('MISSING_AUTH_HEADER');
+      expect((await res.json()) as AuthResponse).toMatchObject({
+        code: 'MISSING_AUTH_HEADER',
+        error: 'Authorization header is required',
+      });
+      expect(mockVerifyClerkToken).not.toHaveBeenCalled();
+    }
+  );
 
   it('falls back to the myzine Clerk JWKS URL when none is configured', async () => {
     mockVerifyClerkToken.mockResolvedValue({

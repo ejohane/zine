@@ -22,17 +22,20 @@ bun install
 bun run dev:worktree
 ```
 
-The worktree command selects service ports, seeds local Worker data, generates
-`apps/web/.env.local`, and starts the services plus the native iOS simulator
-preview. It requires Apple Silicon and Xcode for the native preview.
+The worktree command selects service ports, provisions sanitized production D1
+and article bodies only when local state is absent, and starts the services plus
+the native iOS simulator preview. It requires Apple Silicon and Xcode. Sign in
+with real Clerk credentials from Bitwarden using the `agent-secrets` workflow.
+See [authenticated local development](docs/local-development.md).
 
-Native configuration lives in `apps/ios/Configuration/Local.xcconfig` (see the
-example beside it). Set `ZINE_API_BASE_URL` there to the local Worker URL when
-needed; the native app otherwise defaults to the production API. Worker secrets
-belong in `apps/worker/.dev.vars`; web configuration belongs in `apps/web/.env.local`.
+The native simulator build receives this worktree's selected local API URL.
+Existing local edits survive normal restarts. To explicitly refresh, stop the
+stack and run `bun run data:prod:local -- --yes --include-article-bodies`; this
+backs up existing state. Worker secrets are never copied from other worktrees.
 
-Use `bun run dev` for workspace services without the native preview, or
-`bun run ios:preview` for the standalone native simulator preview.
+Use `bun run dev` for workspace services without the native preview. Standalone
+`bun run ios:preview` requires `ZINE_LOCAL_API_URL` pointing to your local Worker;
+a reused installed build must match that URL.
 
 ## Validation
 

@@ -11,8 +11,8 @@ set -e
 #
 # WHAT IT DOES:
 #   1. Computes a unique worker port (8700-8799) from the worktree path hash
-#   2. Seeds database from main worktree on first run (OAuth tokens, test data)
-#   3. Symlinks worker secrets (.dev.vars) from main
+#   2. Provisions sanitized production D1/R2 only when local state is absent
+#   3. Requires real Clerk authentication; never copies Worker secrets
 #   4. Generates web .env.local with a reachable API URL
 #   5. Starts a public dev proxy when non-localhost access is needed
 #   6. Builds, launches, and serves the native iOS app in the browser
@@ -24,14 +24,13 @@ set -e
 #   ZINE_DEV_HOST=100.92.242.50 bun run dev:worktree    # Override mobile/API host
 #   ZINE_API_PORT=8890 bun run dev:worktree             # Override public API port
 #   ZINE_SERVE_SIM=0 bun run dev:worktree               # Disable native preview
-#   bun run dev:reset && bun run dev:worktree          # Fresh re-seed
+#   bun run dev:reset && bun run dev:worktree          # Back up and provision fresh data
 #
 # =============================================================================
 
 WORKTREE_PATH=$(pwd)
 MAIN_WORKTREE=$(git worktree list | head -1 | awk '{print $1}')
 STATE_DIR="apps/worker/.wrangler/state"
-SEEDED_MARKER="$STATE_DIR/.seeded-from-main"
 
 # -----------------------------------------------------------------------------
 # Port Assignment: Deterministic from worktree path (with manual override)
@@ -122,6 +121,7 @@ fi
 # other before its HTTP server starts.
 WORKER_INSPECTOR_PORT=$(find_available_port_from $((9200 + PORT_OFFSET)))
 X_ARCHIVE_INSPECTOR_PORT=$(find_available_port_from $((9300 + PORT_OFFSET)))
+X_ARCHIVE_PORT=$(find_available_port_from "${X_ARCHIVE_PORT:-8890}")
 
 # Web port: 5173 for main, 8200+ for worktrees
 if [ "$WORKTREE_PATH" = "$MAIN_WORKTREE" ]; then
@@ -164,21 +164,9 @@ fi
 # Port conflict detection is now handled above in find_available_port
 
 # -----------------------------------------------------------------------------
-# Database Seeding: Copy state from main worktree on first run
+# Production-shaped data: provision only absent state, preserve existing edits.
 # -----------------------------------------------------------------------------
-if [ "$WORKTREE_PATH" != "$MAIN_WORKTREE" ] && [ ! -f "$SEEDED_MARKER" ] && [ -d "$MAIN_WORKTREE/$STATE_DIR" ]; then
-    echo "   📦 Seeding database from main worktree..."
-    mkdir -p "$(dirname "$STATE_DIR")"
-    cp -R "$MAIN_WORKTREE/$STATE_DIR" "$STATE_DIR"
-    echo "Seeded from $MAIN_WORKTREE on $(date)" > "$SEEDED_MARKER"
-    echo "   ✓ Database seeded (includes OAuth tokens, existing data)"
-elif [ "$WORKTREE_PATH" = "$MAIN_WORKTREE" ]; then
-    echo "   ℹ️  Running in main worktree"
-elif [ ! -d "$MAIN_WORKTREE/$STATE_DIR" ]; then
-    echo "   ⚠️  No main worktree database found"
-    echo "      Starting with empty database"
-    echo "      (Run main worktree first to enable seeding)"
-fi
+bun run ./scripts/prepare-local-data.mjs
 
 # Apply any pending database migrations (branch may have migrations not in main's DB)
 if [ -d "$STATE_DIR" ]; then
@@ -196,21 +184,11 @@ fi
 # Secret Files Management
 # -----------------------------------------------------------------------------
 
-# --- Worker Secrets ---
-if [ "$WORKTREE_PATH" != "$MAIN_WORKTREE" ]; then
-    # Check for broken symlink (target deleted)
-    if [ -L apps/worker/.dev.vars ]; then
-        if [ ! -e apps/worker/.dev.vars ]; then
-            echo "   ⚠️  Broken .dev.vars symlink detected, recreating..."
-            rm apps/worker/.dev.vars
-        fi
-    fi
-    
-    # Create symlink if it doesn't exist
-    if [ ! -L apps/worker/.dev.vars ] && [ -f "$MAIN_WORKTREE/apps/worker/.dev.vars" ]; then
-        echo "   🔗 Linking apps/worker/.dev.vars from main..."
-        ln -sf "$MAIN_WORKTREE/apps/worker/.dev.vars" apps/worker/.dev.vars
-    fi
+# Credentials are supplied via secretsctl when a particular integration needs them.
+# Never copy or symlink production Worker secrets into a local environment.
+if [ -L apps/worker/.dev.vars ]; then
+    echo "Removing obsolete cross-worktree Worker secrets symlink (target preserved)."
+    rm apps/worker/.dev.vars
 fi
 
 # --- Web Secrets ---
@@ -224,11 +202,7 @@ echo "   📝 Generating apps/web/.env.local ($API_BASE_URL)..."
 mkdir -p apps/web
 
 WEB_ENV_SOURCE_FILE=""
-if [ "$WORKTREE_PATH" = "$MAIN_WORKTREE" ] && [ -n "$CURRENT_WEB_ENV_BACKUP" ] && [ -f "$CURRENT_WEB_ENV_BACKUP" ]; then
-    WEB_ENV_SOURCE_FILE="$CURRENT_WEB_ENV_BACKUP"
-elif [ -f "$MAIN_WORKTREE/apps/web/.env.local" ]; then
-    WEB_ENV_SOURCE_FILE="$MAIN_WORKTREE/apps/web/.env.local"
-elif [ -n "$CURRENT_WEB_ENV_BACKUP" ] && [ -f "$CURRENT_WEB_ENV_BACKUP" ]; then
+if [ -n "$CURRENT_WEB_ENV_BACKUP" ] && [ -f "$CURRENT_WEB_ENV_BACKUP" ]; then
     WEB_ENV_SOURCE_FILE="$CURRENT_WEB_ENV_BACKUP"
 fi
 
@@ -238,13 +212,11 @@ VITE_API_URL=$API_BASE_URL
 EOF
 
 if [ -n "$WEB_ENV_SOURCE_FILE" ]; then
-    grep -v "^VITE_API_URL=" "$WEB_ENV_SOURCE_FILE" | \
+    grep -v -E "^(VITE_API_URL|VITE_TEST_AUTH_BYPASS)=|^VITE_CLERK_PUBLISHABLE_KEY=[[:space:]]*$" "$WEB_ENV_SOURCE_FILE" | \
         grep -v "^#" | grep -v "^$" >> apps/web/.env.local 2>/dev/null || true
     echo "   ✓ Copied web secrets from existing apps/web/.env.local"
 else
-    echo "   ⚠️  No web .env.local found"
-    echo "      Add VITE_CLERK_PUBLISHABLE_KEY etc. to apps/web/.env.local"
-    echo "      See apps/web/.env.example for required variables"
+    echo "   ℹ️  Web login requires VITE_CLERK_PUBLISHABLE_KEY for an approved local-origin Clerk instance"
 fi
 
 if [ -n "$CURRENT_WEB_ENV_BACKUP" ] && [ -f "$CURRENT_WEB_ENV_BACKUP" ]; then
@@ -254,26 +226,14 @@ fi
 # -----------------------------------------------------------------------------
 # Export and Start Services
 # -----------------------------------------------------------------------------
+export ZINE_LOCAL_API_URL="$API_BASE_URL"
 export WORKER_PORT
 export WORKER_INSPECTOR_PORT
+export X_ARCHIVE_PORT
 export X_ARCHIVE_INSPECTOR_PORT
 export WEB_PORT
 
-PROXY_PID=""
-IOS_PREVIEW_PID=""
-
-cleanup() {
-  if [ -n "$IOS_PREVIEW_PID" ] && kill -0 "$IOS_PREVIEW_PID" 2>/dev/null; then
-    kill "$IOS_PREVIEW_PID" 2>/dev/null || true
-    wait "$IOS_PREVIEW_PID" 2>/dev/null || true
-  fi
-  if [ -n "$PROXY_PID" ] && kill -0 "$PROXY_PID" 2>/dev/null; then
-    kill "$PROXY_PID" 2>/dev/null || true
-    wait "$PROXY_PID" 2>/dev/null || true
-  fi
-}
-
-trap cleanup EXIT
+source ./scripts/dev-processes.sh
 
 if [ "$PUBLIC_API_PORT" != "$WORKER_PORT" ]; then
   echo "   🔀 Starting API proxy on $PUBLIC_API_PORT -> $WORKER_PORT..."
@@ -297,4 +257,6 @@ echo ""
 echo "   Starting services..."
 echo ""
 
-bun run dev
+bun run dev &
+SERVICES_PID=$!
+wait "$SERVICES_PID"

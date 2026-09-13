@@ -60,6 +60,7 @@
     "test:web:ci": "bun run test:web && bun run test:web:storybook && bun run test:web:e2e",
     "test:worker": "bun run --cwd apps/worker test:run",
     "test:worker:ci": "bun run --cwd apps/worker test:run --exclude='**/user-do.test.ts' --exclude='**/scheduler.test.ts'",
+    "test:local-development": "bun test scripts/prepare-local-data.test.ts scripts/sync-prod-user-to-local.test.ts scripts/dev-processes.test.ts",
     "test:observability": "bun test ./scripts/lib/observability.test.ts",
     "observability:check": "bun run ./scripts/observability-checks.mjs",
     "lint": "turbo run lint",

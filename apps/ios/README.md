@@ -74,7 +74,7 @@ version pinned by the repository.
 
 ## Reader routing fixture
 
-After building and installing a Debug app, launch with `-screenshot-fixtures`
+For deterministic screenshot tests only (not manual runtime verification), after building and installing a Debug app, launch with `-screenshot-fixtures`
 and `-screenshot-reader-routing-fixtures` to exercise Library → bookmark detail →
 Read in Zine with Substack, custom-domain Substack, and regular web articles.
 This uses the real navigation and reader views with synthetic article responses;
@@ -98,3 +98,5 @@ The app and extension share the Clerk session through the
 to open Zine and sign in before trying the share action again. The share modal
 loads the user’s existing tags and supports selecting or creating tags before
 saving the bookmark.
+
+Local manual verification uses real Clerk login and sanitized local D1/R2. See [the authenticated local workflow](../../docs/local-development.md). `dev:worktree` passes its selected local API URL as a build setting, overriding production defaults.
