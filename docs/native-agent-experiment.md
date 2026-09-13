@@ -1,5 +1,8 @@
 # Native agent experiment 1
 
+Start with [the developer quickstart](native-cli-development.md) for everyday setup,
+development, and adding coverage.
+
 The initial slice below is now extended by [four workflow passes](native-agent-workflows.md),
 including the complete command reference and regression suite.
 

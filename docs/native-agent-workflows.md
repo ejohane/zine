@@ -1,5 +1,8 @@
 # Native CLI workflow coverage
 
+Start with [the developer quickstart](native-cli-development.md) for everyday setup,
+development, and adding coverage.
+
 The `zine-native` developer CLI shares Zine's canonical native sources. It runs
 controlled scenarios on macOS and sends commands to the explicitly enabled local
 Simulator bridge. See [setup and transport](native-agent-experiment.md).

@@ -99,7 +99,10 @@ to open Zine and sign in before trying the share action again. The share modal
 loads the user’s existing tags and supports selecting or creating tags before
 saving the bookmark.
 
-## Native agent experiment
+## Native CLI development and testing
+
+Start with [the developer quickstart](../../docs/native-cli-development.md) for the
+headless edit/test loop, Simulator integration, and adding regression coverage.
 
 See [the first native agent experiment](../../docs/native-agent-experiment.md) for
 shared desktop tests, deterministic offline scenarios, and explicitly enabled
