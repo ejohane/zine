@@ -1,223 +1,76 @@
 // apps/worker/src/trpc/routers/items.ts
-import { z } from 'zod';
-import { ulid } from 'ulid';
 import { TRPCError } from '@trpc/server';
 import {
-  eq,
-  and,
-  asc,
-  desc,
-  ne,
-  or,
-  lt,
-  gt,
-  lte,
-  isNotNull,
-  sql,
-  inArray,
-  type SQL,
-  type SQLWrapper,
-} from 'drizzle-orm';
-import { router, protectedProcedure } from '../trpc';
-import {
-  ContentType,
   CollectionOverrideAction,
+  type CollectionRules,
   CollectionRulesSchema,
   CollectionSort,
   CollectionSortSchema,
+  ContentType,
+  ContentTypeSchema,
   HomeCollectionLayoutSchema,
   HomeScreenSectionKind,
   isJsonObject,
   type JsonObject,
   Provider,
-  type CollectionRules,
   UserItemState,
-  ProviderSchema,
-  ContentTypeSchema,
-  hasSubstackNewsletterIdentity,
-  isSubstackArticleUrl,
 } from '@zine/shared';
+import { and, asc, desc, eq, inArray, isNotNull, lte, ne, or, sql, type SQL } from 'drizzle-orm';
+import { ulid } from 'ulid';
+import { z } from 'zod';
+import type { Database } from '../../db';
 import {
-  userItems,
-  items,
+  collectionItemOverrides,
+  collections,
   creators,
+  homeCollectionSections,
+  itemEnrichments,
+  items,
   newsletterFeedMessages,
   newsletterFeeds,
   rssFeedItems,
   rssFeeds,
   subscriptionItems,
   subscriptions,
-  itemEnrichments,
-  collectionItemOverrides,
-  collections,
-  homeCollectionSections,
   tags,
-  userItemTags,
-  userItemEnrichments,
   userItemConsumptionEvents,
+  userItemEnrichments,
+  userItems,
+  userItemTags,
   userPeople,
   userPersonMentions,
 } from '../../db/schema';
-import { getHomeScreenLayoutSections } from '../../home-screen/layout';
-import { decodeCursor, encodeCursor, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../lib/pagination';
-import { getArticleContent } from '../../lib/article-storage';
-import type { Database } from '../../db';
-import { buildNewsletterAvatarUrl } from '../../newsletters/avatar';
 import { ENRICHMENT_SCHEMA_VERSION, type SuggestedTag } from '../../enrichment/types';
+import { getHomeScreenLayoutSections } from '../../home-screen/layout';
+import { changeItemFinishedState } from '../../items/finished-state';
+import {
+  archiveItem,
+  bookmarkItem,
+  ItemStateError,
+  unbookmarkItem,
+} from '../../items/library-state';
+import {
+  ContentTypePaginationSchema,
+  listInboxItems,
+  listLibraryItems,
+  listQuickWinItems,
+  listRecentlyOpenedItems,
+  PaginationSchema,
+} from '../../items/queries';
+import { toHomeItemViews, toItemViewsWithTags } from '../../items/views';
+import { getArticleContent } from '../../lib/article-storage';
 import { normalizePersonDisplayName, normalizePersonName } from '../../people/service';
 import { replaceTagsForUserItem } from '../tagging';
-import {
-  bookmarkItem,
-  archiveItem,
-  unbookmarkItem,
-  ItemStateError,
-} from '../../items/library-state';
-import { changeItemFinishedState } from '../../items/finished-state';
+import { protectedProcedure, router } from '../trpc';
 
-export type ItemTag = {
-  id: string;
-  name: string;
-};
+export { normalizeNullString, toItemView, toItemViewsWithTags } from '../../items/views';
+export type { ItemTag, ItemView } from '../../items/views';
 
 export type ItemSubscriptionSettings = {
   sourceId: string;
   provider: Provider;
   autoBookmark: boolean;
 };
-
-/**
- * Combined view of Item + UserItem for API responses.
- * This flattens the joined data for easier consumption by the mobile client.
- */
-export type ItemView = {
-  // Identifiers
-  id: string; // UserItem ID (for mutations)
-  itemId: string; // Canonical Item ID
-
-  // Display
-  title: string;
-  thumbnailUrl: string | null;
-  canonicalUrl: string;
-
-  // Classification
-  contentType: ContentType;
-  provider: Provider;
-
-  // Attribution
-  creator: string;
-  creatorImageUrl: string | null;
-  creatorId: string | null;
-  publisher: string | null;
-
-  // Metadata
-  summary: string | null;
-  duration: number | null; // seconds
-  publishedAt: string | null;
-
-  // Article-specific metadata
-  wordCount: number | null;
-  readingTimeMinutes: number | null;
-
-  // User state
-  state: UserItemState;
-  ingestedAt: string;
-  bookmarkedAt: string | null;
-  lastOpenedAt: string | null;
-
-  // Progress
-  progress: {
-    position: number;
-    duration: number;
-    percent: number;
-  } | null;
-
-  // Consumption tracking
-  isFinished: boolean;
-  finishedAt: string | null;
-
-  // Optional user-defined organization
-  tags: ItemTag[];
-};
-
-type HomeItemView = Pick<
-  ItemView,
-  | 'id'
-  | 'itemId'
-  | 'title'
-  | 'thumbnailUrl'
-  | 'canonicalUrl'
-  | 'contentType'
-  | 'provider'
-  | 'creator'
-  | 'creatorImageUrl'
-  | 'creatorId'
-  | 'publisher'
-  | 'summary'
-  | 'duration'
-  | 'publishedAt'
-  | 'readingTimeMinutes'
-  | 'bookmarkedAt'
-  | 'lastOpenedAt'
-  | 'progress'
->;
-
-// Helper Functions
-
-/**
- * Normalize a string value that might contain the literal string "null" to actual null.
- * This handles legacy data where null values were stored as the string "null".
- */
-function normalizeNullString(value: string | null): string | null {
-  if (value === 'null' || value === null) {
-    return null;
-  }
-  return value;
-}
-
-function normalizeCanonicalUrlForResponse(url: string): string {
-  if (!url) {
-    return url;
-  }
-
-  try {
-    const parsed = new URL(url);
-    const isOpenSubstack =
-      parsed.hostname === 'open.substack.com' || parsed.hostname.endsWith('.open.substack.com');
-    if (!isOpenSubstack) {
-      return url;
-    }
-
-    const pathSegments = parsed.pathname.split('/').filter(Boolean);
-    if (pathSegments.length >= 4 && pathSegments[0] === 'pub' && pathSegments[2] === 'p') {
-      const publication = pathSegments[1];
-      const slug = pathSegments[3];
-      if (publication && slug) {
-        return `https://${publication}.substack.com/p/${slug}`;
-      }
-    }
-
-    return url;
-  } catch {
-    return url;
-  }
-}
-
-function parseRawMetadata(rawMetadata: string | null): JsonObject {
-  if (!rawMetadata) {
-    return {};
-  }
-
-  try {
-    const parsed = JSON.parse(rawMetadata);
-    if (isJsonObject(parsed)) {
-      return parsed;
-    }
-  } catch {
-    // Ignore parse errors and fallback to an empty metadata object.
-  }
-
-  return {};
-}
 
 function parseJsonArray<T>(value: string | null): T[] {
   if (!value) return [];
@@ -239,150 +92,6 @@ function parseJsonObjectValue(value: string | null): JsonObject | null {
   } catch {
     return null;
   }
-}
-
-function getStringMetadataField(metadata: JsonObject, key: string): string | null {
-  const value = metadata[key];
-  return typeof value === 'string' && value.trim().length > 0 ? value : null;
-}
-
-/**
- * Transform a joined DB row (userItems + items + creators) into an ItemView.
- * Creator data comes from the creators table (single source of truth).
- */
-function toItemView(
-  row: {
-    user_items: typeof userItems.$inferSelect;
-    items: typeof items.$inferSelect;
-    creators: typeof creators.$inferSelect | null;
-  },
-  itemTags: ItemTag[] = []
-): ItemView {
-  const userItem = row.user_items;
-  const item = row.items;
-  const creator = row.creators;
-  const normalizedCreatorImageUrl = normalizeNullString(creator?.imageUrl ?? null);
-  const metadata = parseRawMetadata(item.rawMetadata);
-  const newsletterAvatarUrl =
-    item.provider === 'GMAIL'
-      ? buildNewsletterAvatarUrl({
-          canonicalUrl: item.canonicalUrl,
-          listId: getStringMetadataField(metadata, 'listId'),
-          fromAddress:
-            getStringMetadataField(metadata, 'fromAddress') ??
-            getStringMetadataField(metadata, 'sender') ??
-            creator?.handle ??
-            null,
-          unsubscribeUrl: getStringMetadataField(metadata, 'unsubscribeUrl'),
-          creatorHandle: creator?.handle ?? null,
-        })
-      : null;
-  const thumbnailUrl =
-    item.thumbnailUrl ??
-    (item.provider === 'GMAIL' ? (normalizedCreatorImageUrl ?? newsletterAvatarUrl) : null);
-  const creatorImageUrl =
-    item.provider === 'GMAIL'
-      ? (normalizedCreatorImageUrl ?? newsletterAvatarUrl)
-      : normalizedCreatorImageUrl;
-  const responseProvider =
-    item.provider === Provider.GMAIL &&
-    isSubstackArticleUrl(item.canonicalUrl) &&
-    hasSubstackNewsletterIdentity({
-      canonicalUrl: item.canonicalUrl,
-      listId: getStringMetadataField(metadata, 'listId'),
-      fromAddress:
-        getStringMetadataField(metadata, 'fromAddress') ??
-        getStringMetadataField(metadata, 'sender') ??
-        creator?.handle ??
-        null,
-      unsubscribeUrl: getStringMetadataField(metadata, 'unsubscribeUrl'),
-    })
-      ? Provider.SUBSTACK
-      : item.provider;
-
-  return {
-    id: userItem.id,
-    itemId: item.id,
-    title: item.title,
-    thumbnailUrl,
-    canonicalUrl: normalizeCanonicalUrlForResponse(item.canonicalUrl),
-    contentType: item.contentType as ContentType,
-    provider: responseProvider as Provider,
-    // Creator data from creators table (normalized)
-    creator: creator?.name ?? 'Unknown Creator',
-    creatorImageUrl,
-    creatorId: item.creatorId ?? null,
-    publisher: item.publisher,
-    summary: item.summary,
-    duration: item.duration,
-    publishedAt: item.publishedAt,
-    wordCount: item.wordCount,
-    readingTimeMinutes: item.readingTimeMinutes,
-    state: userItem.state as UserItemState,
-    ingestedAt: userItem.ingestedAt,
-    bookmarkedAt: userItem.bookmarkedAt,
-    lastOpenedAt: userItem.lastOpenedAt,
-    progress:
-      userItem.progressPosition !== null && userItem.progressDuration !== null
-        ? {
-            position: userItem.progressPosition,
-            duration: userItem.progressDuration,
-            percent: Math.round(
-              (userItem.progressPosition / (userItem.progressDuration || 1)) * 100
-            ),
-          }
-        : null,
-    isFinished: userItem.isFinished,
-    finishedAt: userItem.finishedAt,
-    tags: itemTags,
-  };
-}
-
-function toCompactSearchTerm(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-function stripVowels(value: string): string {
-  return value.replace(/[aeiou]/g, '');
-}
-
-function toCompactSql(value: SQLWrapper): SQL {
-  return sql`replace(replace(replace(replace(replace(replace(lower(coalesce(${value}, '')), ' ', ''), '-', ''), '_', ''), '.', ''), '/', ''), '&', '')`;
-}
-
-function toConsonantSql(value: SQLWrapper): SQL {
-  const compact = toCompactSql(value);
-  return sql`replace(replace(replace(replace(replace(${compact}, 'a', ''), 'e', ''), 'i', ''), 'o', ''), 'u', '')`;
-}
-
-async function getTagsForUserItems(
-  ctx: { db: Database; userId: string },
-  userItemIds: string[]
-): Promise<Map<string, ItemTag[]>> {
-  const map = new Map<string, ItemTag[]>();
-
-  if (userItemIds.length === 0) {
-    return map;
-  }
-
-  const rows = await ctx.db
-    .select({
-      userItemId: userItemTags.userItemId,
-      tagId: tags.id,
-      tagName: tags.name,
-    })
-    .from(userItemTags)
-    .innerJoin(tags, eq(userItemTags.tagId, tags.id))
-    .where(and(inArray(userItemTags.userItemId, userItemIds), eq(tags.userId, ctx.userId)))
-    .orderBy(desc(userItemTags.createdAt));
-
-  for (const row of rows) {
-    const existing = map.get(row.userItemId) ?? [];
-    existing.push({ id: row.tagId, name: row.tagName });
-    map.set(row.userItemId, existing);
-  }
-
-  return map;
 }
 
 async function getItemSubscriptionSettings(
@@ -475,53 +184,6 @@ async function getItemSubscriptionSettings(
   }
 
   return null;
-}
-
-export async function toItemViewsWithTags(
-  ctx: { db: Database; userId: string },
-  rows: Array<{
-    user_items: typeof userItems.$inferSelect;
-    items: typeof items.$inferSelect;
-    creators: typeof creators.$inferSelect | null;
-  }>
-): Promise<ItemView[]> {
-  const userItemIds = rows.map((row) => row.user_items.id);
-  const tagsByItemId = await getTagsForUserItems(ctx, userItemIds);
-
-  return rows.map((row) => toItemView(row, tagsByItemId.get(row.user_items.id) ?? []));
-}
-
-function toHomeItemViews(
-  rows: Array<{
-    user_items: typeof userItems.$inferSelect;
-    items: typeof items.$inferSelect;
-    creators: typeof creators.$inferSelect | null;
-  }>
-): HomeItemView[] {
-  return rows.map((row) => {
-    const itemView = toItemView(row);
-
-    return {
-      id: itemView.id,
-      itemId: itemView.itemId,
-      title: itemView.title,
-      thumbnailUrl: itemView.thumbnailUrl,
-      canonicalUrl: itemView.canonicalUrl,
-      contentType: itemView.contentType,
-      provider: itemView.provider,
-      creator: itemView.creator,
-      creatorImageUrl: itemView.creatorImageUrl,
-      creatorId: itemView.creatorId,
-      publisher: itemView.publisher,
-      summary: itemView.summary,
-      duration: itemView.duration,
-      publishedAt: itemView.publishedAt,
-      readingTimeMinutes: itemView.readingTimeMinutes,
-      bookmarkedAt: itemView.bookmarkedAt,
-      lastOpenedAt: itemView.lastOpenedAt,
-      progress: itemView.progress,
-    };
-  });
 }
 
 function parseCollectionRules(rulesJson: string): CollectionRules {
@@ -643,29 +305,6 @@ async function insertConsumptionEvent(
 
 // Zod Schemas
 
-const FilterSchema = z
-  .object({
-    provider: ProviderSchema.nullish(),
-    contentType: ContentTypeSchema.nullish(),
-    isFinished: z.boolean().nullish(),
-  })
-  .optional();
-
-const PaginationSchema = z.object({
-  filter: FilterSchema,
-  search: z.string().trim().min(1).max(100).optional(),
-  cursor: z.string().optional(),
-  limit: z.number().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
-});
-
-const ContentTypePaginationSchema = PaginationSchema.pick({ cursor: true, limit: true }).extend({
-  filter: z
-    .object({
-      contentType: ContentTypeSchema.nullish(),
-    })
-    .optional(),
-});
-
 const HomeInputSchema = z
   .object({
     filter: z
@@ -684,174 +323,18 @@ export const itemsRouter = router({
    * Supports filtering by provider and content type.
    * Uses cursor-based pagination sorted by ingestedAt DESC (most recently added first).
    */
-  inbox: protectedProcedure.input(PaginationSchema.optional()).query(async ({ input, ctx }) => {
-    const limit = input?.limit ?? DEFAULT_PAGE_SIZE;
-    const cursor = input?.cursor ? decodeCursor(input.cursor) : null;
-
-    // Build WHERE conditions
-    const conditions = [
-      eq(userItems.userId, ctx.userId),
-      eq(userItems.state, UserItemState.INBOX),
-      eq(userItems.isFinished, false),
-    ];
-
-    // Apply cursor-based pagination (fetch items ingested before cursor)
-    if (cursor) {
-      conditions.push(
-        or(
-          lt(userItems.ingestedAt, cursor.sortValue),
-          and(eq(userItems.ingestedAt, cursor.sortValue), lt(userItems.id, cursor.id))
-        )!
-      );
-    }
-
-    // Apply filters
-    if (input?.filter?.provider) {
-      conditions.push(eq(items.provider, input.filter.provider));
-    }
-    if (input?.filter?.contentType) {
-      conditions.push(eq(items.contentType, input.filter.contentType));
-    }
-
-    // Execute query with joins (items + creators)
-    const results = await ctx.db
-      .select()
-      .from(userItems)
-      .innerJoin(items, eq(userItems.itemId, items.id))
-      .leftJoin(creators, eq(items.creatorId, creators.id))
-      .where(and(...conditions))
-      .orderBy(desc(userItems.ingestedAt), desc(userItems.id))
-      .limit(limit + 1); // Fetch one extra to check for more
-
-    // Check if there are more results
-    const hasMore = results.length > limit;
-    const pageResults = hasMore ? results.slice(0, limit) : results;
-
-    // Transform to ItemView
-    const itemViews = await toItemViewsWithTags(ctx, pageResults);
-
-    // Generate next cursor
-    let nextCursor: string | null = null;
-    if (hasMore && pageResults.length > 0) {
-      const lastResult = pageResults[pageResults.length - 1];
-      nextCursor = encodeCursor({
-        sortValue: lastResult.user_items.ingestedAt,
-        id: lastResult.user_items.id,
-      });
-    }
-
-    return {
-      items: itemViews,
-      nextCursor,
-    };
-  }),
+  inbox: protectedProcedure
+    .input(PaginationSchema.optional())
+    .query(async ({ input, ctx }) => listInboxItems(ctx, input)),
 
   /**
    * Get bookmarked items (BOOKMARKED state).
    * Supports filtering by provider/content type and search by title/creator.
    * Uses cursor-based pagination sorted by bookmarkedAt DESC.
    */
-  library: protectedProcedure.input(PaginationSchema.optional()).query(async ({ input, ctx }) => {
-    const limit = input?.limit ?? DEFAULT_PAGE_SIZE;
-    const cursor = input?.cursor ? decodeCursor(input.cursor) : null;
-
-    // Build WHERE conditions
-    const conditions = [
-      eq(userItems.userId, ctx.userId),
-      eq(userItems.state, UserItemState.BOOKMARKED),
-    ];
-
-    // Filter by finished status
-    // Default behavior: hide finished items (isFinished undefined or false)
-    // When isFinished: true is passed, show only finished items
-    const showFinished = input?.filter?.isFinished ?? false;
-    conditions.push(eq(userItems.isFinished, showFinished));
-
-    // Use COALESCE to handle NULL bookmarkedAt - falls back to ingestedAt
-    const librarySortField = sql`COALESCE(${userItems.bookmarkedAt}, ${userItems.ingestedAt})`;
-
-    // Apply cursor-based pagination (fetch items bookmarked before cursor)
-    if (cursor) {
-      conditions.push(
-        or(
-          sql`${librarySortField} < ${cursor.sortValue}`,
-          and(sql`${librarySortField} = ${cursor.sortValue}`, lt(userItems.id, cursor.id))
-        )!
-      );
-    }
-
-    // Apply filters
-    if (input?.filter?.provider) {
-      conditions.push(eq(items.provider, input.filter.provider));
-    }
-    if (input?.filter?.contentType) {
-      conditions.push(eq(items.contentType, input.filter.contentType));
-    }
-
-    // Apply search (case-insensitive + punctuation-insensitive + consonant fallback)
-    const search = input?.search?.trim();
-    if (search) {
-      const loweredSearch = search.toLowerCase();
-      const compactSearch = toCompactSearchTerm(search);
-      const consonantSearch = stripVowels(compactSearch);
-
-      const titleLower = sql`lower(${items.title})`;
-      const creatorLower = sql`lower(coalesce(${creators.name}, ''))`;
-      const titleCompact = toCompactSql(items.title);
-      const creatorCompact = toCompactSql(creators.name);
-
-      const searchConditions: SQL[] = [
-        sql`${titleLower} LIKE ${`%${loweredSearch}%`}`,
-        sql`${creatorLower} LIKE ${`%${loweredSearch}%`}`,
-      ];
-
-      if (compactSearch.length > 0) {
-        searchConditions.push(sql`${titleCompact} LIKE ${`%${compactSearch}%`}`);
-        searchConditions.push(sql`${creatorCompact} LIKE ${`%${compactSearch}%`}`);
-      }
-
-      if (consonantSearch.length >= 3) {
-        const titleConsonants = toConsonantSql(items.title);
-        const creatorConsonants = toConsonantSql(creators.name);
-        searchConditions.push(sql`${titleConsonants} LIKE ${`%${consonantSearch}%`}`);
-        searchConditions.push(sql`${creatorConsonants} LIKE ${`%${consonantSearch}%`}`);
-      }
-
-      conditions.push(or(...searchConditions)!);
-    }
-
-    // Execute query with joins (items + creators)
-    const results = await ctx.db
-      .select()
-      .from(userItems)
-      .innerJoin(items, eq(userItems.itemId, items.id))
-      .leftJoin(creators, eq(items.creatorId, creators.id))
-      .where(and(...conditions))
-      .orderBy(sql`${librarySortField} DESC`, desc(userItems.id))
-      .limit(limit + 1);
-
-    // Check if there are more results
-    const hasMore = results.length > limit;
-    const pageResults = hasMore ? results.slice(0, limit) : results;
-
-    // Transform to ItemView
-    const itemViews = await toItemViewsWithTags(ctx, pageResults);
-
-    // Generate next cursor
-    let nextCursor: string | null = null;
-    if (hasMore && pageResults.length > 0) {
-      const lastResult = pageResults[pageResults.length - 1];
-      nextCursor = encodeCursor({
-        sortValue: lastResult.user_items.bookmarkedAt ?? lastResult.user_items.ingestedAt,
-        id: lastResult.user_items.id,
-      });
-    }
-
-    return {
-      items: itemViews,
-      nextCursor,
-    };
-  }),
+  library: protectedProcedure
+    .input(PaginationSchema.optional())
+    .query(async ({ input, ctx }) => listLibraryItems(ctx, input)),
 
   /**
    * Get unfinished bookmarks that the user has opened, newest open first.
@@ -859,116 +342,14 @@ export const itemsRouter = router({
    */
   recentlyOpened: protectedProcedure
     .input(ContentTypePaginationSchema.optional())
-    .query(async ({ input, ctx }) => {
-      const limit = input?.limit ?? DEFAULT_PAGE_SIZE;
-      const cursor = input?.cursor ? decodeCursor(input.cursor) : null;
-      const conditions = [
-        eq(userItems.userId, ctx.userId),
-        eq(userItems.state, UserItemState.BOOKMARKED),
-        eq(userItems.isFinished, false),
-        isNotNull(userItems.lastOpenedAt),
-      ];
-
-      if (input?.filter?.contentType) {
-        conditions.push(eq(items.contentType, input.filter.contentType));
-      }
-
-      if (cursor) {
-        conditions.push(
-          or(
-            lt(userItems.lastOpenedAt, cursor.sortValue),
-            and(eq(userItems.lastOpenedAt, cursor.sortValue), lt(userItems.id, cursor.id))
-          )!
-        );
-      }
-
-      const results = await ctx.db
-        .select()
-        .from(userItems)
-        .innerJoin(items, eq(userItems.itemId, items.id))
-        .leftJoin(creators, eq(items.creatorId, creators.id))
-        .where(and(...conditions))
-        .orderBy(desc(userItems.lastOpenedAt), desc(userItems.id))
-        .limit(limit + 1);
-
-      const hasMore = results.length > limit;
-      const pageResults = hasMore ? results.slice(0, limit) : results;
-      const itemViews = await toItemViewsWithTags(ctx, pageResults);
-
-      let nextCursor: string | null = null;
-      if (hasMore && pageResults.length > 0) {
-        const lastResult = pageResults[pageResults.length - 1];
-        nextCursor = encodeCursor({
-          sortValue: lastResult.user_items.lastOpenedAt!,
-          id: lastResult.user_items.id,
-        });
-      }
-
-      return {
-        items: itemViews,
-        nextCursor,
-      };
-    }),
+    .query(async ({ input, ctx }) => listRecentlyOpenedItems(ctx, input)),
 
   /**
    * Get unfinished bookmarks that take ten minutes or less, newest save first.
    */
   quickWins: protectedProcedure
     .input(ContentTypePaginationSchema.optional())
-    .query(async ({ input, ctx }) => {
-      const limit = input?.limit ?? DEFAULT_PAGE_SIZE;
-      const cursor = input?.cursor ? decodeCursor(input.cursor) : null;
-      const sortField = sql`COALESCE(${userItems.bookmarkedAt}, ${userItems.ingestedAt})`;
-      const conditions = [
-        eq(userItems.userId, ctx.userId),
-        eq(userItems.state, UserItemState.BOOKMARKED),
-        eq(userItems.isFinished, false),
-        or(
-          and(gt(items.readingTimeMinutes, 0), lte(items.readingTimeMinutes, 10)),
-          and(gt(items.duration, 0), lte(items.duration, 10 * 60))
-        )!,
-      ];
-
-      if (input?.filter?.contentType) {
-        conditions.push(eq(items.contentType, input.filter.contentType));
-      }
-
-      if (cursor) {
-        conditions.push(
-          or(
-            sql`${sortField} < ${cursor.sortValue}`,
-            and(sql`${sortField} = ${cursor.sortValue}`, lt(userItems.id, cursor.id))
-          )!
-        );
-      }
-
-      const results = await ctx.db
-        .select()
-        .from(userItems)
-        .innerJoin(items, eq(userItems.itemId, items.id))
-        .leftJoin(creators, eq(items.creatorId, creators.id))
-        .where(and(...conditions))
-        .orderBy(sql`${sortField} DESC`, desc(userItems.id))
-        .limit(limit + 1);
-
-      const hasMore = results.length > limit;
-      const pageResults = hasMore ? results.slice(0, limit) : results;
-      const itemViews = await toItemViewsWithTags(ctx, pageResults);
-
-      let nextCursor: string | null = null;
-      if (hasMore && pageResults.length > 0) {
-        const lastResult = pageResults[pageResults.length - 1];
-        nextCursor = encodeCursor({
-          sortValue: lastResult.user_items.bookmarkedAt ?? lastResult.user_items.ingestedAt,
-          id: lastResult.user_items.id,
-        });
-      }
-
-      return {
-        items: itemViews,
-        nextCursor,
-      };
-    }),
+    .query(async ({ input, ctx }) => listQuickWinItems(ctx, input)),
 
   /**
    * Get curated home sections.
@@ -1646,4 +1027,4 @@ export const itemsRouter = router({
 export type ItemsRouter = typeof itemsRouter;
 
 // Export helpers for testing and reuse
-export { getItemSubscriptionSettings, normalizeNullString, toItemView };
+export { getItemSubscriptionSettings };
