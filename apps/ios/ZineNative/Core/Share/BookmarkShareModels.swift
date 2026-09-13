@@ -38,6 +38,16 @@ struct BookmarkSharePreview: Decodable, Equatable, Sendable {
         contentType.replacingOccurrences(of: "_", with: " ").capitalized
     }
 
+    var creatorLabel: String {
+        let normalized = creator.trimmingCharacters(in: .whitespacesAndNewlines)
+        if contentType.uppercased() == "PODCAST",
+           normalized.isEmpty || normalized.caseInsensitiveCompare("Unknown") == .orderedSame
+        {
+            return "Unknown show"
+        }
+        return normalized
+    }
+
     var lengthLabel: String? {
         if let duration, duration > 0 {
             let hours = duration / 3600
@@ -50,6 +60,10 @@ struct BookmarkSharePreview: Decodable, Equatable, Sendable {
 
         if let readingTimeMinutes, readingTimeMinutes > 0 {
             return "\(readingTimeMinutes) min read"
+        }
+
+        if contentType.uppercased() == "PODCAST" {
+            return "Duration unavailable"
         }
 
         return nil

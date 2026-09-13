@@ -87,6 +87,8 @@ export async function saveBookmark(
   const contentType = substackProviderId ? ContentType.ARTICLE : input.contentType;
   const providerId = substackProviderId ?? input.providerId;
   const canonicalUrl = substackCanonicalUrl ?? input.canonicalUrl;
+  const handoffUrl =
+    provider === Provider.WEB && contentType === ContentType.PODCAST ? canonicalUrl : null;
 
   // 1. Find or create the canonical item
   const existingItem = await ctx.db.query.items.findFirst({
@@ -239,6 +241,13 @@ export async function saveBookmark(
   if (existingUserItem) {
     // 3a. User already has this item
     if (existingUserItem.state === UserItemState.BOOKMARKED) {
+      if (handoffUrl && existingUserItem.handoffUrl !== handoffUrl) {
+        await ctx.db
+          .update(userItems)
+          .set({ handoffUrl, updatedAt: now })
+          .where(eq(userItems.id, existingUserItem.id));
+      }
+
       if (input.tags && input.tags.length > 0) {
         await mergeTagsForUserItem(ctx, existingUserItem.id, input.tags);
       }
@@ -262,6 +271,7 @@ export async function saveBookmark(
         .set({
           state: UserItemState.BOOKMARKED,
           bookmarkedAt: now,
+          handoffUrl,
           updatedAt: now,
         })
         .where(eq(userItems.id, existingUserItem.id)),
@@ -316,6 +326,7 @@ export async function saveBookmark(
       ingestedAt: now,
       bookmarkedAt: now,
       archivedAt: null,
+      handoffUrl,
       progressPosition: null,
       progressDuration: null,
       progressUpdatedAt: null,

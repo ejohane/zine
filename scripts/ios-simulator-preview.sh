@@ -11,6 +11,18 @@ simulator_udid="${ZINE_SIMULATOR_UDID:-}"
 bundle_id="app.zine.native"
 build_pid=""
 serve_sim_pid=""
+local_api_build_settings=()
+
+case "${ZINE_LOCAL_API_URL:?Start with bun run dev:worktree to select a local API}" in
+  http://*)
+    local_api_authority="${ZINE_LOCAL_API_URL#http://}"
+    local_api_authority="${local_api_authority%%/*}"
+    local_api_host="${local_api_authority%%:*}"
+    local_api_build_settings+=(
+      "INFOPLIST_PREPROCESSOR_DEFINITIONS=\$(inherited) ZINE_ALLOW_INSECURE_LOCAL_API=1 ZINE_ATS_EXCEPTION_DOMAIN=$local_api_host"
+    )
+    ;;
+esac
 
 cleanup_serve_sim() {
   trap - EXIT INT TERM HUP
@@ -67,7 +79,7 @@ if [[ -z "$simulator_udid" ]]; then
   exit 1
 fi
 
-if ! xcrun simctl list devices available | grep -Fq "$simulator_udid"; then
+if ! xcrun simctl list devices available | grep -F "$simulator_udid" >/dev/null; then
   echo "Simulator '$simulator_udid' is not available." >&2
   exit 1
 fi
@@ -77,7 +89,7 @@ trap cleanup_serve_sim EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM HUP
 
-if ! xcrun simctl list devices booted | grep -Fq "$simulator_udid"; then
+if ! xcrun simctl list devices booted | grep -F "$simulator_udid" >/dev/null; then
   xcrun simctl boot "$simulator_udid"
 fi
 xcrun simctl bootstatus "$simulator_udid" -b
@@ -91,6 +103,7 @@ if [[ "${ZINE_SKIP_IOS_BUILD:-0}" != "1" ]]; then
     -derivedDataPath "$derived_data_path" \
     -quiet \
     "ZINE_API_BASE_URL=${ZINE_LOCAL_API_URL:?Start with bun run dev:worktree to select a local API}" \
+    "${local_api_build_settings[@]}" \
     build &
   build_pid=$!
   wait "$build_pid"
@@ -111,6 +124,12 @@ if [[ "$installed_api_url" != "${ZINE_LOCAL_API_URL:?Start with bun run dev:work
   exit 1
 fi
 echo "Verified installed native API: $installed_api_url"
+installed_extension_api_url="$(/usr/libexec/PlistBuddy -c 'Print :ZINEAPIBaseURL' "$installed_app_path/PlugIns/Zine.appex/Info.plist")"
+if [[ "$installed_extension_api_url" != "${ZINE_LOCAL_API_URL:?Start with bun run dev:worktree}" ]]; then
+  echo "Installed share extension API does not match this local stack. Rebuild without ZINE_SKIP_IOS_BUILD." >&2
+  exit 1
+fi
+echo "Verified installed share extension API: $installed_extension_api_url"
 xcrun simctl launch --terminate-running-process "$simulator_udid" "$bundle_id"
 
 echo "Starting the Zine simulator preview for $simulator_name ($simulator_udid)."

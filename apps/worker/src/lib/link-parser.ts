@@ -25,6 +25,12 @@ export interface ParsedLink {
   providerId: string;
   /** Cleaned URL with tracking parameters removed */
   canonicalUrl: string;
+  /** Public podcast-player URL details that need provider-specific preview validation. */
+  podcastLink?: {
+    player: 'apple_podcasts' | 'overcast' | 'pocket_casts';
+    kind: 'episode' | 'show' | 'private' | 'unknown';
+    episodeId?: string;
+  };
 }
 
 export { isValidUrl };
@@ -66,6 +72,40 @@ function stripTrackingParams(url: URL): string {
   }
 
   return result;
+}
+
+const PODCAST_TRACKING_PARAMS = new Set([
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+  'utm_term',
+  'utm_content',
+  'ref',
+  'ref_src',
+  'ref_url',
+  'itsct',
+  'itscg',
+  'at',
+  'ct',
+  'mt',
+  'ls',
+]);
+
+/** Keep playback-position parameters while removing ordinary share/affiliate tracking. */
+function cleanPodcastUrl(url: URL): string {
+  const cleanUrl = new URL(url.toString());
+  for (const param of PODCAST_TRACKING_PARAMS) {
+    cleanUrl.searchParams.delete(param);
+  }
+  return cleanUrl.toString().replace(/\?$/, '');
+}
+
+function hasPrivatePodcastCredentials(url: URL): boolean {
+  return (
+    url.username.length > 0 ||
+    url.password.length > 0 ||
+    [...url.searchParams.keys()].some((key) => /token|secret|auth|key/i.test(key))
+  );
 }
 
 // Provider Patterns
@@ -172,6 +212,77 @@ function parseSpotify(url: URL): ParsedLink | null {
   }
 
   return null;
+}
+
+function parseApplePodcasts(url: URL): ParsedLink | null {
+  const hostname = url.hostname.toLowerCase().replace(/^www\./, '');
+  if (hostname !== 'podcasts.apple.com') return null;
+
+  const episodeId = url.searchParams.get('i') ?? undefined;
+  const showId = url.pathname.match(/\/id(\d+)(?:\/|$)/)?.[1];
+  const hasCredentials = hasPrivatePodcastCredentials(url);
+  const kind = hasCredentials
+    ? 'private'
+    : episodeId && /^\d+$/.test(episodeId)
+      ? 'episode'
+      : 'show';
+
+  return {
+    provider: Provider.WEB,
+    contentType: ContentType.PODCAST,
+    providerId: `apple-podcasts:${episodeId ?? showId ?? url.pathname}`,
+    canonicalUrl: cleanPodcastUrl(url),
+    podcastLink: {
+      player: 'apple_podcasts',
+      kind,
+      episodeId: kind === 'episode' ? episodeId : undefined,
+    },
+  };
+}
+
+function parseOvercast(url: URL): ParsedLink | null {
+  const hostname = url.hostname.toLowerCase().replace(/^www\./, '');
+  if (hostname !== 'overcast.fm') return null;
+
+  const episodeMatch = url.pathname.match(/^\/\+([\w-]+)\/?$/);
+  const isShow = /^\/itunes\d+(?:\/[^/]+)?\/?$/.test(url.pathname);
+  const hasCredentials = hasPrivatePodcastCredentials(url);
+  const kind = hasCredentials ? 'private' : episodeMatch ? 'episode' : isShow ? 'show' : 'unknown';
+  const episodeId = episodeMatch?.[1];
+
+  return {
+    provider: Provider.WEB,
+    contentType: ContentType.PODCAST,
+    providerId: `overcast:${episodeId ?? url.pathname}`,
+    canonicalUrl: cleanPodcastUrl(url),
+    podcastLink: { player: 'overcast', kind, episodeId },
+  };
+}
+
+function pocketCastsEpisodeId(url: URL): string | undefined {
+  const parts = url.pathname.split('/').filter(Boolean);
+  if (parts[0] === 'episode' && parts[1]) return parts[1];
+  if (parts[0] === 'podcast' && parts.length >= 5) return parts[4];
+  return undefined;
+}
+
+function parsePocketCasts(url: URL): ParsedLink | null {
+  const hostname = url.hostname.toLowerCase().replace(/^www\./, '');
+  if (hostname !== 'pca.st' && hostname !== 'pocketcasts.com') return null;
+
+  const parts = url.pathname.split('/').filter(Boolean);
+  const episodeId = pocketCastsEpisodeId(url);
+  const isPrivate = parts[0] === 'follow' || hasPrivatePodcastCredentials(url);
+  const isShow = hostname === 'pocketcasts.com' && parts[0] === 'podcast' && parts.length === 3;
+  const kind = isPrivate ? 'private' : episodeId ? 'episode' : isShow ? 'show' : 'unknown';
+
+  return {
+    provider: Provider.WEB,
+    contentType: ContentType.PODCAST,
+    providerId: `pocket-casts:${episodeId ?? parts.join('/')}`,
+    canonicalUrl: cleanPodcastUrl(url),
+    podcastLink: { player: 'pocket_casts', kind, episodeId },
+  };
 }
 
 /**
@@ -293,7 +404,13 @@ export function parseLink(url: string): ParsedLink | null {
 
   // Try each provider parser in order of specificity
   const result =
-    parseYouTube(parsed) ?? parseSpotify(parsed) ?? parseSubstack(parsed) ?? parseTwitter(parsed);
+    parseYouTube(parsed) ??
+    parseSpotify(parsed) ??
+    parseApplePodcasts(parsed) ??
+    parseOvercast(parsed) ??
+    parsePocketCasts(parsed) ??
+    parseSubstack(parsed) ??
+    parseTwitter(parsed);
 
   if (result) {
     return result;

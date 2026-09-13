@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
-import { fetchLinkPreview, type PreviewContext } from './link-preview';
+import { fetchLinkPreview, LinkPreviewUnsupportedError, type PreviewContext } from './link-preview';
 import { Provider, ContentType } from '@zine/shared';
 
 // Mock dependencies
@@ -288,6 +288,138 @@ describe('link-preview', () => {
 
         expect(result).not.toBeNull();
         expect(result!.source).toBe('oembed');
+      });
+    });
+
+    describe('public podcast player URLs', () => {
+      it('uses public Apple episode metadata and retains the submitted timestamp', async () => {
+        mockScrapeOpenGraph.mockResolvedValue({
+          title: 'Episode title',
+          description: 'Podcast Episode · Example Show · Today · 42m',
+          image: 'https://example.com/art.jpg',
+          resolvedUrl: 'https://podcasts.apple.com/us/podcast/episode/id123?i=1000123456789&t=83',
+          podcastEpisode: {
+            title: 'Episode title',
+            showName: 'Example Show',
+            artworkUrl: 'https://example.com/art.jpg',
+            duration: 2520,
+          },
+        });
+
+        const result = await fetchLinkPreview(
+          'https://podcasts.apple.com/us/podcast/episode/id123?i=1000123456789&t=83&utm_source=share'
+        );
+
+        expect(result).toMatchObject({
+          provider: Provider.WEB,
+          contentType: ContentType.PODCAST,
+          providerId: 'apple_podcasts:1000123456789',
+          title: 'Episode title',
+          creator: 'Example Show',
+          duration: 2520,
+          canonicalUrl: 'https://podcasts.apple.com/us/podcast/episode/id123?i=1000123456789&t=83',
+          siteName: 'Apple Podcasts',
+          source: 'podcast_page',
+        });
+      });
+
+      it('resolves an ambiguous Pocket Casts short link to a stable episode identity', async () => {
+        mockScrapeOpenGraph.mockResolvedValue({
+          title: 'Cloud episode',
+          description: 'Episode notes',
+          image: 'https://example.com/pocket.jpg',
+          resolvedUrl:
+            'https://pocketcasts.com/podcast/cloud/show-uuid/cloud-episode/episode-uuid?t=90',
+          podcastEpisode: {
+            title: 'Cloud episode',
+            showName: 'Cloud Show',
+            artworkUrl: 'https://example.com/pocket.jpg',
+            duration: 1740,
+          },
+        });
+
+        const result = await fetchLinkPreview('https://pca.st/abc123?t=90');
+
+        expect(result).toMatchObject({
+          providerId: 'pocket_casts:episode-uuid',
+          creator: 'Cloud Show',
+          canonicalUrl: 'https://pca.st/abc123?t=90',
+          duration: 1740,
+          siteName: 'Pocket Casts',
+        });
+      });
+
+      it('allows incomplete public Overcast metadata with explicit missing details', async () => {
+        mockScrapeOpenGraph.mockResolvedValue({
+          title: null,
+          description: null,
+          image: null,
+          resolvedUrl: 'https://overcast.fm/+missing',
+          podcastEpisode: null,
+        });
+
+        const result = await fetchLinkPreview('https://overcast.fm/+missing');
+
+        expect(result).toMatchObject({
+          title: 'Podcast episode',
+          creator: 'Unknown show',
+          duration: null,
+          canonicalUrl: 'https://overcast.fm/+missing',
+          siteName: 'Overcast',
+        });
+      });
+
+      it('decodes HTML entities in public podcast metadata', async () => {
+        mockScrapeOpenGraph.mockResolvedValue({
+          title: 'Genes &amp; Memory — Huberman Lab',
+          description: null,
+          image: null,
+          resolvedUrl: 'https://overcast.fm/+episode',
+          podcastEpisode: null,
+        });
+
+        const result = await fetchLinkPreview('https://overcast.fm/+episode');
+
+        expect(result).toMatchObject({
+          title: 'Genes & Memory',
+          creator: 'Huberman Lab',
+        });
+      });
+
+      it('rejects show links without presenting them as episodes', async () => {
+        await expect(
+          fetchLinkPreview('https://podcasts.apple.com/us/podcast/example/id123456789')
+        ).rejects.toThrow('This is a podcast show link');
+        expect(mockScrapeOpenGraph).not.toHaveBeenCalled();
+      });
+
+      it('rejects private or login-gated links explicitly', async () => {
+        await expect(
+          fetchLinkPreview(
+            'https://pocketcasts.com/follow/https%3A%2F%2Fprivate.example%2Fsecret-feed'
+          )
+        ).rejects.toBeInstanceOf(LinkPreviewUnsupportedError);
+
+        mockScrapeOpenGraph.mockResolvedValue({
+          title: null,
+          description: null,
+          image: null,
+          resolvedUrl: 'https://overcast.fm/login',
+        });
+        await expect(fetchLinkPreview('https://overcast.fm/+private')).rejects.toThrow(
+          'Private or login-gated podcast episodes aren’t supported yet.'
+        );
+      });
+
+      it('rejects episode links whose public page is unavailable', async () => {
+        mockScrapeOpenGraph.mockResolvedValue({
+          resolvedUrl: 'https://overcast.fm/+missing',
+          responseStatus: 404,
+        });
+
+        await expect(fetchLinkPreview('https://overcast.fm/+missing')).rejects.toThrow(
+          'isn’t publicly accessible'
+        );
       });
     });
 

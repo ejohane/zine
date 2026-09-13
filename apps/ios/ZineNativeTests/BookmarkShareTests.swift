@@ -156,6 +156,27 @@ struct BookmarkShareTests {
     }
 
     @Test
+    func podcastPreviewClearlyLabelsMissingPublicMetadata() {
+        let preview = BookmarkSharePreview(
+            provider: "WEB",
+            contentType: "PODCAST",
+            title: "Podcast episode",
+            creator: "Unknown",
+            creatorImageUrl: nil,
+            thumbnailUrl: nil,
+            canonicalUrl: "https://overcast.fm/+episode",
+            duration: nil,
+            description: nil,
+            siteName: "Overcast",
+            readingTimeMinutes: nil
+        )
+
+        #expect(preview.creatorLabel == "Unknown show")
+        #expect(preview.lengthLabel == "Duration unavailable")
+        #expect(preview.sourceLabel == "Overcast")
+    }
+
+    @Test
     func liveClientSendsBearerTokenAndDecodesShareRequests() async throws {
         let recorder = RequestRecorder()
         let configuration = URLSessionConfiguration.ephemeral

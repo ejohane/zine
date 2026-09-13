@@ -218,6 +218,13 @@
       "when": 1788786242960,
       "tag": "0030_add_bookmark_enrichment_outbox",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1789307311000,
+      "tag": "0031_add_user_item_handoff_url",
+      "breakpoints": true
     }
   ]
 }

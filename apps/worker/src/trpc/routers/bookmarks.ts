@@ -11,11 +11,12 @@
  */
 
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { eq, and } from 'drizzle-orm';
 import { router, protectedProcedure } from '../trpc';
 import { providerConnections } from '../../db/schema';
 import { BookmarkSaveInputSchema, saveBookmark } from '../../bookmarks/save';
-import { fetchLinkPreview } from '../../lib/link-preview';
+import { fetchLinkPreview, LinkPreviewUnsupportedError } from '../../lib/link-preview';
 import { getValidAccessToken, type TokenRefreshEnv } from '../../lib/token-refresh';
 import { logger } from '../../lib/logger';
 import type { createDb } from '../../db';
@@ -96,9 +97,14 @@ export const bookmarksRouter = router({
     const accessTokens = await getUserAccessTokens(ctx.userId, ctx);
 
     // Fetch preview with optional OAuth tokens
-    const preview = await fetchLinkPreview(input.url, { accessTokens });
-
-    return preview;
+    try {
+      return await fetchLinkPreview(input.url, { accessTokens });
+    } catch (error) {
+      if (error instanceof LinkPreviewUnsupportedError) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: error.message });
+      }
+      throw error;
+    }
   }),
 
   /**

@@ -474,6 +474,9 @@ export const userItems = sqliteTable(
     archivedAt: text('archived_at'), // ISO8601 (legacy)
     lastOpenedAt: text('last_opened_at'), // ISO8601 (legacy)
 
+    // User-specific source handoff (for example, a podcast episode timestamp).
+    handoffUrl: text('handoff_url'),
+
     // Progress tracking
     progressPosition: integer('progress_position'), // Seconds
     progressDuration: integer('progress_duration'), // Seconds

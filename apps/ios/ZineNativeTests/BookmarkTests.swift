@@ -140,6 +140,20 @@ final class BookmarkTests: XCTestCase {
         XCTAssertEqual(Provider.spotify.creatorActionTitle, "View on Spotify")
         XCTAssertEqual(Provider.substack.creatorActionTitle, "View on Substack")
         XCTAssertEqual(Provider.x.creatorActionTitle, "View on X")
+        XCTAssertEqual(
+            Provider.web.openAction(
+                for: URL(string: "https://podcasts.apple.com/us/podcast/example/id1?i=2")!
+            ).title,
+            "Open in Apple Podcasts"
+        )
+        XCTAssertEqual(
+            Provider.web.openAction(for: URL(string: "https://overcast.fm/+episode")!).title,
+            "Open in Overcast"
+        )
+        XCTAssertEqual(
+            Provider.web.openAction(for: URL(string: "https://pca.st/episode/example?t=30")!).title,
+            "Open in Pocket Casts"
+        )
     }
 
     func testArticlesOpenInZineReaderForEveryProvider() {

@@ -39,6 +39,16 @@
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
+#if ZINE_ALLOW_INSECURE_LOCAL_API
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>ZINE_ATS_EXCEPTION_DOMAIN</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+		</dict>
+#endif
 	</dict>
 	<key>ZINEAPIBaseURL</key>
 	<string>$(ZINE_API_BASE_URL)</string>

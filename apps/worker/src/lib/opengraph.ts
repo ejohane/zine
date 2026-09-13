@@ -42,6 +42,17 @@ export interface OpenGraphData {
   author: string | null;
   /** Author image URL from article:author:image or author:image (resolved to absolute URL) */
   authorImageUrl: string | null;
+  /** Final response URL after redirects. */
+  resolvedUrl?: string | null;
+  /** HTTP response status when the page was reached. */
+  responseStatus?: number | null;
+  /** Public podcast episode fields exposed by supported player pages. */
+  podcastEpisode?: {
+    title: string | null;
+    showName: string | null;
+    artworkUrl: string | null;
+    duration: number | null;
+  } | null;
 }
 
 /**
@@ -72,7 +83,25 @@ function createEmptyResult(): OpenGraphData {
     type: null,
     author: null,
     authorImageUrl: null,
+    resolvedUrl: null,
+    responseStatus: null,
+    podcastEpisode: null,
   };
+}
+
+function parseHumanDuration(value: string): number | null {
+  const hours = value.match(/(\d+)\s*(?:h|hr|hrs|hour|hours)\b/i)?.[1];
+  const minutes = value.match(/(\d+)\s*(?:m|min|mins|minute|minutes)\b/i)?.[1];
+  const seconds = value.match(/(\d+)\s*(?:s|sec|secs|second|seconds)\b/i)?.[1];
+  if (!hours && !minutes && !seconds) return null;
+  return Number(hours ?? 0) * 3600 + Number(minutes ?? 0) * 60 + Number(seconds ?? 0);
+}
+
+function parseIsoDuration(value: unknown): number | null {
+  if (typeof value !== 'string') return null;
+  const match = value.match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/i);
+  if (!match) return null;
+  return Number(match[1] ?? 0) * 3600 + Number(match[2] ?? 0) * 60 + Number(match[3] ?? 0);
 }
 
 /**
@@ -129,6 +158,10 @@ export async function scrapeOpenGraph(
   // Track title text chunks (title tag content comes in chunks)
   let titleChunks: string[] = [];
   let inTitleTag = false;
+  const structuredDataChunks: string[][] = [];
+  let currentStructuredData: string[] | null = null;
+  const pocketPodcastTitleChunks: string[] = [];
+  const pocketDurationChunks: string[] = [];
 
   try {
     // Create abort controller for timeout
@@ -150,10 +183,15 @@ export async function scrapeOpenGraph(
 
     clearTimeout(timeoutId);
 
+    result.responseStatus = response.status;
+
     if (!response.ok) {
+      result.resolvedUrl = response.url || url;
       ogLogger.warn('Failed to fetch URL', { url, status: response.status });
       return result;
     }
+
+    result.resolvedUrl = response.url || url;
 
     // Check content type - only parse HTML
     const contentType = response.headers.get('content-type') || '';
@@ -262,6 +300,36 @@ export async function scrapeOpenGraph(
             }
           }
         },
+      })
+      .on('script[type="application/ld+json"]', {
+        element() {
+          currentStructuredData = [];
+          structuredDataChunks.push(currentStructuredData);
+        },
+        text(text) {
+          currentStructuredData?.push(text.text);
+          if (text.lastInTextNode) currentStructuredData = null;
+        },
+      })
+      .on('audio#audioplayer', {
+        element(el) {
+          result.podcastEpisode = {
+            title: el.getAttribute('data-title'),
+            showName: el.getAttribute('data-podcast-title'),
+            artworkUrl: el.getAttribute('data-artwork-url'),
+            duration: null,
+          };
+        },
+      })
+      .on('[data-testid="podcast-title"]', {
+        text(text) {
+          pocketPodcastTitleChunks.push(text.text);
+        },
+      })
+      .on('[class*="duration-text"]', {
+        text(text) {
+          pocketDurationChunks.push(text.text);
+        },
       });
 
     // Process the response through HTMLRewriter
@@ -273,9 +341,46 @@ export async function scrapeOpenGraph(
       result.title = titleChunks.join('').trim();
     }
 
+    for (const chunks of structuredDataChunks) {
+      try {
+        const value = JSON.parse(chunks.join('')) as {
+          '@type'?: string | string[];
+          name?: string;
+          duration?: string;
+          thumbnailUrl?: string;
+          partOfSeries?: { name?: string };
+        };
+        const types = Array.isArray(value['@type']) ? value['@type'] : [value['@type']];
+        if (types.includes('PodcastEpisode')) {
+          result.podcastEpisode = {
+            title: value.name ?? null,
+            showName: value.partOfSeries?.name ?? null,
+            artworkUrl: value.thumbnailUrl ?? null,
+            duration: parseIsoDuration(value.duration),
+          };
+          break;
+        }
+      } catch {
+        // Structured data is best-effort; ordinary OG metadata remains usable.
+      }
+    }
+
+    const pocketShowName = pocketPodcastTitleChunks.join('').trim();
+    if (pocketShowName) {
+      result.podcastEpisode = {
+        title: result.title,
+        showName: pocketShowName,
+        artworkUrl: result.image,
+        duration: parseHumanDuration(pocketDurationChunks.join(' ')),
+      };
+    }
+
     // Resolve relative image URLs
     result.image = resolveUrl(result.image, url);
     result.authorImageUrl = resolveUrl(result.authorImageUrl, url);
+    if (result.podcastEpisode?.artworkUrl) {
+      result.podcastEpisode.artworkUrl = resolveUrl(result.podcastEpisode.artworkUrl, url);
+    }
 
     ogLogger.debug('OG scrape complete', {
       url,

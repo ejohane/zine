@@ -93,6 +93,42 @@ extension Provider {
             )
         }
     }
+
+    func openAction(for destination: URL) -> ProviderOpenAction {
+        guard self == .web else { return openAction }
+
+        return switch destination.host(percentEncoded: false)?.lowercased() {
+        case "podcasts.apple.com":
+            ProviderOpenAction(
+                title: "Open in Apple Podcasts",
+                accessibilityLabel: "Open in Apple Podcasts",
+                backgroundColor: Color(red: 153 / 255, green: 78 / 255, blue: 229 / 255),
+                foregroundColor: .white,
+                logo: .system("dot.radiowaves.left.and.right"),
+                needsDarkModeBorder: false
+            )
+        case "overcast.fm", "www.overcast.fm":
+            ProviderOpenAction(
+                title: "Open in Overcast",
+                accessibilityLabel: "Open in Overcast",
+                backgroundColor: Color(red: 252 / 255, green: 126 / 255, blue: 15 / 255),
+                foregroundColor: .white,
+                logo: .system("cloud.fill"),
+                needsDarkModeBorder: false
+            )
+        case "pca.st", "pocketcasts.com", "www.pocketcasts.com":
+            ProviderOpenAction(
+                title: "Open in Pocket Casts",
+                accessibilityLabel: "Open in Pocket Casts",
+                backgroundColor: Color(red: 244 / 255, green: 62 / 255, blue: 55 / 255),
+                foregroundColor: .white,
+                logo: .system("waveform.circle.fill"),
+                needsDarkModeBorder: false
+            )
+        default:
+            openAction
+        }
+    }
 }
 
 struct ProviderLinkButton: View {
@@ -104,7 +140,7 @@ struct ProviderLinkButton: View {
     let title: String
     var onOpen: () -> Void = {}
 
-    private var action: ProviderOpenAction { provider.openAction }
+    private var action: ProviderOpenAction { provider.openAction(for: destination) }
 
     var body: some View {
         Button {
@@ -176,7 +212,7 @@ struct ProviderOpenButton: View {
         self.onOpen = onOpen
     }
 
-    private var action: ProviderOpenAction { provider.openAction }
+    private var action: ProviderOpenAction { provider.openAction(for: destination) }
 
     var body: some View {
         Button {

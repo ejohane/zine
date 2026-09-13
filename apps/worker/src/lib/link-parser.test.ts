@@ -246,6 +246,71 @@ describe('parseLink', () => {
     });
   });
 
+  describe('public podcast player episode links', () => {
+    it('classifies Apple episode links and preserves playback positions', () => {
+      const result = parseLink(
+        'https://podcasts.apple.com/us/podcast/example/id123456789?i=1000123456789&t=83&utm_source=test'
+      );
+
+      expect(result).toMatchObject({
+        provider: Provider.WEB,
+        contentType: ContentType.PODCAST,
+        providerId: 'apple-podcasts:1000123456789',
+        canonicalUrl:
+          'https://podcasts.apple.com/us/podcast/example/id123456789?i=1000123456789&t=83',
+        podcastLink: {
+          player: 'apple_podcasts',
+          kind: 'episode',
+          episodeId: '1000123456789',
+        },
+      });
+    });
+
+    it('distinguishes Apple and Overcast show links from episodes', () => {
+      expect(
+        parseLink('https://podcasts.apple.com/us/podcast/example/id123456789')?.podcastLink?.kind
+      ).toBe('show');
+      expect(parseLink('https://overcast.fm/itunes123456789')?.podcastLink?.kind).toBe('show');
+      expect(parseLink('https://overcast.fm/+BL5ZgWiWVU')?.podcastLink).toEqual({
+        player: 'overcast',
+        kind: 'episode',
+        episodeId: 'BL5ZgWiWVU',
+      });
+    });
+
+    it('preserves Pocket Casts timestamps but excludes them from episode identity', () => {
+      const result = parseLink(
+        'https://pca.st/episode/72db90b8-2c42-4235-96be-9cdfced94497?t=90&utm_campaign=share'
+      );
+
+      expect(result).toMatchObject({
+        provider: Provider.WEB,
+        contentType: ContentType.PODCAST,
+        providerId: 'pocket-casts:72db90b8-2c42-4235-96be-9cdfced94497',
+        canonicalUrl: 'https://pca.st/episode/72db90b8-2c42-4235-96be-9cdfced94497?t=90',
+        podcastLink: {
+          player: 'pocket_casts',
+          kind: 'episode',
+          episodeId: '72db90b8-2c42-4235-96be-9cdfced94497',
+        },
+      });
+    });
+
+    it('marks Pocket Casts follow links and credentialed links as private', () => {
+      expect(
+        parseLink('https://pocketcasts.com/follow/https%3A%2F%2Fprivate.example%2Ffeed')
+          ?.podcastLink?.kind
+      ).toBe('private');
+      expect(parseLink('https://user:secret@overcast.fm/+private')?.podcastLink?.kind).toBe(
+        'private'
+      );
+      expect(
+        parseLink('https://podcasts.apple.com/us/podcast/example/id123?i=456&auth_token=secret')
+          ?.podcastLink?.kind
+      ).toBe('private');
+    });
+  });
+
   describe('Substack', () => {
     describe('post URLs', () => {
       it('parses *.substack.com/p/* URLs', () => {

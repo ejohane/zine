@@ -472,21 +472,21 @@ apiV1Routes.post('/bookmarks', apiAuth('bookmarks:write'), async (c) => {
   }
 
   const caller = appRouter.createCaller(await createContext(c));
-  const preview = await caller.bookmarks.preview({ url: parsedBody.data.url });
-
-  if (!preview) {
-    return c.json(
-      {
-        error: 'URL could not be previewed',
-        code: 'UNSUPPORTED_URL',
-        requestId: c.get('requestId'),
-        traceId: c.get('traceId'),
-      },
-      422
-    );
-  }
-
   try {
+    const preview = await caller.bookmarks.preview({ url: parsedBody.data.url });
+
+    if (!preview) {
+      return c.json(
+        {
+          error: 'URL could not be previewed',
+          code: 'UNSUPPORTED_URL',
+          requestId: c.get('requestId'),
+          traceId: c.get('traceId'),
+        },
+        422
+      );
+    }
+
     const saveInput = BookmarkSaveInputSchema.safeParse({
       ...preview,
       url: parsedBody.data.url,
