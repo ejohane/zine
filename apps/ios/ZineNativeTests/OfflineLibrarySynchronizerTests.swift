@@ -42,7 +42,8 @@ final class OfflineLibrarySynchronizerTests: XCTestCase {
                 }
                 return (200, try Self.pageJSON(items: [webArticle], nextCursor: "page-2"))
             case "/api/v1/bookmarks/web-article/article-content",
-                 "/api/v1/bookmarks/rss-article/article-content":
+                 "/api/v1/bookmarks/rss-article/article-content",
+                 "/api/v1/bookmarks/substack-article/article-content":
                 return (200, Data(Self.availableArticleJSON.utf8))
             case "/api/v1/bookmarks/unavailable-article/article-content":
                 return (200, Data(Self.unavailableArticleJSON.utf8))
@@ -79,7 +80,7 @@ final class OfflineLibrarySynchronizerTests: XCTestCase {
         let cachedVideo = await articleCache.load(bookmarkID: "video")
         XCTAssertNotNil(cachedWebArticle)
         XCTAssertNotNil(cachedRssArticle)
-        XCTAssertNil(cachedSubstackArticle)
+        XCTAssertNotNil(cachedSubstackArticle)
         XCTAssertNil(cachedUnavailableArticle)
         XCTAssertNil(cachedVideo)
 
@@ -88,6 +89,7 @@ final class OfflineLibrarySynchronizerTests: XCTestCase {
         }
         XCTAssertEqual(articleRequests.map { $0.url!.path }.sorted(), [
             "/api/v1/bookmarks/rss-article/article-content",
+            "/api/v1/bookmarks/substack-article/article-content",
             "/api/v1/bookmarks/unavailable-article/article-content",
             "/api/v1/bookmarks/web-article/article-content",
         ])
@@ -96,7 +98,7 @@ final class OfflineLibrarySynchronizerTests: XCTestCase {
         let repeatedArticleRequests = OfflineSyncURLProtocol.requests.filter {
             $0.url?.path.hasSuffix("/article-content") == true
         }
-        XCTAssertEqual(repeatedArticleRequests.count, 3)
+        XCTAssertEqual(repeatedArticleRequests.count, 4)
     }
 
     private static func bookmark(

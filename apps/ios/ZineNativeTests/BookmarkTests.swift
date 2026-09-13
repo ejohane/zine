@@ -142,10 +142,39 @@ final class BookmarkTests: XCTestCase {
         XCTAssertEqual(Provider.x.creatorActionTitle, "View on X")
     }
 
-    func testSubstackArticlesKeepTheirNativeProviderDestination() {
-        XCTAssertTrue(Provider.web.opensInZineReader(contentType: .article))
-        XCTAssertTrue(Provider.rss.opensInZineReader(contentType: .article))
-        XCTAssertFalse(Provider.substack.opensInZineReader(contentType: .article))
-        XCTAssertFalse(Provider.substack.opensInZineReader(contentType: .post))
+    func testArticlesOpenInZineReaderForEveryProvider() {
+        for provider in Provider.allCases {
+            XCTAssertTrue(provider.opensInZineReader(contentType: .article), provider.rawValue)
+        }
+    }
+
+    func testSubstackArticleRoutingUsesMetadataOnStandardAndCustomDomains() throws {
+        for url in ["https://example.substack.com/p/article", "https://newsletter.example.com/p/article"] {
+            let data = Data(
+                """
+                {
+                  "id":"substack-article","itemId":"item-1","title":"Substack article",
+                  "canonicalUrl":"\(url)","contentType":"ARTICLE","provider":"SUBSTACK","creator":"Writer",
+                  "state":"BOOKMARKED","ingestedAt":"2026-09-12T00:00:00Z",
+                  "isFinished":false,"tags":[]
+                }
+                """.utf8
+            )
+            let bookmark = try JSONDecoder().decode(Bookmark.self, from: data)
+
+            XCTAssertEqual(bookmark.provider, .substack)
+            XCTAssertTrue(bookmark.provider.opensInZineReader(contentType: bookmark.contentType))
+        }
+    }
+
+    func testNonArticlesKeepTheirProviderDestination() {
+        for provider in Provider.allCases {
+            for contentType in [ContentType.post, .video, .podcast] {
+                XCTAssertFalse(
+                    provider.opensInZineReader(contentType: contentType),
+                    "\(provider.rawValue) \(contentType.rawValue)"
+                )
+            }
+        }
     }
 }

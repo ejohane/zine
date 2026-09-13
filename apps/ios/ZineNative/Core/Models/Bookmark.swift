@@ -44,7 +44,7 @@ enum Provider: String, Codable, CaseIterable, Identifiable {
     }
 
     func opensInZineReader(contentType: ContentType) -> Bool {
-        contentType == .article && self != .substack
+        contentType == .article
     }
 }
 
