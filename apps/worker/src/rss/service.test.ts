@@ -120,6 +120,14 @@ const sampleAtomBacklog = `<?xml version="1.0" encoding="utf-8"?>
   </entry>
 </feed>`;
 
+const samplePodcast = `<?xml version="1.0"?><rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"><channel>
+  <title>Example Podcast</title><item><guid>new-guid</guid><title>New episode</title>
+  <link>https://example.com/new</link><itunes:duration>42:00</itunes:duration>
+  <enclosure url="https://cdn.example/new.mp3" type="audio/mpeg" /></item>
+  <item><guid>baseline-guid</guid><title>Existing episode</title>
+  <link>https://example.com/existing</link><enclosure url="https://cdn.example/existing.mp3" type="audio/mpeg" /></item>
+</channel></rss>`;
+
 const feed = {
   id: 'feed_123',
   userId: 'user_123',
@@ -193,6 +201,92 @@ describe('syncRssFeed', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
     expect(spies.updateSpy).not.toHaveBeenCalled();
     expect(mockPrepareItem).not.toHaveBeenCalled();
+  });
+
+  it('skips paused feeds before making a network request', async () => {
+    const { db } = createMockDb();
+    const result = await syncRssFeed(db, { ...feed, status: 'PAUSED' } as SyncFeed, {
+      maxEntries: 20,
+      useConditional: false,
+    });
+    expect(result.reason).toBe('paused');
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(mockPrepareItem).not.toHaveBeenCalled();
+  });
+
+  it('establishes a podcast baseline without putting existing episodes in Inbox', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async () => new Response(samplePodcast, { status: 200 })
+    );
+    const { db, spies } = createMockDb();
+    const result = await syncRssFeed(db, { ...feed, feedType: 'PODCAST' } as SyncFeed, {
+      establishBaseline: true,
+      useConditional: false,
+    });
+    expect(result).toMatchObject({
+      newItems: 0,
+      processedEntries: 2,
+      reason: 'baseline-established',
+    });
+    expect(mockPrepareItem).not.toHaveBeenCalled();
+    expect(spies.setSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        feedType: 'PODCAST',
+        baselineEntryIdsJson: JSON.stringify(['new-guid', 'baseline-guid']),
+      })
+    );
+  });
+
+  it('ingests exactly one post-baseline podcast episode and deduplicates a retry', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async () => new Response(samplePodcast, { status: 200 })
+    );
+    mockPrepareItem
+      .mockResolvedValueOnce({
+        status: 'prepared',
+        item: {
+          newItem: {
+            id: 'new_item',
+            contentType: ContentType.PODCAST,
+            provider: Provider.RSS,
+            providerId: 'new-guid',
+            canonicalUrl: 'https://example.com/new',
+            title: 'New episode',
+            creator: 'Example Podcast',
+            durationSeconds: 2520,
+            publishedAt: Date.now(),
+            createdAt: Date.now(),
+          },
+          rawItem: {},
+          providerId: 'new-guid',
+          canonicalItemId: 'new_item',
+          canonicalItemExists: false,
+          userItemId: 'user_item_new',
+          creatorId: null,
+        },
+      })
+      .mockResolvedValueOnce({ status: 'skipped' });
+    const { db } = createMockDb();
+    const podcastFeed = {
+      ...feed,
+      feedType: 'PODCAST',
+      baselineEntryIdsJson: JSON.stringify(['baseline-guid']),
+      lastSuccessAt: Date.now() - 60_000,
+    } as SyncFeed;
+
+    const first = await syncRssFeed(db, podcastFeed, { maxEntries: 20, useConditional: false });
+    const retry = await syncRssFeed(db, podcastFeed, { maxEntries: 20, useConditional: false });
+
+    expect(first.newItems).toBe(1);
+    expect(first.processedEntries).toBe(1);
+    expect(retry.newItems).toBe(0);
+    expect(mockPrepareItem).toHaveBeenCalledTimes(2);
+    expect(mockPrepareItem.mock.calls[0]?.[0].rawItem).toMatchObject({
+      entryId: 'new-guid',
+      contentType: 'PODCAST',
+      durationSeconds: 2520,
+    });
+    expect(mockFetchLinkPreview).not.toHaveBeenCalled();
   });
 
   it('uses the requested batch size after the feed has synced successfully', async () => {

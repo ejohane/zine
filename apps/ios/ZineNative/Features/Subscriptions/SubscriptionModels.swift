@@ -225,6 +225,47 @@ struct RssFeed: Decodable, Equatable, Identifiable {
     let lastPolledAt: Int?
     let lastSuccessAt: Int?
     let autoBookmark: Bool
+    let feedType: String?
+    let sourcePlayer: String?
+}
+
+struct PodcastEpisodePreview: Decodable, Equatable, Identifiable {
+    var id: String { publisherUrl.absoluteString }
+    let title: String
+    let publishedAt: Int?
+    let durationSeconds: Int?
+    let publisherUrl: URL
+}
+
+struct PodcastShowPreview: Decodable, Equatable {
+    let feedUrl: URL
+    let title: String
+    let description: String?
+    let artworkUrl: URL?
+    let siteUrl: URL?
+    let sourcePlayer: String
+    let externalShowUrl: URL?
+    let externalShowLabel: String?
+    let matchedEntryId: String?
+    let recentEpisodes: [PodcastEpisodePreview]
+}
+
+struct PodcastShowPreviewResponse: Decodable, Equatable {
+    let podcast: PodcastShowPreview
+}
+
+struct PodcastFollowResult: Decodable, Equatable {
+    let id: String
+    let title: String
+    let feedUrl: URL
+    let status: String
+    let created: Bool
+    let baselineCount: Int
+    let reconciledBookmark: Bool
+}
+
+struct PodcastFollowResponse: Decodable, Equatable {
+    let feed: PodcastFollowResult
 }
 
 struct RssStats: Decodable, Equatable {

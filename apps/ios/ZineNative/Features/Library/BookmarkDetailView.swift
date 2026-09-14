@@ -107,6 +107,7 @@ struct BookmarkDetailView: View {
     @Environment(\.nativeCommandSession) private var commandSession
     @State private var showsReader = false
     @State private var showsTagEditor = false
+    @State private var showsPodcastFollow = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.displayScale) private var displayScale
@@ -277,6 +278,11 @@ struct BookmarkDetailView: View {
             ArticleTagEditorView(bookmarkID: content.id, initialTags: content.tags, client: client,
                 saveTags: { names in try await saveDetailTags(names).value }, onSaved: updateTags)
         }
+        .sheet(isPresented: $showsPodcastFollow) {
+            PodcastFollowSheet(bookmarkID: content.id, client: client) {
+                Task { await hydrateSubscriptionSettings() }
+            }
+        }
         .task(id: content.id) {
             await hydrateBookmark()
         }
@@ -324,6 +330,20 @@ struct BookmarkDetailView: View {
             }
 
             actionRow
+
+            if content.contentType == .podcast, content.provider == .web,
+               subscriptionSettings == nil {
+                Button {
+                    showsPodcastFollow = true
+                } label: {
+                    Label("Follow show", systemImage: "plus.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ZineTheme.brandAccent)
+                .foregroundStyle(ZineTheme.onAccent)
+                .accessibilityIdentifier("podcast-follow-show")
+            }
 
             if let summary = content.summary, !summary.isEmpty {
                 Text(BookmarkDescription.attributedText(

@@ -901,6 +901,38 @@ struct APIClient {
         try await request(url: baseURL.appending(path: "/api/v1/subscriptions/rss"))
     }
 
+    func previewPodcastShow(
+        bookmarkId: String,
+        manualFeedUrl: String? = nil
+    ) async throws -> PodcastShowPreview {
+        var request = URLRequest(
+            url: baseURL.appending(path: "/api/v1/subscriptions/podcast/preview")
+        )
+        request.httpMethod = "POST"
+        request.httpBody = try JSONEncoder().encode(
+            PodcastShowRequest(bookmarkId: bookmarkId, manualFeedUrl: manualFeedUrl)
+        )
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let response: PodcastShowPreviewResponse = try await send(request)
+        return response.podcast
+    }
+
+    func followPodcastShow(
+        bookmarkId: String,
+        manualFeedUrl: String? = nil
+    ) async throws -> PodcastFollowResult {
+        var request = URLRequest(
+            url: baseURL.appending(path: "/api/v1/subscriptions/podcast/follow")
+        )
+        request.httpMethod = "POST"
+        request.httpBody = try JSONEncoder().encode(
+            PodcastShowRequest(bookmarkId: bookmarkId, manualFeedUrl: manualFeedUrl)
+        )
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let response: PodcastFollowResponse = try await send(request)
+        return response.feed
+    }
+
     func addRssFeed(url: String) async throws {
         var request = URLRequest(url: baseURL.appending(path: "/api/v1/subscriptions/rss"))
         request.httpMethod = "POST"
@@ -1028,6 +1060,11 @@ private struct AddProviderSubscriptionRequest: Encodable {
     let channelId: String
     let name: String
     let imageUrl: String?
+}
+
+private struct PodcastShowRequest: Encodable {
+    let bookmarkId: String
+    let manualFeedUrl: String?
 }
 
 private struct ReadingProgressRequest: Encodable {

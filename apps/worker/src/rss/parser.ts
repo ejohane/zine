@@ -19,6 +19,10 @@ export interface ParsedRssEntry {
   creatorImageUrl?: string;
   publishedAt?: number;
   imageUrl?: string;
+  rawGuid?: string;
+  audioUrl?: string;
+  durationSeconds?: number;
+  contentType: 'ARTICLE' | 'PODCAST';
   articleBodyCandidate?: ParsedArticleBodyCandidate;
 }
 
@@ -27,6 +31,7 @@ export interface ParsedRssFeed {
   description?: string;
   siteUrl?: string;
   imageUrl?: string;
+  contentType: 'ARTICLE' | 'PODCAST';
   entries: ParsedRssEntry[];
 }
 
@@ -83,6 +88,30 @@ function toTimestamp(value: string | null): number | undefined {
   const timestamp = Date.parse(value);
   if (Number.isNaN(timestamp)) return undefined;
   return timestamp;
+}
+
+function attributeValue(value: unknown, key: string): string | null {
+  if (!value || typeof value !== 'object') return null;
+  return textValue((value as Record<string, unknown>)[key]);
+}
+
+function parsePodcastDuration(value: string | null): number | undefined {
+  if (!value) return undefined;
+  if (/^\d+$/.test(value)) return Number(value);
+  const parts = value.split(':').map((part) => Number(part));
+  if (parts.some((part) => !Number.isFinite(part)) || parts.length < 2 || parts.length > 3) {
+    return undefined;
+  }
+  return parts.length === 3
+    ? parts[0]! * 3600 + parts[1]! * 60 + parts[2]!
+    : parts[0]! * 60 + parts[1]!;
+}
+
+function isAudioEnclosure(enclosure: Record<string, unknown>): boolean {
+  const type = textValue(enclosure.type)?.toLowerCase();
+  if (type?.startsWith('audio/')) return true;
+  const url = textValue(enclosure.url)?.toLowerCase();
+  return Boolean(url && /\.(?:mp3|m4a|aac|ogg|opus|wav)(?:$|[?#])/.test(url));
 }
 
 function decodeCommonHtmlEntities(input: string): string {
@@ -161,14 +190,16 @@ function parseRssChannel(channel: Record<string, unknown>, feedUrl: string): Par
   const imageNode = (channel.image as Record<string, unknown> | undefined) ?? {};
   const imageUrl =
     normalizeContentUrl(
-      firstText(imageNode, ['url', 'href']) ?? firstText(channel, ['itunes:image']),
+      firstText(imageNode, ['url', 'href']) ??
+        attributeValue(channel['itunes:image'], 'href') ??
+        firstText(channel, ['itunes:image']),
       feedUrl
     ) ?? undefined;
 
   const items = asArray<Record<string, unknown>>(channel.item as Record<string, unknown>[]);
   const entries = items
     .map((item) => {
-      const itemTitle = firstText(item, ['title']) ?? 'Untitled';
+      const itemTitle = firstText(item, ['itunes:title', 'title']) ?? 'Untitled';
       const summary =
         firstText(item, ['description', 'content:encoded', 'content', 'summary']) ?? '';
       const embeddedHtml = normalizeEmbeddedHtmlCandidate(
@@ -183,16 +214,23 @@ function parseRssChannel(channel: Record<string, unknown>, feedUrl: string): Par
       const mediaContent = (item['media:content'] as Record<string, unknown> | undefined) ?? {};
       const mediaThumbnail = (item['media:thumbnail'] as Record<string, unknown> | undefined) ?? {};
 
+      const podcastEntry = isAudioEnclosure(enclosure);
+      const mediaType = textValue(mediaContent.type)?.toLowerCase();
       const imageCandidate =
-        textValue(mediaContent.url) ??
+        attributeValue(item['itunes:image'], 'href') ??
+        (mediaType?.startsWith('image/') ? textValue(mediaContent.url) : null) ??
         textValue(mediaThumbnail.url) ??
-        textValue(enclosure.url) ??
         firstText(item, ['image']) ??
         extractImageFromHtmlSnippet(summary);
 
+      const rawGuid = firstText(item, ['guid', 'id']);
+      const audioUrl = podcastEntry
+        ? (normalizeContentUrl(textValue(enclosure.url), feedUrl) ?? undefined)
+        : undefined;
+
       const identity = resolveEntryIdentity({
         feedUrl,
-        guid: firstText(item, ['guid', 'id']),
+        guid: rawGuid,
         link: firstText(item, ['link']),
         title: itemTitle,
         summary,
@@ -209,6 +247,10 @@ function parseRssChannel(channel: Record<string, unknown>, feedUrl: string): Par
         creatorImageUrl: imageUrl,
         publishedAt,
         imageUrl: normalizeContentUrl(imageCandidate, feedUrl) ?? undefined,
+        rawGuid: rawGuid ?? undefined,
+        audioUrl,
+        durationSeconds: parsePodcastDuration(firstText(item, ['itunes:duration', 'duration'])),
+        contentType: podcastEntry ? 'PODCAST' : 'ARTICLE',
         articleBodyCandidate: embeddedHtml
           ? { html: embeddedHtml, sourceKind: 'RSS_FULL', sourceUrl: feedUrl }
           : undefined,
@@ -221,6 +263,7 @@ function parseRssChannel(channel: Record<string, unknown>, feedUrl: string): Par
     description,
     siteUrl,
     imageUrl,
+    contentType: entries.some((entry) => entry.contentType === 'PODCAST') ? 'PODCAST' : 'ARTICLE',
     entries,
   };
 }
@@ -294,6 +337,8 @@ function parseAtomFeed(feed: Record<string, unknown>, feedUrl: string): ParsedRs
         creatorImageUrl: iconUrl,
         publishedAt,
         imageUrl: normalizeContentUrl(imageCandidate, feedUrl) ?? undefined,
+        rawGuid: firstText(entry, ['id']) ?? undefined,
+        contentType: 'ARTICLE',
         articleBodyCandidate: embeddedHtml
           ? { html: embeddedHtml, sourceKind: 'ATOM_FULL', sourceUrl: feedUrl }
           : undefined,
@@ -306,6 +351,7 @@ function parseAtomFeed(feed: Record<string, unknown>, feedUrl: string): ParsedRs
     description,
     siteUrl,
     imageUrl: iconUrl,
+    contentType: 'ARTICLE',
     entries,
   };
 }

@@ -52,6 +52,7 @@ export interface OpenGraphData {
     showName: string | null;
     artworkUrl: string | null;
     duration: number | null;
+    audioUrl: string | null;
   } | null;
 }
 
@@ -318,6 +319,10 @@ export async function scrapeOpenGraph(
             showName: el.getAttribute('data-podcast-title'),
             artworkUrl: el.getAttribute('data-artwork-url'),
             duration: null,
+            audioUrl:
+              el.getAttribute('data-audio-url') ??
+              el.getAttribute('data-url') ??
+              el.getAttribute('src'),
           };
         },
       })
@@ -349,6 +354,8 @@ export async function scrapeOpenGraph(
           duration?: string;
           thumbnailUrl?: string;
           partOfSeries?: { name?: string };
+          associatedMedia?: { contentUrl?: string };
+          audio?: { contentUrl?: string };
         };
         const types = Array.isArray(value['@type']) ? value['@type'] : [value['@type']];
         if (types.includes('PodcastEpisode')) {
@@ -357,6 +364,7 @@ export async function scrapeOpenGraph(
             showName: value.partOfSeries?.name ?? null,
             artworkUrl: value.thumbnailUrl ?? null,
             duration: parseIsoDuration(value.duration),
+            audioUrl: value.associatedMedia?.contentUrl ?? value.audio?.contentUrl ?? null,
           };
           break;
         }
@@ -372,6 +380,7 @@ export async function scrapeOpenGraph(
         showName: pocketShowName,
         artworkUrl: result.image,
         duration: parseHumanDuration(pocketDurationChunks.join(' ')),
+        audioUrl: result.podcastEpisode?.audioUrl ?? null,
       };
     }
 
@@ -380,6 +389,9 @@ export async function scrapeOpenGraph(
     result.authorImageUrl = resolveUrl(result.authorImageUrl, url);
     if (result.podcastEpisode?.artworkUrl) {
       result.podcastEpisode.artworkUrl = resolveUrl(result.podcastEpisode.artworkUrl, url);
+    }
+    if (result.podcastEpisode?.audioUrl) {
+      result.podcastEpisode.audioUrl = resolveUrl(result.podcastEpisode.audioUrl, url);
     }
 
     ogLogger.debug('OG scrape complete', {

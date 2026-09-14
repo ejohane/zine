@@ -80,6 +80,8 @@ export const rssRouter = router({
           description: row.description,
           siteUrl: row.siteUrl,
           imageUrl: row.imageUrl,
+          feedType: row.feedType,
+          sourcePlayer: row.sourcePlayer,
           autoBookmark: row.autoBookmark,
           status: row.status as z.infer<typeof RssFeedStatusSchema>,
           errorCount: row.errorCount,
