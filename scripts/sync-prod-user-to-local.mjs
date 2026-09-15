@@ -1,15 +1,7 @@
 #!/usr/bin/env bun
 import { execFile, execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
@@ -27,7 +19,6 @@ const SANITIZED_SQL = join(SNAPSHOT_DIR, 'local-sanitized.sql');
 const ARTICLE_BODIES_DIR = join(SNAPSHOT_DIR, 'article-bodies');
 const STAGED_STATE_DIR = join(SNAPSHOT_DIR, 'staged-wrangler-state');
 const STATE_DIR = join(WORKER_DIR, '.wrangler/state');
-const MIGRATIONS_DIR = join(WORKER_DIR, 'src/db/migrations');
 
 const PROD_DATABASE = 'zine-db-production';
 const PROD_ENV = 'production';
@@ -653,22 +644,6 @@ async function restoreLocalArticleBodies(objects) {
   });
 }
 
-function markRepoMigrationsApplied() {
-  const migrationNames = readdirSync(MIGRATIONS_DIR)
-    .filter((name) => name.endsWith('.sql'))
-    .sort();
-  const values = migrationNames.map((name) => `(${sqlString(name)})`).join(',\n  ');
-
-  runSqlite(
-    RAW_DB,
-    `
-INSERT OR IGNORE INTO d1_migrations (name)
-VALUES
-  ${values};
-`
-  );
-}
-
 function quoteIdentifier(value) {
   return `"${String(value).replaceAll('"', '""')}"`;
 }
@@ -792,7 +767,7 @@ function buildStagedLocalD1() {
     ['wrangler', 'd1', 'migrations', 'apply', 'DB', '--local', '--persist-to', STAGED_STATE_DIR],
     {
       cwd: WORKER_DIR,
-      successMessage: 'Staged local D1 migrations are marked current.',
+      successMessage: 'Staged local D1 migrations applied.',
     }
   );
 }
@@ -833,7 +808,6 @@ async function main() {
   exportProductionD1();
   buildRawSqlite();
   sanitizeSqlite();
-  markRepoMigrationsApplied();
   dumpSanitizedSql();
   printCounts();
   const articleBodyObjects = await downloadArticleBodies();

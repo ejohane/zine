@@ -1188,6 +1188,10 @@ export const rssFeeds = sqliteTable(
     description: text('description'),
     siteUrl: text('site_url'),
     imageUrl: text('image_url'),
+    feedType: text('feed_type').notNull().default('ARTICLE'), // ARTICLE | PODCAST
+    baselineEntryIdsJson: text('baseline_entry_ids_json'),
+    sourceUrl: text('source_url'),
+    sourcePlayer: text('source_player'), // APPLE_PODCASTS | OVERCAST | POCKET_CASTS | RSS
     etag: text('etag'),
     lastModified: text('last_modified'),
     lastPolledAt: integer('last_polled_at'), // Unix ms

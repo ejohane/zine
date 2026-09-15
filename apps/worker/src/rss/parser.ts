@@ -1,6 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
 
-import { deriveIdentityHash, normalizeContentUrl } from './url';
+import { deriveIdentityHash, hashString, normalizeContentUrl } from './url';
 import type { ArticleBodySourceKind } from '../article-body/types';
 
 export interface ParsedArticleBodyCandidate {
@@ -19,6 +19,10 @@ export interface ParsedRssEntry {
   creatorImageUrl?: string;
   publishedAt?: number;
   imageUrl?: string;
+  rawGuid?: string;
+  audioUrl?: string;
+  durationSeconds?: number;
+  contentType: 'ARTICLE' | 'PODCAST';
   articleBodyCandidate?: ParsedArticleBodyCandidate;
 }
 
@@ -27,6 +31,7 @@ export interface ParsedRssFeed {
   description?: string;
   siteUrl?: string;
   imageUrl?: string;
+  contentType: 'ARTICLE' | 'PODCAST';
   entries: ParsedRssEntry[];
 }
 
@@ -83,6 +88,34 @@ function toTimestamp(value: string | null): number | undefined {
   const timestamp = Date.parse(value);
   if (Number.isNaN(timestamp)) return undefined;
   return timestamp;
+}
+
+function attributeValue(value: unknown, key: string): string | null {
+  if (!value || typeof value !== 'object') return null;
+  return textValue((value as Record<string, unknown>)[key]);
+}
+
+function parsePodcastDuration(value: string | null): number | undefined {
+  if (!value) return undefined;
+  if (/^\d+$/.test(value)) return Number(value);
+  const parts = value.split(':').map((part) => Number(part));
+  if (parts.some((part) => !Number.isFinite(part)) || parts.length < 2 || parts.length > 3) {
+    return undefined;
+  }
+  return parts.length === 3
+    ? parts[0]! * 3600 + parts[1]! * 60 + parts[2]!
+    : parts[0]! * 60 + parts[1]!;
+}
+
+function isAudioEnclosure(enclosure: Record<string, unknown>): boolean {
+  const type = textValue(enclosure.type)?.toLowerCase();
+  if (type?.startsWith('audio/')) return true;
+  const url = textValue(enclosure.url)?.toLowerCase();
+  return Boolean(url && /\.(?:mp3|m4a|aac|ogg|opus|wav)(?:$|[?#])/.test(url));
+}
+
+function isLikelyAudioUrl(value: string | null): boolean {
+  return Boolean(value && /\.(?:mp3|m4a|aac|ogg|opus|wav)(?:$|[?#])/i.test(value));
 }
 
 function decodeCommonHtmlEntities(input: string): string {
@@ -153,6 +186,38 @@ function resolveEntryIdentity(params: {
   return { entryId, providerId, canonicalUrl };
 }
 
+function resolvePodcastEntryIdentity(params: {
+  feedUrl: string;
+  guid: string | null;
+  link: string | null;
+  audioUrl: string | null;
+  title: string;
+  summary: string;
+  publishedAt: number | null;
+}): Pick<ParsedRssEntry, 'entryId' | 'providerId' | 'canonicalUrl'> {
+  const canonicalFromLink = normalizeContentUrl(params.link, params.feedUrl);
+  const canonicalFromGuid = normalizeContentUrl(params.guid, params.feedUrl);
+  const normalizedAudioUrl = normalizeContentUrl(params.audioUrl, params.feedUrl);
+  const fallbackHash = deriveIdentityHash({
+    feedUrl: params.feedUrl,
+    title: params.title,
+    summary: params.summary,
+    publishedAt: params.publishedAt,
+  });
+  const feedIdentity = hashString(params.feedUrl).slice(0, 20);
+  const episodeIdentity = params.guid ?? normalizedAudioUrl ?? fallbackHash;
+
+  return {
+    entryId: episodeIdentity,
+    providerId: `podcast:${feedIdentity}:${hashString(episodeIdentity).slice(0, 40)}`,
+    canonicalUrl:
+      canonicalFromLink ??
+      canonicalFromGuid ??
+      normalizedAudioUrl ??
+      `${params.feedUrl}#entry-${fallbackHash}`,
+  };
+}
+
 function parseRssChannel(channel: Record<string, unknown>, feedUrl: string): ParsedRssFeed {
   const title = firstText(channel, ['title']) ?? undefined;
   const description = firstText(channel, ['description', 'subtitle']) ?? undefined;
@@ -161,14 +226,16 @@ function parseRssChannel(channel: Record<string, unknown>, feedUrl: string): Par
   const imageNode = (channel.image as Record<string, unknown> | undefined) ?? {};
   const imageUrl =
     normalizeContentUrl(
-      firstText(imageNode, ['url', 'href']) ?? firstText(channel, ['itunes:image']),
+      firstText(imageNode, ['url', 'href']) ??
+        attributeValue(channel['itunes:image'], 'href') ??
+        firstText(channel, ['itunes:image']),
       feedUrl
     ) ?? undefined;
 
   const items = asArray<Record<string, unknown>>(channel.item as Record<string, unknown>[]);
   const entries = items
     .map((item) => {
-      const itemTitle = firstText(item, ['title']) ?? 'Untitled';
+      const itemTitle = firstText(item, ['itunes:title', 'title']) ?? 'Untitled';
       const summary =
         firstText(item, ['description', 'content:encoded', 'content', 'summary']) ?? '';
       const embeddedHtml = normalizeEmbeddedHtmlCandidate(
@@ -183,21 +250,45 @@ function parseRssChannel(channel: Record<string, unknown>, feedUrl: string): Par
       const mediaContent = (item['media:content'] as Record<string, unknown> | undefined) ?? {};
       const mediaThumbnail = (item['media:thumbnail'] as Record<string, unknown> | undefined) ?? {};
 
+      const podcastEntry = isAudioEnclosure(enclosure);
+      const mediaType = textValue(mediaContent.type)?.toLowerCase();
+      const mediaUrl = textValue(mediaContent.url);
+      const enclosureUrl = textValue(enclosure.url);
       const imageCandidate =
-        textValue(mediaContent.url) ??
+        attributeValue(item['itunes:image'], 'href') ??
+        (mediaType?.startsWith('image/') || (!mediaType && !isLikelyAudioUrl(mediaUrl))
+          ? mediaUrl
+          : null) ??
         textValue(mediaThumbnail.url) ??
-        textValue(enclosure.url) ??
+        (!podcastEntry ? enclosureUrl : null) ??
         firstText(item, ['image']) ??
         extractImageFromHtmlSnippet(summary);
 
-      const identity = resolveEntryIdentity({
-        feedUrl,
-        guid: firstText(item, ['guid', 'id']),
-        link: firstText(item, ['link']),
-        title: itemTitle,
-        summary,
-        publishedAt: publishedAt ?? null,
-      });
+      const rawGuid = firstText(item, ['guid', 'id']);
+      const audioUrl = podcastEntry
+        ? (normalizeContentUrl(textValue(enclosure.url), feedUrl) ?? undefined)
+        : undefined;
+
+      const identity = podcastEntry
+        ? resolvePodcastEntryIdentity({
+            feedUrl,
+            guid: rawGuid,
+            link: firstText(item, ['link']),
+            audioUrl: enclosureUrl,
+            title: itemTitle,
+            summary,
+            publishedAt: publishedAt ?? null,
+          })
+        : resolveEntryIdentity({
+            feedUrl,
+            guid: rawGuid,
+            link: firstText(item, ['link']),
+            title: itemTitle,
+            summary,
+            publishedAt: publishedAt ?? null,
+          });
+
+      const normalizedImageUrl = normalizeContentUrl(imageCandidate, feedUrl) ?? undefined;
 
       return {
         entryId: identity.entryId,
@@ -208,7 +299,11 @@ function parseRssChannel(channel: Record<string, unknown>, feedUrl: string): Par
         creator,
         creatorImageUrl: imageUrl,
         publishedAt,
-        imageUrl: normalizeContentUrl(imageCandidate, feedUrl) ?? undefined,
+        imageUrl: normalizedImageUrl ?? (podcastEntry ? imageUrl : undefined),
+        rawGuid: rawGuid ?? undefined,
+        audioUrl,
+        durationSeconds: parsePodcastDuration(firstText(item, ['itunes:duration', 'duration'])),
+        contentType: podcastEntry ? 'PODCAST' : 'ARTICLE',
         articleBodyCandidate: embeddedHtml
           ? { html: embeddedHtml, sourceKind: 'RSS_FULL', sourceUrl: feedUrl }
           : undefined,
@@ -221,6 +316,7 @@ function parseRssChannel(channel: Record<string, unknown>, feedUrl: string): Par
     description,
     siteUrl,
     imageUrl,
+    contentType: entries.some((entry) => entry.contentType === 'PODCAST') ? 'PODCAST' : 'ARTICLE',
     entries,
   };
 }
@@ -294,6 +390,8 @@ function parseAtomFeed(feed: Record<string, unknown>, feedUrl: string): ParsedRs
         creatorImageUrl: iconUrl,
         publishedAt,
         imageUrl: normalizeContentUrl(imageCandidate, feedUrl) ?? undefined,
+        rawGuid: firstText(entry, ['id']) ?? undefined,
+        contentType: 'ARTICLE',
         articleBodyCandidate: embeddedHtml
           ? { html: embeddedHtml, sourceKind: 'ATOM_FULL', sourceUrl: feedUrl }
           : undefined,
@@ -306,6 +404,7 @@ function parseAtomFeed(feed: Record<string, unknown>, feedUrl: string): ParsedRs
     description,
     siteUrl,
     imageUrl: iconUrl,
+    contentType: 'ARTICLE',
     entries,
   };
 }

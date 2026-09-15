@@ -14,12 +14,12 @@ import { enqueueArticleBody, isArticleBodyEnrollmentEnabled } from '../article-b
 import { releaseLock, tryAcquireLock } from '../lib/locks';
 import type { Bindings } from '../types';
 import { parseRssFeedXml, type ParsedRssEntry, type ParsedRssFeed } from './parser';
-import { normalizeFeedUrl } from './url';
+import { fetchPublicFeedUrl, hashString, normalizeFeedUrl } from './url';
 
 const rssLogger = logger.child('rss');
 
 const FEED_FETCH_TIMEOUT_MS = 10_000;
-const MAX_FEED_BYTES = 1_500_000;
+const MAX_FEED_BYTES = 5_000_000;
 const MAX_ENTRIES_PER_SYNC = 20;
 const INITIAL_SYNC_MAX_ENTRIES = 1;
 const ERROR_THRESHOLD = 10;
@@ -49,11 +49,13 @@ interface FetchFeedResult {
   parsed?: ParsedRssFeed;
   etag: string | null;
   lastModified: string | null;
+  resolvedUrl: string;
 }
 
 interface SyncOptions {
   maxEntries?: number;
   useConditional?: boolean;
+  establishBaseline?: boolean;
   articleBodyEnv?: Pick<
     Bindings,
     'ARTICLE_BODY_PIPELINE_ENABLED' | 'ARTICLE_BODY_ENROLLMENT_MODE' | 'ARTICLE_BODY_QUEUE'
@@ -73,10 +75,9 @@ async function fetchFeed(feed: RssFeedRow, useConditional: boolean): Promise<Fet
     headers.set('If-Modified-Since', feed.lastModified);
   }
 
-  const response = await fetch(feed.feedUrl, {
+  const { response, resolvedUrl } = await fetchPublicFeedUrl(feed.feedUrl, {
     method: 'GET',
     headers,
-    redirect: 'follow',
     signal: AbortSignal.timeout(FEED_FETCH_TIMEOUT_MS),
   });
 
@@ -85,6 +86,7 @@ async function fetchFeed(feed: RssFeedRow, useConditional: boolean): Promise<Fet
       notModified: true,
       etag: feed.etag ?? response.headers.get('etag'),
       lastModified: feed.lastModified ?? response.headers.get('last-modified'),
+      resolvedUrl: feed.feedUrl,
     };
   }
 
@@ -98,13 +100,14 @@ async function fetchFeed(feed: RssFeedRow, useConditional: boolean): Promise<Fet
   }
 
   const xml = new TextDecoder().decode(payload);
-  const parsed = parseRssFeedXml(xml, feed.feedUrl);
+  const parsed = parseRssFeedXml(xml, resolvedUrl);
 
   return {
     notModified: false,
     parsed,
     etag: response.headers.get('etag'),
     lastModified: response.headers.get('last-modified'),
+    resolvedUrl,
   };
 }
 
@@ -121,6 +124,12 @@ async function enrichRssEntryMetadata(
   entry: ParsedRssEntry,
   feedId: string
 ): Promise<ParsedRssEntry> {
+  // Podcast feeds already carry authoritative episode/show metadata. A publisher
+  // page preview can replace it with generic page data or fail independently.
+  if (entry.contentType === 'PODCAST') {
+    return entry;
+  }
+
   const shouldFetchPreview =
     looksLikeHtml(entry.summary) || !entry.imageUrl || !entry.creatorImageUrl;
 
@@ -228,7 +237,7 @@ async function ingestEntry(params: {
   autoBookmark: boolean;
   entry: ParsedRssEntry;
   articleBodyEnv?: SyncOptions['articleBodyEnv'];
-}): Promise<boolean> {
+}): Promise<{ created: boolean; mapped: boolean }> {
   const { db, userId, feedId, autoBookmark, entry, articleBodyEnv } = params;
   const enrichedEntry = await enrichRssEntryMetadata(entry, feedId);
 
@@ -270,9 +279,10 @@ async function ingestEntry(params: {
         entryUrl: enrichedEntry.canonicalUrl,
         publishedAt: enrichedEntry.publishedAt,
       });
+      return { created: false, mapped: true };
     }
 
-    return false;
+    return { created: false, mapped: false };
   }
 
   const statements: BatchItem<'sqlite'>[] = [];
@@ -296,6 +306,14 @@ async function ingestEntry(params: {
           creatorId: prepared.item.creatorId,
           thumbnailUrl: prepared.item.newItem.imageUrl,
           duration: prepared.item.newItem.durationSeconds,
+          rawMetadata:
+            enrichedEntry.contentType === 'PODCAST'
+              ? JSON.stringify({
+                  rssFeedId: feedId,
+                  rawGuid: enrichedEntry.rawGuid ?? null,
+                  audioUrl: enrichedEntry.audioUrl ?? null,
+                })
+              : null,
           publishedAt: publishedAtISO,
           createdAt: nowISO,
           updatedAt: nowISO,
@@ -369,7 +387,11 @@ async function ingestEntry(params: {
 
   await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 
-  if (articleBodyEnv && isArticleBodyEnrollmentEnabled(articleBodyEnv, 'ingestion')) {
+  if (
+    enrichedEntry.contentType === 'ARTICLE' &&
+    articleBodyEnv &&
+    isArticleBodyEnrollmentEnabled(articleBodyEnv, 'ingestion')
+  ) {
     try {
       await enqueueArticleBody(db, articleBodyEnv, {
         itemId: prepared.item.canonicalItemId,
@@ -386,7 +408,7 @@ async function ingestEntry(params: {
       });
     }
   }
-  return true;
+  return { created: true, mapped: true };
 }
 
 async function ingestEntries(params: {
@@ -396,14 +418,26 @@ async function ingestEntries(params: {
   autoBookmark: boolean;
   entries: ParsedRssEntry[];
   maxEntries: number;
+  skipMappedEntries: boolean;
   articleBodyEnv?: SyncOptions['articleBodyEnv'];
-}): Promise<{ newItems: number; processedEntries: number }> {
-  const sortedEntries = sortEntriesByPublishDate(params.entries).slice(0, params.maxEntries);
+}): Promise<{ newItems: number; processedEntries: number; pendingEntries: number }> {
+  const mappedRows = params.skipMappedEntries
+    ? await params.db
+        .select({ entryId: rssFeedItems.entryId })
+        .from(rssFeedItems)
+        .where(eq(rssFeedItems.rssFeedId, params.feedId))
+    : [];
+  const mappedEntryIds = new Set(mappedRows.map((row) => row.entryId));
+  const alreadyMappedEntries = params.entries.filter((entry) =>
+    mappedEntryIds.has(entry.entryId)
+  ).length;
+  const sortedEntries = selectEntriesToIngest(params.entries, mappedEntryIds, params.maxEntries);
   let newItems = 0;
+  let mappedEntries = 0;
 
   for (const entry of sortedEntries) {
     try {
-      const created = await ingestEntry({
+      const result = await ingestEntry({
         db: params.db,
         userId: params.userId,
         feedId: params.feedId,
@@ -411,9 +445,10 @@ async function ingestEntries(params: {
         entry,
         articleBodyEnv: params.articleBodyEnv,
       });
-      if (created) {
+      if (result.created) {
         newItems += 1;
       }
+      if (result.mapped) mappedEntries += 1;
     } catch (error) {
       rssLogger.error('Failed to ingest RSS entry', {
         feedId: params.feedId,
@@ -426,7 +461,19 @@ async function ingestEntries(params: {
   return {
     newItems,
     processedEntries: sortedEntries.length,
+    pendingEntries: params.entries.length - alreadyMappedEntries - mappedEntries,
   };
+}
+
+function selectEntriesToIngest(
+  entries: ParsedRssEntry[],
+  mappedEntryIds: ReadonlySet<string>,
+  maxEntries: number,
+  skipMappedEntries = true
+): ParsedRssEntry[] {
+  return sortEntriesByPublishDate(entries)
+    .filter((entry) => !skipMappedEntries || !mappedEntryIds.has(entry.entryId))
+    .slice(0, maxEntries);
 }
 
 async function markFeedSuccess(params: {
@@ -435,6 +482,8 @@ async function markFeedSuccess(params: {
   parsed: ParsedRssFeed;
   etag: string | null;
   lastModified: string | null;
+  resolvedUrl?: string;
+  clearValidators?: boolean;
 }): Promise<void> {
   const now = Date.now();
   const safeStatus = params.feed.status === 'ERROR' ? 'ACTIVE' : params.feed.status;
@@ -442,12 +491,17 @@ async function markFeedSuccess(params: {
   await params.db
     .update(rssFeeds)
     .set({
+      feedUrl: params.resolvedUrl ?? params.feed.feedUrl,
+      feedUrlHash: hashString(params.resolvedUrl ?? params.feed.feedUrl),
       title: params.parsed.title ?? params.feed.title ?? null,
       description: params.parsed.description ?? params.feed.description ?? null,
       siteUrl: params.parsed.siteUrl ?? params.feed.siteUrl ?? null,
       imageUrl: params.parsed.imageUrl ?? params.feed.imageUrl ?? null,
-      etag: params.etag ?? params.feed.etag ?? null,
-      lastModified: params.lastModified ?? params.feed.lastModified ?? null,
+      feedType: params.parsed.contentType,
+      etag: params.clearValidators ? null : (params.etag ?? params.feed.etag ?? null),
+      lastModified: params.clearValidators
+        ? null
+        : (params.lastModified ?? params.feed.lastModified ?? null),
       lastPolledAt: now,
       lastSuccessAt: now,
       lastErrorAt: null,
@@ -510,6 +564,14 @@ export async function syncRssFeed(
       reason: 'unsubscribed',
     };
   }
+  if (feed.status === 'PAUSED') {
+    return {
+      newItems: 0,
+      processedEntries: 0,
+      skipped: true,
+      reason: 'paused',
+    };
+  }
 
   const requestedMaxEntries = options.maxEntries ?? MAX_ENTRIES_PER_SYNC;
   const maxEntries =
@@ -537,13 +599,68 @@ export async function syncRssFeed(
     }
 
     const parsed = fetched.parsed!;
-    const { newItems, processedEntries } = await ingestEntries({
+
+    if (options.establishBaseline) {
+      if (parsed.contentType !== 'PODCAST') {
+        throw new Error('The selected feed does not contain public podcast audio');
+      }
+
+      const now = Date.now();
+      await db
+        .update(rssFeeds)
+        .set({
+          feedUrl: fetched.resolvedUrl,
+          feedUrlHash: hashString(fetched.resolvedUrl),
+          feedType: 'PODCAST',
+          baselineEntryIdsJson: JSON.stringify(parsed.entries.map((entry) => entry.entryId)),
+          title: parsed.title ?? feed.title ?? null,
+          description: parsed.description ?? feed.description ?? null,
+          siteUrl: parsed.siteUrl ?? feed.siteUrl ?? null,
+          imageUrl: parsed.imageUrl ?? feed.imageUrl ?? null,
+          etag: fetched.etag,
+          lastModified: fetched.lastModified,
+          lastPolledAt: now,
+          lastSuccessAt: now,
+          lastErrorAt: null,
+          lastError: null,
+          errorCount: 0,
+          status: 'ACTIVE',
+          updatedAt: now,
+        })
+        .where(eq(rssFeeds.id, feed.id));
+
+      return {
+        newItems: 0,
+        processedEntries: parsed.entries.length,
+        skipped: false,
+        reason: 'baseline-established',
+      };
+    }
+
+    const baselineEntryIds = (() => {
+      if (feed.feedType !== 'PODCAST' || !feed.baselineEntryIdsJson) {
+        return new Set<string>();
+      }
+      try {
+        const value: unknown = JSON.parse(feed.baselineEntryIdsJson);
+        return new Set(
+          Array.isArray(value)
+            ? value.filter((entry): entry is string => typeof entry === 'string')
+            : []
+        );
+      } catch {
+        return new Set<string>();
+      }
+    })();
+    const eligibleEntries = parsed.entries.filter((entry) => !baselineEntryIds.has(entry.entryId));
+    const { newItems, processedEntries, pendingEntries } = await ingestEntries({
       db,
       userId: feed.userId,
       feedId: feed.id,
       autoBookmark: feed.autoBookmark === true,
-      entries: parsed.entries,
+      entries: eligibleEntries,
       maxEntries,
+      skipMappedEntries: feed.feedType === 'PODCAST',
       articleBodyEnv: options.articleBodyEnv,
     });
 
@@ -553,6 +670,10 @@ export async function syncRssFeed(
       parsed,
       etag: fetched.etag,
       lastModified: fetched.lastModified,
+      // A validator retained during catch-up can still match the current feed
+      // and return 304. Clear both until every eligible podcast entry maps.
+      clearValidators: feed.feedType === 'PODCAST' && pendingEntries > 0,
+      resolvedUrl: fetched.resolvedUrl,
     });
 
     return {
@@ -595,7 +716,7 @@ function dueRssFeedCondition(now: number) {
   );
 }
 
-export const rssServiceInternals = { dueRssFeedCondition };
+export const rssServiceInternals = { dueRssFeedCondition, selectEntriesToIngest };
 
 export async function pollRssFeeds(env: Bindings, _ctx: ExecutionContext): Promise<RssPollResult> {
   const lockAcquired = await tryAcquireLock(

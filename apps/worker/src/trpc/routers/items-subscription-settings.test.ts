@@ -66,7 +66,7 @@ describe('getItemSubscriptionSettings', () => {
   });
 
   it('returns no setting for an item without a managed subscription source', async () => {
-    const { context } = contextWithResults([{ itemId: 'item_4', provider: Provider.X }]);
+    const { context } = contextWithResults([{ itemId: 'item_4', provider: Provider.X }], []);
 
     await expect(getItemSubscriptionSettings(context as never, 'bookmark_4')).resolves.toBeNull();
   });

@@ -1,6 +1,13 @@
 import { Provider, SubscriptionStatus } from '@zine/shared';
+import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
+import type { Context } from 'hono';
+import { ulid } from 'ulid';
 import { z } from 'zod';
+import { createDb } from '../../db';
+import { creators, items, rssFeedItems, rssFeeds, userItems } from '../../db/schema';
+import { resolvePodcastShow } from '../../rss/podcast-resolver';
+import { buildPodcastFollowWrite } from '../../rss/podcast-follow';
 import { createContext } from '../../trpc/context';
 import { appRouter } from '../../trpc/router';
 import type { Env } from '../../types';
@@ -56,6 +63,53 @@ const UpdateRssFeedBodySchema = z
     action: z.enum(['pause', 'resume', 'auto_bookmark_on', 'auto_bookmark_off']),
   })
   .strict();
+
+const PodcastShowBodySchema = z
+  .object({
+    bookmarkId: z.string().min(1),
+    manualFeedUrl: z.string().url().optional(),
+  })
+  .strict();
+
+async function resolveOwnedPodcastBookmark(
+  c: Context<Env>,
+  bookmarkId: string,
+  manualFeedUrl?: string
+) {
+  const userId = c.get('userId');
+  if (!userId) throw new Error('Unauthorized');
+  const db = createDb(c.env.DB);
+  const rows = await db
+    .select({
+      itemId: items.id,
+      sourceUrl: userItems.handoffUrl,
+      canonicalUrl: items.canonicalUrl,
+      episodeTitle: items.title,
+      showName: creators.name,
+      publisher: items.publisher,
+      durationSeconds: items.duration,
+      contentType: items.contentType,
+    })
+    .from(userItems)
+    .innerJoin(items, eq(items.id, userItems.itemId))
+    .leftJoin(creators, eq(creators.id, items.creatorId))
+    .where(and(eq(userItems.id, bookmarkId), eq(userItems.userId, userId)))
+    .limit(1);
+  const bookmark = rows[0];
+  if (!bookmark) throw new Error('Bookmark not found');
+  if (bookmark.contentType !== 'PODCAST')
+    throw new Error('Only podcast bookmarks can follow a show');
+  const resolution = await resolvePodcastShow({
+    sourceUrl: bookmark.sourceUrl ?? bookmark.canonicalUrl,
+    manualFeedUrl,
+    hints: {
+      episodeTitle: bookmark.episodeTitle,
+      showName: bookmark.showName ?? bookmark.publisher ?? undefined,
+      durationSeconds: bookmark.durationSeconds ?? undefined,
+    },
+  });
+  return { db, userId, bookmark, resolution };
+}
 
 const UpdateXBookmarkSettingsBodySchema = z
   .object({
@@ -720,6 +774,120 @@ apiV1Routes.post('/subscriptions/gmail/sync', apiAuth('sync:write'), async (c) =
     return c.json({ ...result, requestId: c.get('requestId'), traceId: c.get('traceId') });
   } catch (error) {
     return trpcErrorResponse(c, error);
+  }
+});
+
+apiV1Routes.post('/subscriptions/podcast/preview', apiAuth('sync:read'), async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsedBody = PodcastShowBodySchema.safeParse(body);
+  if (!parsedBody.success) {
+    return c.json({ error: 'Invalid request body', code: 'INVALID_REQUEST_BODY' }, 400);
+  }
+
+  try {
+    const { resolution } = await resolveOwnedPodcastBookmark(
+      c,
+      parsedBody.data.bookmarkId,
+      parsedBody.data.manualFeedUrl
+    );
+    return c.json({
+      podcast: resolution,
+      requestId: c.get('requestId'),
+      traceId: c.get('traceId'),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Could not resolve podcast show';
+    const status = message === 'Bookmark not found' ? 404 : 422;
+    return c.json(
+      {
+        error: message,
+        code: 'PODCAST_RESOLUTION_FAILED',
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      status
+    );
+  }
+});
+
+apiV1Routes.post('/subscriptions/podcast/follow', apiAuth('sync:write'), async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsedBody = PodcastShowBodySchema.safeParse(body);
+  if (!parsedBody.success) {
+    return c.json({ error: 'Invalid request body', code: 'INVALID_REQUEST_BODY' }, 400);
+  }
+
+  try {
+    const { db, userId, bookmark, resolution } = await resolveOwnedPodcastBookmark(
+      c,
+      parsedBody.data.bookmarkId,
+      parsedBody.data.manualFeedUrl
+    );
+    const now = Date.now();
+    const existing = await db.query.rssFeeds.findFirst({
+      where: and(eq(rssFeeds.userId, userId), eq(rssFeeds.feedUrl, resolution.feedUrl)),
+    });
+    const feedId = existing?.id ?? ulid();
+    const write = buildPodcastFollowWrite(existing, resolution, now);
+
+    if (existing && write.values) {
+      await db.update(rssFeeds).set(write.values).where(eq(rssFeeds.id, existing.id));
+    } else if (!existing) {
+      await db.insert(rssFeeds).values({
+        id: feedId,
+        userId,
+        ...write.values!,
+        etag: null,
+        lastModified: null,
+        pollIntervalSeconds: 3600,
+        autoBookmark: false,
+        createdAt: now,
+      });
+    }
+
+    if (resolution.matchedEntry) {
+      await db
+        .insert(rssFeedItems)
+        .values({
+          id: ulid(),
+          rssFeedId: feedId,
+          itemId: bookmark.itemId,
+          entryId: resolution.matchedEntry.entryId,
+          entryUrl: resolution.matchedEntry.publisherUrl,
+          publishedAt: resolution.matchedEntry.publishedAt,
+          fetchedAt: now,
+        })
+        .onConflictDoNothing();
+    }
+
+    return c.json(
+      {
+        feed: {
+          id: feedId,
+          title: write.title,
+          feedUrl: resolution.feedUrl,
+          status: write.status,
+          created: !existing,
+          baselineCount: write.baselineCount,
+          reconciledBookmark: Boolean(resolution.matchedEntry),
+        },
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      existing ? 200 : 201
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Could not follow podcast show';
+    const status = message === 'Bookmark not found' ? 404 : 422;
+    return c.json(
+      {
+        error: message,
+        code: 'PODCAST_FOLLOW_FAILED',
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      status
+    );
   }
 });
 

@@ -116,6 +116,31 @@ export function normalizeFeedUrl(rawUrl: string): string {
   return normalizeUrlCommon(url).toString();
 }
 
+export async function fetchPublicFeedUrl(
+  rawUrl: string,
+  init: RequestInit,
+  maxRedirects = 5
+): Promise<{ response: Response; resolvedUrl: string }> {
+  let resolvedUrl = normalizeFeedUrl(rawUrl);
+  const redirectStatuses = new Set([301, 302, 303, 307, 308]);
+
+  for (let redirectCount = 0; redirectCount <= maxRedirects; redirectCount += 1) {
+    const response = await fetch(resolvedUrl, { ...init, redirect: 'manual' });
+    if (!redirectStatuses.has(response.status)) {
+      return { response, resolvedUrl };
+    }
+
+    const location = response.headers.get('location');
+    if (!location || redirectCount === maxRedirects) {
+      throw new Error('Feed request exceeded the safe redirect limit');
+    }
+
+    resolvedUrl = normalizeFeedUrl(new URL(location, resolvedUrl).toString());
+  }
+
+  throw new Error('Feed request exceeded the safe redirect limit');
+}
+
 export function normalizeContentUrl(
   rawUrl: string | null | undefined,
   baseUrl: string

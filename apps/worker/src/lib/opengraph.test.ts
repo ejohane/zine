@@ -220,6 +220,7 @@ describe('scrapeOpenGraph', () => {
         showName: 'Example Show',
         artworkUrl: 'https://podcasts.apple.com/art.jpg',
         duration: 3723,
+        audioUrl: null,
       });
     });
 
@@ -258,6 +259,7 @@ describe('scrapeOpenGraph', () => {
         showName: 'Example Show',
         artworkUrl: 'https://overcast.fm/art.jpg',
         duration: null,
+        audioUrl: null,
       });
     });
   });

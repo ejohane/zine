@@ -95,6 +95,16 @@ extension Provider {
     }
 
     func openAction(for destination: URL) -> ProviderOpenAction {
+        if self == .rss {
+            return ProviderOpenAction(
+                title: "Open publisher page",
+                accessibilityLabel: "Open publisher page",
+                backgroundColor: Color(uiColor: .systemBlue),
+                foregroundColor: .white,
+                logo: .system("safari.fill"),
+                needsDarkModeBorder: false
+            )
+        }
         guard self == .web else { return openAction }
 
         return switch destination.host(percentEncoded: false)?.lowercased() {

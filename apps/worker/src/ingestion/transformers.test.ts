@@ -111,6 +111,21 @@ describe('transformRssEntry', () => {
 
     expect(result.description).toBe('Plain summary');
   });
+
+  it('classifies audio-feed entries as podcasts and retains duration', () => {
+    const result = transformRssEntry({
+      providerId: 'episode-guid-42',
+      canonicalUrl: 'https://publisher.example/episodes/42',
+      title: 'Episode 42',
+      creator: 'Example Podcast',
+      contentType: 'PODCAST',
+      durationSeconds: 3723,
+    });
+
+    expect(result.provider).toBe(Provider.RSS);
+    expect(result.contentType).toBe(ContentType.PODCAST);
+    expect(result.durationSeconds).toBe(3723);
+  });
 });
 
 afterEach(() => {

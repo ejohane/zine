@@ -251,6 +251,8 @@ export interface RssEntryForTransform {
   creatorImageUrl?: string;
   imageUrl?: string;
   publishedAt?: number;
+  durationSeconds?: number;
+  contentType?: 'ARTICLE' | 'PODCAST';
 }
 
 /**
@@ -269,7 +271,7 @@ export function transformRssEntry(entry: RssEntryForTransform): NewItem {
 
   return {
     id: ulid(),
-    contentType: ContentType.ARTICLE,
+    contentType: entry.contentType === 'PODCAST' ? ContentType.PODCAST : ContentType.ARTICLE,
     provider: Provider.RSS,
     providerId: entry.providerId,
     canonicalUrl: entry.canonicalUrl,
@@ -278,6 +280,7 @@ export function transformRssEntry(entry: RssEntryForTransform): NewItem {
     creator: decodeHtmlEntities(entry.creator || 'Unknown'),
     creatorImageUrl: entry.creatorImageUrl,
     imageUrl: entry.imageUrl,
+    durationSeconds: entry.durationSeconds,
     publishedAt: entry.publishedAt ?? now,
     createdAt: now,
   };

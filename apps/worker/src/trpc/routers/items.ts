@@ -162,28 +162,27 @@ async function getItemSubscriptionSettings(
       : null;
   }
 
-  if (ownedItem.provider === Provider.RSS) {
-    const rows = await ctx.db
-      .select({
-        sourceId: rssFeeds.id,
-        autoBookmark: rssFeeds.autoBookmark,
-      })
-      .from(rssFeedItems)
-      .innerJoin(rssFeeds, eq(rssFeedItems.rssFeedId, rssFeeds.id))
-      .where(and(eq(rssFeedItems.itemId, ownedItem.itemId), eq(rssFeeds.userId, ctx.userId)))
-      .limit(1);
+  // A saved player-scoped podcast bookmark remains WEB so its original handoff
+  // URL is preserved. Once it is reconciled to a followed RSS entry, expose the
+  // feed's controls through the same mapping as native RSS-ingested episodes.
+  const rows = await ctx.db
+    .select({
+      sourceId: rssFeeds.id,
+      autoBookmark: rssFeeds.autoBookmark,
+    })
+    .from(rssFeedItems)
+    .innerJoin(rssFeeds, eq(rssFeedItems.rssFeedId, rssFeeds.id))
+    .where(and(eq(rssFeedItems.itemId, ownedItem.itemId), eq(rssFeeds.userId, ctx.userId)))
+    .limit(1);
 
-    const row = rows[0];
-    return row
-      ? {
-          sourceId: row.sourceId,
-          provider: Provider.RSS,
-          autoBookmark: row.autoBookmark,
-        }
-      : null;
-  }
-
-  return null;
+  const row = rows[0];
+  return row
+    ? {
+        sourceId: row.sourceId,
+        provider: Provider.RSS,
+        autoBookmark: row.autoBookmark,
+      }
+    : null;
 }
 
 function parseCollectionRules(rulesJson: string): CollectionRules {

@@ -209,7 +209,7 @@ struct RssSubscriptionsView: View {
                         systemImage: searchText.isEmpty ? SubscriptionSource.rss.systemImage : "magnifyingglass",
                         description: Text(
                             searchText.isEmpty
-                                ? "Paste a feed URL above to start syncing articles."
+                                ? "Paste a feed URL above to start syncing articles or podcast episodes."
                                 : "Try another title or URL."
                         )
                     )
@@ -229,7 +229,7 @@ struct RssSubscriptionsView: View {
     private func feedRow(_ feed: RssFeed) -> some View {
         HStack(spacing: 12) {
             CachedRemoteImage(url: feed.imageUrl, targetSize: CGSize(width: 44, height: 44)) {
-                Image(systemName: "dot.radiowaves.left.and.right")
+                Image(systemName: feed.feedType == "PODCAST" ? "waveform" : "dot.radiowaves.left.and.right")
                     .resizable()
                     .scaledToFit()
                     .padding(10)
@@ -247,6 +247,11 @@ struct RssSubscriptionsView: View {
                     .foregroundStyle(
                         feed.status == .active ? ZineTheme.secondaryText : ZineTheme.brandAccent
                     )
+                if feed.feedType == "PODCAST" {
+                    Text("Podcast")
+                        .font(.system(.caption2, design: .rounded, weight: .semibold))
+                        .foregroundStyle(ZineTheme.secondaryText)
+                }
             }
 
             Spacer()
