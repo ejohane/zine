@@ -132,11 +132,13 @@ Away from the top, a single tap on ordinary content toggles the controls;
 sustained upward scrolling reveals them and downward scrolling hides them.
 Links and WebKit text selection keep their native interactions. VoiceOver keeps
 the controls available, and Reduce Motion disables the chrome transition.
-Appearance and tagging use native sheets. A settled scroll to the bottom opens
-a completion sheet once per visit, with saving, confirmation, and retry states.
-The bottom tag, links, and completion controls share the top controls’ scroll and tap
-visibility. The completion control opens the sheet at any point. The inline end action can also reopen it after dismissal. Completion remains
-reversible in the More menu.
+Appearance and tagging use native sheets. A settled scroll to the bottom reveals
+both control bars without changing completion state. The bottom tag, links, and
+completion controls share the top controls’ scroll and tap visibility. The
+completion control updates the article directly with optimistic feedback and a
+retry alert if persistence fails. Completion remains reversible from the same
+control and the More menu. The reader adds no end-of-article footer or divider;
+publisher-provided body content remains intact.
 
 Appearance persists in local preferences (System, Charter, or Georgia, plus text
 scale) and combines with Dynamic Type. Legacy size presets migrate on first use.

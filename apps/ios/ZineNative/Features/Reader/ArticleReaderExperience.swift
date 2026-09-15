@@ -42,6 +42,13 @@ struct ArticleReaderChromeState {
         travel = 0
     }
 
+    mutating func reveal() -> Bool? {
+        travel = 0
+        guard !isVisible else { return nil }
+        isVisible = true
+        return true
+    }
+
     mutating func begin(at offset: CGFloat) {
         lastOffset = offset
         travel = 0
@@ -74,14 +81,14 @@ struct ArticleReaderChromeState {
     }
 }
 
-/// A settled user scroll can prompt once; layout and restored positions cannot.
+/// A settled user scroll reveals chrome once per arrival at the end.
 struct ArticleReaderEndState {
-    private(set) var hasPresented = false
+    private var isAtEnd = false
 
     mutating func settled(offset: CGFloat, maximum: CGFloat) -> Bool {
-        guard !hasPresented, offset >= max(0, maximum) - 8 else { return false }
-        hasPresented = true
-        return true
+        let nextIsAtEnd = offset >= max(0, maximum) - 8
+        defer { isAtEnd = nextIsAtEnd }
+        return nextIsAtEnd && !isAtEnd
     }
 }
 
@@ -210,12 +217,6 @@ enum ArticleReaderScript {
           if (atTop) { pinned = null; scrollTo(0, 0); }
           else { pinned = position; settle(position); }
         },
-        completion(finished, busy) {
-          const footer = document.getElementById('zine-reader-end');
-          const button = footer.querySelector('button');
-          button.textContent = finished ? 'Mark Unfinished' : 'Mark Complete';
-          button.disabled = busy;
-        },
         save
       };
       new ResizeObserver(() => { if (pinned) settle(pinned); }).observe(document.body);
@@ -229,7 +230,6 @@ enum ArticleReaderScript {
         touch = {x:event.clientX, y:event.clientY, time:Date.now(), hadSelection:!getSelection().isCollapsed};
       }, {passive:true});
       document.addEventListener('click', event => {
-        if (event.target.closest('#zine-reader-end button')) { send({type:'complete'}); return; }
         if (event.target.closest('a, button, input, textarea, select, [contenteditable], summary')) return;
         if (!getSelection().isCollapsed || event.detail > 1) return;
         if (touch && (touch.hadSelection || Date.now() - touch.time > 350 || Math.hypot(event.clientX - touch.x, event.clientY - touch.y) > 10)) return;

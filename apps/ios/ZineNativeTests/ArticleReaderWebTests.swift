@@ -38,9 +38,7 @@ final class ArticleReaderWebTests: XCTestCase {
             <html><head><meta name="viewport" content="width=device-width, initial-scale=1">
             <meta http-equiv="Content-Security-Policy" content="script-src 'none'">
             <style>body { padding: 24px; font-size: calc(17px * var(--reader-font-scale, 1)); font-family: var(--reader-font-family, Georgia); } p { margin-bottom: 30px; }</style>
-            </head><body><main><a href="https://example.com">Ordinary link</a>\(paragraphs)</main>
-            <footer id="zine-reader-end"><button>Mark Complete</button></footer>
-            </body></html>
+            </head><body><main><a href="https://example.com">Ordinary link</a>\(paragraphs)</main></body></html>
             """, baseURL: URL(string: "https://example.com/article"))
         for _ in 0..<100 {
             if let ready = try? await evaluate("Boolean(window.zineReader)", in: web) as? Bool, ready {
@@ -151,7 +149,7 @@ final class ArticleReaderWebTests: XCTestCase {
         XCTAssertEqual(empty?.count, 0)
     }
 
-    func testLinksSelectionAndCompletionDoNotToggleChrome() async throws {
+    func testLinksAndSelectionDoNotToggleChrome() async throws {
         let (web, recorder) = try await makeWebView()
         _ = try await evaluate("document.querySelector('a').dispatchEvent(new MouseEvent('click', {bubbles:true}));", in: web)
         _ = try await evaluate("""
@@ -161,10 +159,7 @@ final class ArticleReaderWebTests: XCTestCase {
             """, in: web)
         try await Task.sleep(for: .milliseconds(350))
         XCTAssertFalse(recorder.types.contains("toggle"))
-        _ = try await evaluate("getSelection().removeAllRanges(); document.querySelector('footer button').click();", in: web)
-        try await Task.sleep(for: .milliseconds(50))
-        XCTAssertTrue(recorder.types.contains("complete"))
-        XCTAssertFalse(recorder.types.contains("toggle"))
+        _ = try await evaluate("getSelection().removeAllRanges();", in: web)
         _ = try await evaluate("document.querySelector('p').dispatchEvent(new MouseEvent('click', {bubbles:true}));", in: web)
         try await Task.sleep(for: .milliseconds(350))
         XCTAssertEqual(recorder.types.filter { $0 == "toggle" }.count, 1)
