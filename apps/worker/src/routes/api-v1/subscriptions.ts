@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { createDb } from '../../db';
 import { creators, items, rssFeedItems, rssFeeds, userItems } from '../../db/schema';
 import { resolvePodcastShow } from '../../rss/podcast-resolver';
-import { hashString } from '../../rss/url';
+import { buildPodcastFollowWrite } from '../../rss/podcast-follow';
 import { createContext } from '../../trpc/context';
 import { appRouter } from '../../trpc/router';
 import type { Env } from '../../types';
@@ -828,33 +828,15 @@ apiV1Routes.post('/subscriptions/podcast/follow', apiAuth('sync:write'), async (
       where: and(eq(rssFeeds.userId, userId), eq(rssFeeds.feedUrl, resolution.feedUrl)),
     });
     const feedId = existing?.id ?? ulid();
-    const values = {
-      feedUrl: resolution.feedUrl,
-      feedUrlHash: hashString(resolution.feedUrl),
-      title: resolution.title,
-      description: resolution.description,
-      siteUrl: resolution.siteUrl,
-      imageUrl: resolution.artworkUrl,
-      feedType: 'PODCAST',
-      baselineEntryIdsJson: JSON.stringify(resolution.baselineEntryIds),
-      sourceUrl: resolution.sourceUrl,
-      sourcePlayer: resolution.sourcePlayer,
-      status: 'ACTIVE',
-      lastPolledAt: now,
-      lastSuccessAt: now,
-      lastErrorAt: null,
-      lastError: null,
-      errorCount: 0,
-      updatedAt: now,
-    } as const;
+    const write = buildPodcastFollowWrite(existing, resolution, now);
 
-    if (existing) {
-      await db.update(rssFeeds).set(values).where(eq(rssFeeds.id, existing.id));
-    } else {
+    if (existing && write.values) {
+      await db.update(rssFeeds).set(write.values).where(eq(rssFeeds.id, existing.id));
+    } else if (!existing) {
       await db.insert(rssFeeds).values({
         id: feedId,
         userId,
-        ...values,
+        ...write.values!,
         etag: null,
         lastModified: null,
         pollIntervalSeconds: 3600,
@@ -882,11 +864,11 @@ apiV1Routes.post('/subscriptions/podcast/follow', apiAuth('sync:write'), async (
       {
         feed: {
           id: feedId,
-          title: resolution.title,
+          title: write.title,
           feedUrl: resolution.feedUrl,
-          status: 'ACTIVE',
+          status: write.status,
           created: !existing,
-          baselineCount: resolution.baselineEntryIds.length,
+          baselineCount: write.baselineCount,
           reconciledBookmark: Boolean(resolution.matchedEntry),
         },
         requestId: c.get('requestId'),

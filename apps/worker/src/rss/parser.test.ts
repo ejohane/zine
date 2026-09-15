@@ -40,6 +40,49 @@ describe('parseRssFeedXml', () => {
     expect(entry?.imageUrl).toBeUndefined();
     expect(entry?.audioUrl).toBe('https://cdn.example/audio.mp3');
   });
+
+  it('scopes podcast identity to the feed and GUID when episode links are reused', () => {
+    const xml = `<?xml version="1.0"?><rss version="2.0"><channel><title>Audio</title>
+      <item><guid>episode-1</guid><title>One</title><link>https://example.com/episodes</link>
+        <enclosure url="https://cdn.example/one.mp3" type="audio/mpeg" /></item>
+      <item><guid>episode-2</guid><title>Two</title><link>https://example.com/episodes</link>
+        <enclosure url="https://cdn.example/two.mp3" type="audio/mpeg" /></item>
+    </channel></rss>`;
+    const entries = parseRssFeedXml(xml, 'https://example.com/feed.xml').entries;
+
+    expect(entries[0]?.canonicalUrl).toBe(entries[1]?.canonicalUrl);
+    expect(entries[0]?.providerId).not.toBe(entries[1]?.providerId);
+    expect(entries.map((entry) => entry.entryId)).toEqual(['episode-1', 'episode-2']);
+  });
+
+  it('falls back from missing episode artwork to show artwork', () => {
+    const xml = `<?xml version="1.0"?><rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"><channel>
+      <title>Audio</title><itunes:image href="https://cdn.example/show.jpg" />
+      <item><guid>episode-1</guid><title>One</title>
+        <enclosure url="https://cdn.example/one.mp3" type="audio/mpeg" /></item>
+    </channel></rss>`;
+
+    const entry = parseRssFeedXml(xml, 'https://example.com/feed.xml').entries[0];
+    expect(entry?.imageUrl).toBe('https://cdn.example/show.jpg');
+  });
+
+  it('preserves non-audio enclosure and untyped media artwork for articles', () => {
+    const enclosureXml = `<?xml version="1.0"?><rss version="2.0"><channel><title>Articles</title><item>
+      <guid>article-1</guid><title>One</title>
+      <enclosure url="https://cdn.example/article.jpg" type="image/jpeg" />
+    </item></channel></rss>`;
+    const mediaXml = `<?xml version="1.0"?><rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/"><channel><title>Articles</title><item>
+      <guid>article-2</guid><title>Two</title>
+      <media:content url="https://cdn.example/media.jpg" />
+    </item></channel></rss>`;
+
+    expect(parseRssFeedXml(enclosureXml, 'https://example.com/feed.xml').entries[0]?.imageUrl).toBe(
+      'https://cdn.example/article.jpg'
+    );
+    expect(parseRssFeedXml(mediaXml, 'https://example.com/feed.xml').entries[0]?.imageUrl).toBe(
+      'https://cdn.example/media.jpg'
+    );
+  });
   it('parses RSS 2.0 feeds', () => {
     const xml = `<?xml version="1.0"?>
       <rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">

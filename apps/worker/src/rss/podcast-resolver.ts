@@ -1,6 +1,6 @@
 import { scrapeOpenGraph } from '../lib/opengraph';
 import { parseRssFeedXml, type ParsedRssEntry, type ParsedRssFeed } from './parser';
-import { normalizeFeedUrl } from './url';
+import { fetchPublicFeedUrl, normalizeFeedUrl } from './url';
 
 const DIRECTORY_TIMEOUT_MS = 10_000;
 const MAX_FEED_BYTES = 5_000_000;
@@ -104,12 +104,11 @@ async function fetchParsedFeed(
   rawFeedUrl: string
 ): Promise<{ feedUrl: string; parsed: ParsedRssFeed }> {
   const feedUrl = normalizeFeedUrl(rawFeedUrl);
-  const response = await fetch(feedUrl, {
+  const { response, resolvedUrl: resolvedFeedUrl } = await fetchPublicFeedUrl(feedUrl, {
     headers: {
       Accept: 'application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8',
       'User-Agent': 'ZinePodcastResolver/1.0 (+https://myzine.app)',
     },
-    redirect: 'follow',
     signal: AbortSignal.timeout(DIRECTORY_TIMEOUT_MS),
   });
   if (!response.ok)
@@ -117,7 +116,6 @@ async function fetchParsedFeed(
   const payload = await response.arrayBuffer();
   if (payload.byteLength > MAX_FEED_BYTES)
     throw new PodcastResolutionError('Podcast feed is too large');
-  const resolvedFeedUrl = normalizeFeedUrl(response.url || feedUrl);
   const parsed = parseRssFeedXml(new TextDecoder().decode(payload), resolvedFeedUrl);
   if (parsed.contentType !== 'PODCAST') {
     throw new PodcastResolutionError('The selected feed does not contain public podcast audio');
@@ -126,13 +124,9 @@ async function fetchParsedFeed(
 }
 
 function exactEntryMatch(
-  feedTitle: string | null | undefined,
   entries: ParsedRssEntry[],
   evidence: {
     audioUrl?: string | null;
-    title?: string;
-    showName?: string;
-    durationSeconds?: number;
   }
 ): ParsedRssEntry | null {
   if (evidence.audioUrl) {
@@ -141,24 +135,6 @@ function exactEntryMatch(
     if (match) return match;
   }
 
-  if (
-    evidence.title &&
-    evidence.showName &&
-    feedTitle &&
-    normalizedText(feedTitle) === normalizedText(evidence.showName) &&
-    evidence.durationSeconds != null
-  ) {
-    const title = normalizedText(evidence.title);
-    return (
-      entries.find(
-        (entry) =>
-          normalizedText(entry.title) === title &&
-          entry.durationSeconds != null &&
-          // Player pages commonly round a displayed duration to the nearest minute.
-          Math.abs(entry.durationSeconds - evidence.durationSeconds!) <= 90
-      ) ?? null
-    );
-  }
   return null;
 }
 
@@ -221,12 +197,8 @@ async function resolveViaAppleId(sourceUrl: string, sourcePlayer: PodcastPlayer,
     ? results.find((result) => result.trackId === Number(episodeId) && result.episodeUrl)
     : null;
   const matchedEntry = episode
-    ? exactEntryMatch(parsed.title, parsed.entries, {
+    ? exactEntryMatch(parsed.entries, {
         audioUrl: episode.episodeUrl,
-        title: episode.trackName,
-        showName: directory.collectionName,
-        durationSeconds:
-          episode.trackTimeMillis != null ? Math.floor(episode.trackTimeMillis / 1000) : undefined,
       })
     : null;
   return buildResolution({ feedUrl, parsed, sourceUrl, sourcePlayer, directory, matchedEntry });
@@ -254,17 +226,12 @@ export async function resolvePodcastShow(params: {
 
   if (params.manualFeedUrl) {
     const { feedUrl, parsed } = await fetchParsedFeed(params.manualFeedUrl);
-    const matchedEntry = exactEntryMatch(parsed.title, parsed.entries, {
-      title: params.hints?.episodeTitle,
-      showName: params.hints?.showName,
-      durationSeconds: params.hints?.durationSeconds,
-    });
     return buildResolution({
       feedUrl,
       parsed,
       sourceUrl: source.toString(),
       sourcePlayer: sourcePlayer ?? 'RSS',
-      matchedEntry,
+      matchedEntry: null,
     });
   }
 
@@ -279,8 +246,6 @@ export async function resolvePodcastShow(params: {
   }
 
   const showName = page.podcastEpisode?.showName ?? params.hints?.showName;
-  const episodeTitle = page.podcastEpisode?.title ?? params.hints?.episodeTitle;
-  const durationSeconds = page.podcastEpisode?.duration ?? params.hints?.durationSeconds;
   if (!showName)
     throw new PodcastResolutionError(
       'Zine could not identify the show. Paste the public RSS feed instead.'
@@ -299,11 +264,8 @@ export async function resolvePodcastShow(params: {
     try {
       const { feedUrl, parsed } = await fetchParsedFeed(directory.feedUrl);
       if (normalizedText(parsed.title) !== normalizedText(showName)) continue;
-      const matchedEntry = exactEntryMatch(parsed.title, parsed.entries, {
+      const matchedEntry = exactEntryMatch(parsed.entries, {
         audioUrl: page.podcastEpisode?.audioUrl,
-        title: episodeTitle,
-        showName,
-        durationSeconds,
       });
       if (!matchedEntry) continue;
       return buildResolution({

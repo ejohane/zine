@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { deriveIdentityHash, normalizeContentUrl, normalizeFeedUrl } from './url';
+import {
+  deriveIdentityHash,
+  fetchPublicFeedUrl,
+  normalizeContentUrl,
+  normalizeFeedUrl,
+} from './url';
 
 describe('rss url utilities', () => {
   it('normalizes feed urls and strips tracking params', () => {
@@ -44,5 +49,34 @@ describe('rss url utilities', () => {
 
     expect(first).toBe(second);
     expect(first.length).toBeGreaterThan(8);
+  });
+
+  it('rejects a redirect to a private host before following it', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { location: 'http://127.0.0.1/private.xml' },
+      })
+    );
+
+    await expect(fetchPublicFeedUrl('https://example.com/feed.xml', {})).rejects.toThrow(
+      'unsafe or private host'
+    );
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://example.com/feed.xml',
+      expect.objectContaining({ redirect: 'manual' })
+    );
+  });
+
+  it('passes a conditional 304 response through without requiring a location', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 304 }));
+
+    const result = await fetchPublicFeedUrl('https://example.com/feed.xml', {
+      headers: { 'If-None-Match': '"current"' },
+    });
+
+    expect(result.response.status).toBe(304);
+    expect(result.resolvedUrl).toBe('https://example.com/feed.xml');
   });
 });

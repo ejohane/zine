@@ -1,6 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
 
-import { deriveIdentityHash, normalizeContentUrl } from './url';
+import { deriveIdentityHash, hashString, normalizeContentUrl } from './url';
 import type { ArticleBodySourceKind } from '../article-body/types';
 
 export interface ParsedArticleBodyCandidate {
@@ -114,6 +114,10 @@ function isAudioEnclosure(enclosure: Record<string, unknown>): boolean {
   return Boolean(url && /\.(?:mp3|m4a|aac|ogg|opus|wav)(?:$|[?#])/.test(url));
 }
 
+function isLikelyAudioUrl(value: string | null): boolean {
+  return Boolean(value && /\.(?:mp3|m4a|aac|ogg|opus|wav)(?:$|[?#])/i.test(value));
+}
+
 function decodeCommonHtmlEntities(input: string): string {
   return input
     .replace(/&lt;/gi, '<')
@@ -182,6 +186,38 @@ function resolveEntryIdentity(params: {
   return { entryId, providerId, canonicalUrl };
 }
 
+function resolvePodcastEntryIdentity(params: {
+  feedUrl: string;
+  guid: string | null;
+  link: string | null;
+  audioUrl: string | null;
+  title: string;
+  summary: string;
+  publishedAt: number | null;
+}): Pick<ParsedRssEntry, 'entryId' | 'providerId' | 'canonicalUrl'> {
+  const canonicalFromLink = normalizeContentUrl(params.link, params.feedUrl);
+  const canonicalFromGuid = normalizeContentUrl(params.guid, params.feedUrl);
+  const normalizedAudioUrl = normalizeContentUrl(params.audioUrl, params.feedUrl);
+  const fallbackHash = deriveIdentityHash({
+    feedUrl: params.feedUrl,
+    title: params.title,
+    summary: params.summary,
+    publishedAt: params.publishedAt,
+  });
+  const feedIdentity = hashString(params.feedUrl).slice(0, 20);
+  const episodeIdentity = params.guid ?? normalizedAudioUrl ?? fallbackHash;
+
+  return {
+    entryId: episodeIdentity,
+    providerId: `podcast:${feedIdentity}:${hashString(episodeIdentity).slice(0, 40)}`,
+    canonicalUrl:
+      canonicalFromLink ??
+      canonicalFromGuid ??
+      normalizedAudioUrl ??
+      `${params.feedUrl}#entry-${fallbackHash}`,
+  };
+}
+
 function parseRssChannel(channel: Record<string, unknown>, feedUrl: string): ParsedRssFeed {
   const title = firstText(channel, ['title']) ?? undefined;
   const description = firstText(channel, ['description', 'subtitle']) ?? undefined;
@@ -216,10 +252,15 @@ function parseRssChannel(channel: Record<string, unknown>, feedUrl: string): Par
 
       const podcastEntry = isAudioEnclosure(enclosure);
       const mediaType = textValue(mediaContent.type)?.toLowerCase();
+      const mediaUrl = textValue(mediaContent.url);
+      const enclosureUrl = textValue(enclosure.url);
       const imageCandidate =
         attributeValue(item['itunes:image'], 'href') ??
-        (mediaType?.startsWith('image/') ? textValue(mediaContent.url) : null) ??
+        (mediaType?.startsWith('image/') || (!mediaType && !isLikelyAudioUrl(mediaUrl))
+          ? mediaUrl
+          : null) ??
         textValue(mediaThumbnail.url) ??
+        (!podcastEntry ? enclosureUrl : null) ??
         firstText(item, ['image']) ??
         extractImageFromHtmlSnippet(summary);
 
@@ -228,14 +269,26 @@ function parseRssChannel(channel: Record<string, unknown>, feedUrl: string): Par
         ? (normalizeContentUrl(textValue(enclosure.url), feedUrl) ?? undefined)
         : undefined;
 
-      const identity = resolveEntryIdentity({
-        feedUrl,
-        guid: rawGuid,
-        link: firstText(item, ['link']),
-        title: itemTitle,
-        summary,
-        publishedAt: publishedAt ?? null,
-      });
+      const identity = podcastEntry
+        ? resolvePodcastEntryIdentity({
+            feedUrl,
+            guid: rawGuid,
+            link: firstText(item, ['link']),
+            audioUrl: enclosureUrl,
+            title: itemTitle,
+            summary,
+            publishedAt: publishedAt ?? null,
+          })
+        : resolveEntryIdentity({
+            feedUrl,
+            guid: rawGuid,
+            link: firstText(item, ['link']),
+            title: itemTitle,
+            summary,
+            publishedAt: publishedAt ?? null,
+          });
+
+      const normalizedImageUrl = normalizeContentUrl(imageCandidate, feedUrl) ?? undefined;
 
       return {
         entryId: identity.entryId,
@@ -246,7 +299,7 @@ function parseRssChannel(channel: Record<string, unknown>, feedUrl: string): Par
         creator,
         creatorImageUrl: imageUrl,
         publishedAt,
-        imageUrl: normalizeContentUrl(imageCandidate, feedUrl) ?? undefined,
+        imageUrl: normalizedImageUrl ?? (podcastEntry ? imageUrl : undefined),
         rawGuid: rawGuid ?? undefined,
         audioUrl,
         durationSeconds: parsePodcastDuration(firstText(item, ['itunes:duration', 'duration'])),

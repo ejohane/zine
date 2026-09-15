@@ -153,7 +153,7 @@ describe('resolvePodcastShow', () => {
     expect(result.matchedEntryId).toBeNull();
   });
 
-  it('reconciles a manual feed using exact show, episode, and duration evidence', async () => {
+  it('follows a manual feed without claiming title and duration prove episode identity', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(podcastFeed, { status: 200 }));
 
     const result = await resolvePodcastShow({
@@ -166,7 +166,24 @@ describe('resolvePodcastShow', () => {
       },
     });
 
-    expect(result.matchedEntryId).toBe('saved-guid');
+    expect(result.matchedEntryId).toBeNull();
+  });
+
+  it('rejects a podcast feed redirect to a private destination before following it', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { location: 'http://127.0.0.1/private.xml' },
+      })
+    );
+
+    await expect(
+      resolvePodcastShow({
+        sourceUrl: 'https://overcast.fm/+episode',
+        manualFeedUrl: 'https://publisher.example/feed.xml',
+      })
+    ).rejects.toThrow('unsafe or private host');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
   it('rejects a manual feed that has no public audio enclosures', async () => {

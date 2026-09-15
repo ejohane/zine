@@ -42,6 +42,7 @@ function createMockDb(options?: {
   existingThumbnailUrl?: string | null;
   existingSummary?: string | null;
   existingCreatorId?: string | null;
+  mappedEntryIdBatches?: string[][];
 }) {
   const itemFindFirst = vi.fn().mockResolvedValue({
     id: 'item_123',
@@ -56,6 +57,18 @@ function createMockDb(options?: {
   const onConflictDoNothingSpy = vi.fn().mockResolvedValue(undefined);
   const valuesSpy = vi.fn(() => ({ onConflictDoNothing: onConflictDoNothingSpy }));
   const insertSpy = vi.fn(() => ({ values: valuesSpy }));
+  const mappedEntryIdBatches = options?.mappedEntryIdBatches ?? [[]];
+  let mappedEntryIdBatchIndex = 0;
+  const selectWhereSpy = vi.fn(async () => {
+    const batch =
+      mappedEntryIdBatches[Math.min(mappedEntryIdBatchIndex, mappedEntryIdBatches.length - 1)] ??
+      [];
+    mappedEntryIdBatchIndex += 1;
+    return batch.map((entryId) => ({ entryId }));
+  });
+  const selectSpy = vi.fn(() => ({
+    from: vi.fn(() => ({ where: selectWhereSpy })),
+  }));
 
   return {
     db: {
@@ -65,6 +78,7 @@ function createMockDb(options?: {
         },
       },
       update: updateSpy,
+      select: selectSpy,
       insert: insertSpy,
       batch: vi.fn(),
     } as unknown as SyncDb,
@@ -76,6 +90,8 @@ function createMockDb(options?: {
       insertSpy,
       valuesSpy,
       onConflictDoNothingSpy,
+      selectSpy,
+      selectWhereSpy,
     },
   };
 }
@@ -214,6 +230,21 @@ describe('syncRssFeed', () => {
     expect(mockPrepareItem).not.toHaveBeenCalled();
   });
 
+  it('treats a conditional 304 as not modified', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 304 }));
+    const { db } = createMockDb();
+
+    const result = await syncRssFeed(
+      db,
+      { ...feed, etag: '"current"', lastSuccessAt: Date.now() - 60_000 } as SyncFeed,
+      { useConditional: true }
+    );
+
+    expect(result).toMatchObject({ skipped: true, reason: 'not_modified', processedEntries: 0 });
+    const [, init] = vi.mocked(globalThis.fetch).mock.calls[0] ?? [];
+    expect(new Headers(init?.headers).get('if-none-match')).toBe('"current"');
+  });
+
   it('establishes a podcast baseline without putting existing episodes in Inbox', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(
       async () => new Response(samplePodcast, { status: 200 })
@@ -308,6 +339,65 @@ describe('syncRssFeed', () => {
 
     expect(result.processedEntries).toBe(2);
     expect(mockPrepareItem).toHaveBeenCalledTimes(2);
+  });
+
+  it('drains 21 unseen episodes before accepting the new conditional validator', async () => {
+    const entries = Array.from({ length: 21 }, (_, index) => {
+      const number = 21 - index;
+      return `<item><guid>guid-${number}</guid><title>Episode ${number}</title>
+        <pubDate>${new Date(Date.UTC(2026, 8, number)).toUTCString()}</pubDate>
+        <link>https://example.com/${number}</link>
+        <enclosure url="https://cdn.example/${number}.mp3" type="audio/mpeg" /></item>`;
+    }).join('');
+    const expandedFeed = `<?xml version="1.0"?><rss version="2.0"><channel><title>Show</title>${entries}</channel></rss>`;
+    const requestEtags: Array<string | null> = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      requestEtags.push(new Headers(init?.headers).get('if-none-match'));
+      return new Response(expandedFeed, { status: 200, headers: { etag: '"expanded"' } });
+    });
+    const firstTwenty = Array.from({ length: 20 }, (_, index) => `guid-${21 - index}`);
+    const { db, spies } = createMockDb({ mappedEntryIdBatches: [[], firstTwenty] });
+    const podcastFeed = {
+      ...feed,
+      feedType: 'PODCAST',
+      baselineEntryIdsJson: '[]',
+      etag: '"baseline"',
+      lastSuccessAt: Date.now() - 60_000,
+    } as SyncFeed;
+
+    const first = await syncRssFeed(db, podcastFeed, { maxEntries: 20, useConditional: true });
+    const second = await syncRssFeed(
+      db,
+      { ...podcastFeed, etag: null, lastModified: null },
+      { maxEntries: 20, useConditional: true }
+    );
+
+    expect(first.processedEntries).toBe(20);
+    expect(second.processedEntries).toBe(1);
+    expect(requestEtags).toEqual(['"baseline"', null]);
+    const feedUpdates = (spies.setSpy.mock.calls as unknown[][])
+      .map((call) => call[0] as { etag?: string | null })
+      .filter((values) => 'etag' in values);
+    expect(feedUpdates[0]?.etag).toBeNull();
+    expect(feedUpdates[1]?.etag).toBe('"expanded"');
+  });
+
+  it('keeps an unmapped entry eligible for the next bounded attempt', () => {
+    const entries = Array.from({ length: 2 }, (_, index) => ({
+      entryId: `guid-${index}`,
+      providerId: `provider-${index}`,
+      canonicalUrl: `https://example.com/${index}`,
+      title: `Episode ${index}`,
+      creator: 'Show',
+      publishedAt: index,
+      contentType: 'PODCAST' as const,
+    }));
+
+    expect(
+      rssServiceInternals
+        .selectEntriesToIngest(entries, new Set(['guid-1']), 20)
+        .map((entry) => entry.entryId)
+    ).toEqual(['guid-0']);
   });
 
   it('enrolls a new RSS article with its embedded Atom candidate in all mode', async () => {
