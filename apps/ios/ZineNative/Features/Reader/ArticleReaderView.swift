@@ -1,7 +1,7 @@
 import SwiftUI
 
 private enum ArticleReaderSheet: String, Identifiable {
-    case tags, appearance, completion, links
+    case tags, appearance, links
 
     var id: String { rawValue }
 }
@@ -28,6 +28,7 @@ struct ArticleReaderView: View {
     @State private var articleLinks: [ArticleReaderLink]?
     @State private var linksFailed = false
     @State private var bookmarkHapticTrigger = 0
+    @State private var completionHapticTrigger = 0
     @State private var linkSaveStates: [String: ArticleLinkSaveState] = [:]
     @State private var actionErrorMessage: String?
 
@@ -106,13 +107,17 @@ struct ArticleReaderView: View {
                         .accessibilityIdentifier("article-reader-links")
 
                         Button {
-                            presentedSheet = .completion
+                            completionHapticTrigger += 1
+                            toggleFinished()
                         } label: {
                             readerControlSymbol(store.isFinished ? "checkmark.circle.fill" : "checkmark.circle")
                                 .frame(width: 48, height: 48)
+                                .foregroundStyle(store.isFinished ? .green : ZineTheme.primaryText)
+                                .contentTransition(.symbolEffect(.replace))
                         }
-                        .accessibilityLabel("Finish reading")
-                        .accessibilityHint("Opens reading completion options")
+                        .disabled(store.isUpdatingFinished)
+                        .accessibilityLabel(store.isFinished ? "Mark unfinished" : "Mark complete")
+                        .accessibilityHint("Updates the article immediately")
                         .accessibilityIdentifier("article-reader-completion")
                     }
                     .buttonStyle(.plain)
@@ -130,6 +135,7 @@ struct ArticleReaderView: View {
             }
         }
         .sensoryFeedback(.impact(weight: .heavy, intensity: 1), trigger: bookmarkHapticTrigger)
+        .sensoryFeedback(.impact(weight: .heavy, intensity: 1), trigger: completionHapticTrigger)
         .accessibilityAction(.escape) { dismiss() }
         .toolbarVisibility(.hidden, for: .navigationBar)
         .zinePushedDestinationChrome()
@@ -195,14 +201,6 @@ struct ArticleReaderView: View {
             switch destination {
             case .links:
                 ArticleReaderLinksSheet(links: articleLinks, failed: linksFailed, saveStates: linkSaveStates, onSave: saveLink)
-            case .completion:
-                ArticleReaderCompletionSheet(
-                    title: store.metadata.title,
-                    isFinished: store.isFinished,
-                    isSaving: store.isUpdatingFinished,
-                    errorMessage: actionErrorMessage,
-                    onMarkComplete: toggleFinished
-                )
             case .appearance:
                 ArticleReaderAppearanceSheet(textScale: $textScale, fontFamily: $storedFontFamily)
             case .tags:
@@ -218,10 +216,11 @@ struct ArticleReaderView: View {
             }
         }
         .alert("Couldn’t update article", isPresented: Binding(
-            get: { actionErrorMessage != nil && presentedSheet != .completion },
+            get: { actionErrorMessage != nil },
             set: { if !$0 { actionErrorMessage = nil } }
         )) {
-            Button("OK", role: .cancel) {}
+            Button("Try Again", action: toggleFinished)
+            Button("Cancel", role: .cancel) {}
         } message: {
             Text(actionErrorMessage ?? "Please try again.")
         }
@@ -266,24 +265,14 @@ struct ArticleReaderView: View {
             initialPosition: store.initialReadingPosition,
             fontScale: min(max(textScale, 0.85), 1.6) * dynamicScale,
             fontFamily: ArticleReaderFontFamily(rawValue: storedFontFamily) ?? .system,
-            isFinished: store.isFinished,
-            isUpdatingFinished: store.isUpdatingFinished,
             onProgressChanged: updateScrollProgress,
             onScrollSettled: persistSettledProgress,
             onChromeVisibilityChanged: { chromeVisible = $0 },
             onPositionChanged: { position in
                 Task { await client.saveArticleReadingPosition(id: store.metadata.bookmarkID, position: position) }
             },
-            onToggleFinished: {
-                if store.isFinished { toggleFinished() }
-                else { presentedSheet = .completion }
-            },
             onOpenURL: { openURL($0) },
             topContentInset: topInset,
-            onReachedEnd: {
-                guard presentedSheet == nil else { return }
-                presentedSheet = .completion
-            },
             onLinksLoaded: { result in
                 switch result {
                 case let .success(links): articleLinks = links; linksFailed = false
@@ -552,63 +541,6 @@ private struct ArticleReaderLinksSheet: View {
         .presentationBackground(ZineTheme.surface)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-    }
-}
-
-private struct ArticleReaderCompletionSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    let title: String
-    let isFinished: Bool
-    let isSaving: Bool
-    let errorMessage: String?
-    let onMarkComplete: () -> Void
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: isFinished && !isSaving ? "checkmark.circle.fill" : "book.closed")
-                .font(.system(size: 32))
-                .foregroundStyle(ZineTheme.brandAccent)
-                .accessibilityHidden(true)
-            Text(isFinished && !isSaving ? "Reading complete" : "Finish reading")
-                .font(.title2.weight(.semibold))
-            Text(title)
-                .font(.subheadline)
-                .foregroundStyle(ZineTheme.secondaryText)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.callout)
-                    .foregroundStyle(ZineTheme.secondaryText)
-                    .multilineTextAlignment(.center)
-                    .accessibilityIdentifier("article-completion-error")
-            }
-            if !isFinished || isSaving {
-                Button(action: onMarkComplete) {
-                    HStack(spacing: 8) {
-                        if isSaving { ProgressView().tint(ZineTheme.onAccent) }
-                        Text(isSaving ? "Saving…" : "Mark Complete")
-                            .fontWeight(.semibold)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 48)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(ZineTheme.onAccent)
-                .background(ZineTheme.brandAccent, in: Capsule())
-                .disabled(isSaving)
-                .accessibilityIdentifier("article-completion-confirm")
-            }
-            Button(isFinished && !isSaving ? "Done" : "Keep Reading") { dismiss() }
-                .frame(minHeight: 44)
-                .disabled(isSaving)
-        }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .foregroundStyle(ZineTheme.primaryText)
-        .presentationBackground(ZineTheme.surface)
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-        .interactiveDismissDisabled(isSaving)
     }
 }
 

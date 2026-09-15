@@ -99,7 +99,7 @@ enum ArticleHTMLDocumentBuilder {
             body {
               margin: 0 auto;
               max-width: 760px;
-              padding: calc(var(--reader-top-inset) + 72px) 22px 0;
+              padding: calc(var(--reader-top-inset) + 72px) 22px calc(env(safe-area-inset-bottom) + 68px);
               background: #\(ZineTheme.Role.surface.lightHex);
               color: #\(ZineTheme.Role.readerBodyText.lightHex);
               font: -apple-system-body;
@@ -205,12 +205,6 @@ enum ArticleHTMLDocumentBuilder {
             a { color: #\(ZineTheme.Role.inlineLink.lightHex); text-decoration-thickness: 0.08em; }
             hr { border: 0; border-top: 1px solid #\(ZineTheme.Role.border.lightHex); margin: 2em 0; }
             ::selection { background: rgba(239, 102, 31, 0.24); }
-            #zine-reader-end { margin-top: 48px; padding: 24px 0 0; border-top: 1px solid #\(ZineTheme.Role.border.lightHex); }
-            #zine-reader-end button {
-              font: inherit; font-weight: 600; color: #\(ZineTheme.Role.inlineLink.lightHex); background: transparent;
-              border: 0; padding: 10px 0; min-height: 44px; text-align: left;
-            }
-            #zine-reader-end button:disabled { opacity: 0.5; }
             @media (prefers-color-scheme: dark) {
               body { background: #\(ZineTheme.Role.surface.darkHex); color: #\(ZineTheme.Role.readerBodyText.darkHex); }
               h1, h2, h3, h4, h5, h6 { color: #\(ZineTheme.Role.primaryText.darkHex); }
@@ -219,8 +213,6 @@ enum ArticleHTMLDocumentBuilder {
               blockquote { color: #\(ZineTheme.Role.secondaryText.darkHex); border-left-color: #\(ZineTheme.Role.brandAccent.lightHex); }
               pre { background: #\(ZineTheme.Role.raised.darkHex); }
               a { color: #\(ZineTheme.Role.inlineLink.darkHex); }
-              #zine-reader-end { border-color: #\(ZineTheme.Role.border.darkHex); }
-              #zine-reader-end button { color: #\(ZineTheme.Role.inlineLink.darkHex); }
               hr, .title-rule { border-top-color: #\(ZineTheme.Role.border.darkHex); }
             }
             @media (max-width: 420px) {
@@ -235,9 +227,6 @@ enum ArticleHTMLDocumentBuilder {
             <hr class="title-rule" aria-hidden="true">
           </header>
           <main>\(body)</main>
-          <footer id="zine-reader-end" aria-label="Article completion">
-            <button type="button">Mark Complete</button>
-          </footer>
         </body>
         </html>
         """
@@ -268,16 +257,12 @@ struct ArticleHTMLView: UIViewRepresentable {
     let initialPosition: ArticleReadingPosition?
     let fontScale: Double
     let fontFamily: ArticleReaderFontFamily
-    let isFinished: Bool
-    let isUpdatingFinished: Bool
     let onProgressChanged: (Double) -> Void
     let onScrollSettled: (Double) -> Void
     let onChromeVisibilityChanged: (Bool) -> Void
     let onPositionChanged: (ArticleReadingPosition) -> Void
-    let onToggleFinished: () -> Void
     let onOpenURL: (URL) -> Void
     var topContentInset: CGFloat = 0
-    var onReachedEnd: () -> Void = {}
     var onLinksLoaded: (Result<[ArticleReaderLink], Error>) -> Void = { _ in }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -396,13 +381,11 @@ struct ArticleHTMLView: UIViewRepresentable {
         func update(_ next: ArticleHTMLView, in webView: WKWebView) {
             let appearanceChanged = parent.fontScale != next.fontScale || parent.fontFamily != next.fontFamily
             let layoutChanged = parent.topContentInset != next.topContentInset
-            let completionChanged = parent.isFinished != next.isFinished || parent.isUpdatingFinished != next.isUpdatingFinished
             parent = next
             if loadedHash != next.document.contentHash { load(next.document, in: webView); return }
             guard ready else { return }
             if layoutChanged { run("window.zineReader.layout(\(parent.topContentInset));", in: webView) }
             if appearanceChanged { applyAppearance(in: webView) }
-            if completionChanged { applyCompletion(in: webView) }
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation?) {
@@ -430,15 +413,10 @@ struct ArticleHTMLView: UIViewRepresentable {
             }
             run("window.zineReader.restore(\(json));", in: webView)
             applyAppearance(in: webView)
-            applyCompletion(in: webView)
         }
 
         private func applyAppearance(in webView: WKWebView) {
             run("window.zineReader.appearance(\(parent.fontScale), '\(parent.fontFamily.css)');", in: webView)
-        }
-
-        private func applyCompletion(in webView: WKWebView) {
-            run("window.zineReader.completion(\(parent.isFinished), \(parent.isUpdatingFinished));", in: webView)
         }
 
         private func run(_ script: String, in webView: WKWebView) {
@@ -455,7 +433,6 @@ struct ArticleHTMLView: UIViewRepresentable {
             guard message.frameInfo.isMainFrame, let body = message.body as? [String: Any] else { return }
             switch body["type"] as? String {
             case "toggle": _ = toggleChrome()
-            case "complete": parent.onToggleFinished()
             case "position": acceptPosition(body)
             default: break
             }
@@ -524,7 +501,9 @@ struct ArticleHTMLView: UIViewRepresentable {
             if endState.settled(
                 offset: scrollView.contentOffset.y,
                 maximum: scrollView.contentSize.height - scrollView.bounds.height
-            ) { parent.onReachedEnd() }
+            ), let visible = chrome.reveal() {
+                parent.onChromeVisibilityChanged(visible)
+            }
             if let webView { capturePosition(in: webView) }
         }
         private func progress(in scrollView: UIScrollView) -> Double {

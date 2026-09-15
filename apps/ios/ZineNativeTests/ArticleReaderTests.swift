@@ -43,7 +43,7 @@ final class ArticleReaderTests: XCTestCase {
 
         XCTAssertTrue(html.contains("--reader-font-scale: 1.3"))
         XCTAssertTrue(html.contains("font-size: calc(17px * var(--reader-font-scale))"))
-        XCTAssertTrue(html.contains("padding: calc(var(--reader-top-inset) + 72px) 22px 0"))
+        XCTAssertTrue(html.contains("padding: calc(var(--reader-top-inset) + 72px) 22px calc(env(safe-area-inset-bottom) + 68px)"))
         XCTAssertFalse(html.contains("zoom:"))
     }
 
@@ -82,6 +82,23 @@ final class ArticleReaderTests: XCTestCase {
         XCTAssertLessThan(html.range(of: title)!.lowerBound, html.range(of: metadata)!.lowerBound)
         XCTAssertLessThan(html.range(of: metadata)!.lowerBound, html.range(of: rule)!.lowerBound)
         XCTAssertLessThan(html.range(of: rule)!.lowerBound, html.range(of: body)!.lowerBound)
+    }
+
+    func testHTMLDocumentOmitsOnlyTheAppGeneratedEndFooter() throws {
+        let response = try JSONDecoder().decode(
+            ArticleContentResponse.self,
+            from: Data(Self.availableJSON.replacingOccurrences(
+                of: "<article><p>Readable body</p></article>",
+                with: "<article><p>Readable body</p><hr id='publisher-rule'><footer id='publisher-footer'>Publisher notes</footer></article>"
+            ).utf8)
+        )
+        let html = ArticleHTMLDocumentBuilder.makeHTML(
+            for: ArticleReaderDocument(metadata: Self.metadata(), response: response)
+        )
+
+        XCTAssertFalse(html.contains("zine-reader-end"))
+        XCTAssertTrue(html.contains("<hr id='publisher-rule'>"))
+        XCTAssertTrue(html.contains("<footer id='publisher-footer'>Publisher notes</footer>"))
     }
 
     func testReaderFontSizePresetsHaveStableIncreasingScales() {
@@ -147,18 +164,28 @@ final class ArticleReaderTests: XCTestCase {
         XCTAssertTrue(chrome.isVisible)
     }
 
-    func testCompletionPromptWaitsForBottomAndOnlyPresentsOnce() {
+    func testEndRevealFiresOncePerArrivalWithoutBounceRepeats() {
         var end = ArticleReaderEndState()
         XCTAssertFalse(end.settled(offset: 500, maximum: 1000))
         XCTAssertTrue(end.settled(offset: 998, maximum: 1000))
         XCTAssertFalse(end.settled(offset: 1000, maximum: 1000))
         XCTAssertFalse(end.settled(offset: 500, maximum: 1000))
-        XCTAssertFalse(end.settled(offset: 1000, maximum: 1000))
+        XCTAssertTrue(end.settled(offset: 1000, maximum: 1000))
     }
 
-    func testShortArticleCanPresentCompletionAfterUserScroll() {
+    func testShortArticleCanRevealControlsAfterUserScroll() {
         var end = ArticleReaderEndState()
         XCTAssertTrue(end.settled(offset: 0, maximum: -100))
+    }
+
+    func testEndRevealResetsChromeTravelAndDoesNotToggleVisibleChrome() {
+        var chrome = ArticleReaderChromeState()
+        XCTAssertNil(chrome.reveal())
+        chrome.toggle(at: 200)
+        XCTAssertFalse(chrome.isVisible)
+        XCTAssertEqual(chrome.reveal(), true)
+        XCTAssertTrue(chrome.isVisible)
+        XCTAssertNil(chrome.reveal())
     }
 
     func testChromeRequiresSustainedDirectionAndIgnoresJitter() {
