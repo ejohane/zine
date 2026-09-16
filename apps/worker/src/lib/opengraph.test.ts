@@ -264,6 +264,22 @@ describe('scrapeOpenGraph', () => {
     });
   });
 
+  it('extracts the Overcast RSS badge and nested audio source', async () => {
+    mockFetch(`<html><body>
+      <audio id="audioplayer" data-podcast-title="Huberman Lab">
+        <source src="https://traffic.megaphone.fm/SCIM2290485637.mp3#t=0" type="audio/mpeg" />
+      </audio>
+      <div class="externalbadges">
+        <a href="https://podcasts.apple.com/podcast/id1545953110"><img src="/img/badge-apple.svg" /></a>
+        <a href="https://feeds.megaphone.fm/hubermanlab"><img src="/img/badge-rss.svg" /></a>
+      </div></body></html>`);
+    const result = await scrapeOpenGraph('https://overcast.fm/+AA2-B-UYX2s');
+    expect(result.podcastFeedUrl).toBe('https://feeds.megaphone.fm/hubermanlab');
+    expect(result.podcastEpisode?.audioUrl).toBe(
+      'https://traffic.megaphone.fm/SCIM2290485637.mp3#t=0'
+    );
+  });
+
   describe('URL resolution', () => {
     it('should resolve relative image URLs', async () => {
       mockFetch(createHtmlWithOG({ image: '/images/og.jpg' }));

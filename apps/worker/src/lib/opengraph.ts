@@ -46,6 +46,8 @@ export interface OpenGraphData {
   resolvedUrl?: string | null;
   /** HTTP response status when the page was reached. */
   responseStatus?: number | null;
+  /** Public RSS feed explicitly linked by a supported player page. */
+  podcastFeedUrl?: string | null;
   /** Public podcast episode fields exposed by supported player pages. */
   podcastEpisode?: {
     title: string | null;
@@ -163,6 +165,7 @@ export async function scrapeOpenGraph(
   let currentStructuredData: string[] | null = null;
   const pocketPodcastTitleChunks: string[] = [];
   const pocketDurationChunks: string[] = [];
+  let externalBadgeHref: string | null = null;
 
   try {
     // Create abort controller for timeout
@@ -324,6 +327,27 @@ export async function scrapeOpenGraph(
               el.getAttribute('data-url') ??
               el.getAttribute('src'),
           };
+        },
+      })
+      .on('audio#audioplayer source', {
+        element(el) {
+          if (result.podcastEpisode && !result.podcastEpisode.audioUrl) {
+            result.podcastEpisode.audioUrl = el.getAttribute('src');
+          }
+        },
+      })
+      .on('.externalbadges a', {
+        element(el) {
+          externalBadgeHref = el.getAttribute('href');
+        },
+      })
+      .on('.externalbadges a img', {
+        element(el) {
+          // Overcast publishes an explicit RSS badge alongside its player links.
+          const host = new URL(response.url || url).hostname;
+          if (host === 'overcast.fm' && el.getAttribute('src') === '/img/badge-rss.svg') {
+            result.podcastFeedUrl = resolveUrl(externalBadgeHref, response.url || url);
+          }
         },
       })
       .on('[data-testid="podcast-title"]', {

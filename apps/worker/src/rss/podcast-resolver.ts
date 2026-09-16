@@ -95,6 +95,11 @@ async function fetchJson(url: URL): Promise<AppleLookupResponse> {
     headers: { Accept: 'application/json', 'User-Agent': 'ZinePodcastResolver/1.0' },
     signal: AbortSignal.timeout(DIRECTORY_TIMEOUT_MS),
   });
+  if (response.status === 429 || response.status >= 500) {
+    throw new PodcastResolutionError(
+      'The podcast directory is temporarily unavailable. Please try again later, or paste the public RSS feed.'
+    );
+  }
   if (!response.ok)
     throw new PodcastResolutionError(`Podcast directory request failed (${response.status})`);
   return (await response.json()) as AppleLookupResponse;
@@ -250,6 +255,28 @@ export async function resolvePodcastShow(params: {
     throw new PodcastResolutionError(
       'Zine could not identify the show. Paste the public RSS feed instead.'
     );
+
+  // Prefer an explicit player RSS link over a directory search. Verify both the
+  // show and exact enclosure before trusting it or reconciling the saved item.
+  if (page.podcastFeedUrl) {
+    try {
+      const { feedUrl, parsed } = await fetchParsedFeed(page.podcastFeedUrl);
+      const matchedEntry = exactEntryMatch(parsed.entries, {
+        audioUrl: page.podcastEpisode?.audioUrl,
+      });
+      if (normalizedText(parsed.title) === normalizedText(showName) && matchedEntry) {
+        return buildResolution({
+          feedUrl,
+          parsed,
+          sourceUrl: source.toString(),
+          sourcePlayer: sourcePlayer!,
+          matchedEntry,
+        });
+      }
+    } catch {
+      // A stale or invalid player link can still be resolved through the directory.
+    }
+  }
 
   const search = new URL('https://itunes.apple.com/search');
   search.searchParams.set('term', showName);

@@ -100,6 +100,51 @@ describe('resolvePodcastShow', () => {
     expect(result.matchedEntryId).toBe('saved-guid');
   });
 
+  it('uses a verified direct Overcast feed without calling the Apple directory', async () => {
+    mockScrapeOpenGraph.mockResolvedValue({
+      responseStatus: 200,
+      resolvedUrl: 'https://overcast.fm/+episode',
+      podcastFeedUrl: 'https://publisher.example/feed.xml',
+      podcastEpisode: { showName: 'Example Show', audioUrl: 'https://cdn.example/saved.mp3#t=42' },
+    });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(podcastFeed));
+    const result = await resolvePodcastShow({ sourceUrl: 'https://overcast.fm/+episode' });
+    expect(result.matchedEntryId).toBe('saved-guid');
+    expect(result.baselineEntryIds).toEqual(['new-guid', 'saved-guid']);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0][0])).toBe('https://publisher.example/feed.xml');
+  });
+
+  it.each([
+    ['Wrong Show', 'https://cdn.example/saved.mp3'],
+    ['Example Show', 'https://cdn.example/unrelated.mp3'],
+  ])(
+    'does not trust a direct feed with mismatched show or enclosure: %s %s',
+    async (showName, audioUrl) => {
+      mockScrapeOpenGraph.mockResolvedValue({
+        responseStatus: 200,
+        podcastFeedUrl: 'https://publisher.example/feed.xml',
+        podcastEpisode: { showName, audioUrl },
+      });
+      vi.spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(new Response(podcastFeed))
+        .mockResolvedValueOnce(Response.json({ results: [] }));
+      await expect(
+        resolvePodcastShow({ sourceUrl: 'https://overcast.fm/+episode' })
+      ).rejects.toThrow('could not verify');
+    }
+  );
+
+  it('explains directory throttling without claiming the feed is missing or retrying immediately', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status: 429 }));
+    await expect(
+      resolvePodcastShow({ sourceUrl: 'https://podcasts.apple.com/podcast/id123' })
+    ).rejects.toThrow('temporarily unavailable');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('does not reconcile a player bookmark to a feed entry by title alone', async () => {
     mockScrapeOpenGraph.mockResolvedValue({
       responseStatus: 200,

@@ -128,10 +128,14 @@ struct PodcastFollowSheet: View {
         Form {
             Section {
                 ContentUnavailableView(
-                    "Feed not found",
+                    "Couldn’t load the feed",
                     systemImage: "dot.radiowaves.left.and.right",
                     description: Text(errorMessage ?? "Paste the publisher's public RSS feed to continue.")
                 )
+                Button("Try again") {
+                    Task { await loadPreview(manualFeedURL: manualFeedURL.isEmpty ? nil : manualFeedURL) }
+                }
+                .accessibilityIdentifier("podcast-follow-retry")
             }
             .listRowBackground(ZineTheme.surface)
 
