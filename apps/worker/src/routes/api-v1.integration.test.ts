@@ -10,6 +10,8 @@ import { dispatchBookmarkEnrichment, getBookmarkEnrichmentHealth } from '../enri
 import { createDb } from '../db';
 import {
   bookmarkEnrichmentOutbox,
+  rssFeeds,
+  rssFeedItems,
   apiTokens,
   tags,
   userItemTags,
@@ -1098,5 +1100,77 @@ describe.each(['REST', 'tRPC'])('%s manual bookmark save contract', (api) => {
       id: first.userItemId,
       canonicalUrl: 'https://pca.st/episode/episode-123?t=420',
     });
+  });
+});
+
+describe('podcast destination ownership and source preservation', () => {
+  it('requires authentication and rejects invalid players and another user bookmark', async () => {
+    const unauthenticated = await app.request(
+      '/api/v1/bookmarks/owner-bookmark/podcast-destination?player=OVERCAST',
+      {},
+      bindings
+    );
+    expect(unauthenticated.status).toBe(401);
+    expect(
+      (await request('/bookmarks/owner-bookmark/podcast-destination?player=UNSUPPORTED')).status
+    ).toBe(400);
+    expect(
+      (await request('/bookmarks/other-bookmark/podcast-destination?player=OVERCAST')).status
+    ).toBe(404);
+    expect(
+      (await request('/bookmarks/owner-bookmark/podcast-destination?player=OVERCAST')).status
+    ).toBe(422);
+  });
+
+  it('resolves a feed belonging to the user without changing saved links or read state', async () => {
+    await db
+      .update(items)
+      .set({
+        contentType: 'PODCAST',
+        provider: 'RSS',
+        canonicalUrl: 'https://publisher.example/episode',
+        rawMetadata: JSON.stringify({
+          audioUrl: 'https://publisher.example/audio.mp3',
+          rawGuid: 'one',
+        }),
+      })
+      .where(eq(items.id, 'item'));
+    await db
+      .update(userItems)
+      .set({ handoffUrl: 'https://overcast.fm/+original?t=90' })
+      .where(eq(userItems.id, 'owner-bookmark'));
+    await db.insert(rssFeeds).values({
+      id: 'podcast-feed',
+      userId: 'owner',
+      title: 'Show',
+      feedUrl: 'https://publisher.example/rss',
+      feedUrlHash: 'hash',
+      feedType: 'PODCAST',
+      sourceUrl: 'https://overcast.fm/itunes123',
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    await db.insert(rssFeedItems).values({
+      id: 'podcast-map',
+      rssFeedId: 'podcast-feed',
+      itemId: 'item',
+      entryId: 'one',
+      fetchedAt: 1,
+    });
+    const before = await db.query.userItems.findFirst({
+      where: eq(userItems.id, 'owner-bookmark'),
+    });
+    const response = await request('/bookmarks/owner-bookmark/podcast-destination?player=OVERCAST');
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as any;
+    expect(body.originalUrl).toBe('https://overcast.fm/+original?t=90');
+    expect(body.publisherUrl).toBe('https://publisher.example/episode');
+    expect(body.destination).toEqual({
+      kind: 'subscribe',
+      url: 'overcast://x-callback-url/add?url=https%3A%2F%2Fpublisher.example%2Frss',
+    });
+    expect(
+      await db.query.userItems.findFirst({ where: eq(userItems.id, 'owner-bookmark') })
+    ).toEqual(before);
   });
 });

@@ -901,6 +901,12 @@ struct APIClient {
         try await request(url: baseURL.appending(path: "/api/v1/subscriptions/rss"))
     }
 
+    func podcastDestination(id: String, player: PodcastPlayer) async throws -> PodcastDestinationResponse {
+        let url = baseURL.appending(path: "/api/v1/bookmarks/\(id)/podcast-destination")
+            .appending(queryItems: [URLQueryItem(name: "player", value: player.rawValue)])
+        return try await request(url: url)
+    }
+
     func previewPodcastShow(
         bookmarkId: String,
         manualFeedUrl: String? = nil

@@ -2688,6 +2688,91 @@
           }
         }
       }
+    },
+    "/api/v1/bookmarks/{id}/podcast-destination": {
+      "get": {
+        "summary": "Resolve a verified player destination for a podcast bookmark",
+        "operationId": "getPodcastDestination",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "player",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["OVERCAST", "APPLE_PODCASTS", "POCKET_CASTS"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verified episode, show, or explicit subscribe destination; null when unavailable. Original and publisher URLs remain separate.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "destination",
+                    "originalUrl",
+                    "publisherUrl",
+                    "temporarilyUnavailable"
+                  ],
+                  "properties": {
+                    "destination": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "url": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["episode", "show", "subscribe"]
+                        }
+                      },
+                      "required": ["url", "kind"]
+                    },
+                    "originalUrl": {
+                      "type": ["string", "null"]
+                    },
+                    "publisherUrl": {
+                      "type": "string"
+                    },
+                    "temporarilyUnavailable": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unsupported player"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "404": {
+            "description": "Bookmark not owned by the caller"
+          },
+          "422": {
+            "description": "Not a podcast"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": ["Bookmarks"]
+      }
     }
   },
   "components": {

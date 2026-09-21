@@ -50,6 +50,7 @@ struct AppSettingsView: View {
     @Environment(Clerk.self) private var clerk
     @Environment(\.zineTabNavigationActions) private var navigation
     @State private var store = SettingsStore()
+    @AppStorage(PodcastPlayer.preferenceKey) private var podcastPlayer = PodcastPlayer.overcast.rawValue
 
     init(
         client: APIClient,
@@ -104,6 +105,19 @@ struct AppSettingsView: View {
                     settingsSectionTitle("Your Zine")
                     sourcesCard
                     appearanceCard
+                    VStack(alignment: .leading, spacing: 10) {
+                        Picker("Default podcast app", selection: $podcastPlayer) {
+                            ForEach(PodcastPlayer.allCases) { player in
+                                Text(player.title).tag(player.rawValue)
+                            }
+                        }
+                        .accessibilityIdentifier("settings-podcast-player")
+                        Text("Used for episodes from followed feeds. Original podcast share links keep opening in their original app.")
+                            .font(.caption)
+                            .foregroundStyle(ZineTheme.secondaryText)
+                    }
+                    .padding(20)
+                    .background(ZineTheme.surface, in: .rect(cornerRadius: 22))
                 }
 
                 VStack(alignment: .leading, spacing: 12) {
