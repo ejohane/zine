@@ -48,6 +48,7 @@ export interface OpenGraphData {
   responseStatus?: number | null;
   /** Public RSS feed explicitly linked by a supported player page. */
   podcastFeedUrl?: string | null;
+  podcastAppleId?: string | null;
   /** Public podcast episode fields exposed by supported player pages. */
   podcastEpisode?: {
     title: string | null;
@@ -339,6 +340,16 @@ export async function scrapeOpenGraph(
       .on('.externalbadges a', {
         element(el) {
           externalBadgeHref = el.getAttribute('href');
+          if (new URL(response.url || url).hostname === 'overcast.fm' && externalBadgeHref) {
+            try {
+              const badge = new URL(externalBadgeHref);
+              if (badge.hostname === 'podcasts.apple.com' && badge.protocol === 'https:') {
+                result.podcastAppleId = badge.pathname.match(/\/id(\d+)(?:\/|$)/)?.[1] ?? null;
+              }
+            } catch {
+              /* Ignore malformed player badges. */
+            }
+          }
         },
       })
       .on('.externalbadges a img', {

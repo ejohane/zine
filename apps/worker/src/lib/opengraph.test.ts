@@ -275,6 +275,7 @@ describe('scrapeOpenGraph', () => {
       </div></body></html>`);
     const result = await scrapeOpenGraph('https://overcast.fm/+AA2-B-UYX2s');
     expect(result.podcastFeedUrl).toBe('https://feeds.megaphone.fm/hubermanlab');
+    expect(result.podcastAppleId).toBe('1545953110');
     expect(result.podcastEpisode?.audioUrl).toBe(
       'https://traffic.megaphone.fm/SCIM2290485637.mp3#t=0'
     );

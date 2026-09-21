@@ -26,6 +26,8 @@ exports[`apiV1Routes > preserves the mounted HTTP route contract 1`] = `
   "GET /api/v1/bookmarks/:id",
   "GET /api/v1/bookmarks/:id/article-content",
   "GET /api/v1/bookmarks/:id/article-content",
+  "GET /api/v1/bookmarks/:id/podcast-destination",
+  "GET /api/v1/bookmarks/:id/podcast-destination",
   "GET /api/v1/bookmarks/:id/subscription-settings",
   "GET /api/v1/bookmarks/:id/subscription-settings",
   "GET /api/v1/bookmarks/opened",

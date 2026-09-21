@@ -330,6 +330,11 @@ struct BookmarkDetailView: View {
             }
 
             actionRow
+            if content.contentType == .podcast, content.provider == .rss, PodcastPlayer.originalPlayer(for: content.canonicalUrl) == nil {
+                PodcastOpenControl(bookmarkID: content.id, publisherURL: content.canonicalUrl, client: client) {
+                    onExternalOpen(bookmark)
+                }
+            }
 
             if content.contentType == .podcast, content.provider == .web,
                subscriptionSettings == nil {
@@ -416,7 +421,7 @@ struct BookmarkDetailView: View {
                 .accessibilityLabel("Read in Zine")
                 .actionRowHaptic()
                 .padding(.trailing, 8)
-            } else {
+            } else if !(content.contentType == .podcast && content.provider == .rss && PodcastPlayer.originalPlayer(for: content.canonicalUrl) == nil) {
                 ProviderOpenButton(
                     provider: content.provider,
                     destination: content.canonicalUrl,

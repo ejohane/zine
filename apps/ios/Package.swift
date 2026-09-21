@@ -25,7 +25,7 @@ let package = Package(
                 "Features/Library/ActionRowHaptic.swift", "Features/Library/BookmarkDescription.swift",
                 "Features/Library/BookmarkDetailView.swift", "Features/Library/BookmarkRow.swift",
                 "Features/Library/CreatorAvatar.swift", "Features/Library/LibraryView.swift",
-                "Features/Library/ProviderOpenButton.swift", "Features/Library/ScreenshotLibraryView.swift",
+                "Features/Library/ProviderOpenButton.swift", "Features/Library/PodcastOpenControl.swift", "Features/Library/ScreenshotLibraryView.swift",
                 "Features/Library/YouTubeDescriptionChapters.swift", "Features/Reader/ArticleHTMLView.swift",
                 "Features/Reader/ArticleReaderView.swift", "Features/Reader/ArticleReaderExperience.swift",
                 "Features/Reader/ScreenshotArticleReaderView.swift", "Features/Settings",
