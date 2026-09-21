@@ -17,11 +17,18 @@ and failures suppress further lookups for five minutes. Directory requests are b
 and identify Zine with a User-Agent (Pocket Casts rejected an absent User-Agent in live testing).
 Resolution runs separately when opening detail and never blocks Inbox ingestion.
 
-Overcast's published Universal Links paths cover `/+*`, not its documented `/itunes…`
-web show URLs. Those URLs cannot safely be presented as a native "Open show" action.
-For RSS items we use the documented `overcast://x-callback-url/add?url=…` scheme, explicitly
-labelled **Add show to Overcast**, with text explaining that it is an add-feed prompt,
-not an exact-episode destination. Known original Overcast episode links remain intact.
+Overcast uses `https://overcast.fm/+itunes{appleShowID}` after verifying the Apple
+show against the RSS feed. Its published Universal Links association includes this
+route; a website 404 does not describe its native behavior. The user verified that
+it opens the correct show on iPhone. We label it **Open show in Overcast**, not an
+exact episode action. No subscribe prompt is generated when resolution fails.
+The catalog cache namespace is v2 to discard old subscribe destinations.
+
+RSS podcast detail uses the existing 56-point circular action in the action row.
+Its provider icon/color and accessible label track the device's preferred player.
+A small progress indicator covers lookup time. Failed resolution or app opening
+provides an alert with publisher fallback; a long press also exposes the publisher
+page and retry. Original player share links remain intact.
 
 Native episode/show actions use Universal Links only; if the app cannot handle the URL,
 the UI offers the publisher page rather than silently opening a browser/login page.
@@ -33,11 +40,12 @@ It never marks an episode listened or finished.
 - Deterministic Worker resolver, metadata, and authenticated REST/D1 integration tests.
 - Native CLI/core tests cover destination labels, host validation, and original-player recognition.
 - A temporary read-only live test resolved the saved Huberman Arthur Brooks episode using
-  actual directory responses: Apple/Pocket Casts exact episode and Overcast subscribe prompt.
+  actual directory responses: Apple/Pocket Casts exact episode. The user subsequently
+  verified both player handoffs and the Overcast +itunes show route on iPhone.
 - Native Simulator build passed. Live authenticated UI remains blocked by the pre-existing
   local snapshot import trying to reapply `0001_add_user_items_last_opened_at.sql`.
 - Physical-device third-party opening remains unverified. Before release acceptance, test
-  Overcast with the feed already followed and not followed, Apple/Pocket Casts exact opening,
+  the circular action with each selected player, Overcast show opening,
   missing-app fallback, and Settings persistence. Test settings/detail in light and dark mode.
 
 Sources: https://overcast.fm/podcasterinfo,

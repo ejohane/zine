@@ -133,7 +133,7 @@ async function appleId(context: PlayerContext): Promise<string | null> {
       source.hostname === 'podcasts.apple.com'
         ? source.pathname.match(/\/id(\d+)(?:\/|$)/)?.[1]
         : source.hostname === 'overcast.fm'
-          ? source.pathname.match(/^\/itunes(\d+)(?:\/|$)/)?.[1]
+          ? source.pathname.match(/^\/\+?itunes(\d+)(?:\/|$)/)?.[1]
           : null;
     if (directId) {
       // Manual RSS entry can associate a different feed with an original player link.
@@ -167,14 +167,13 @@ async function appleId(context: PlayerContext): Promise<string | null> {
     : null;
 }
 async function loadCatalog(player: PodcastPlayer, context: PlayerContext): Promise<Catalog> {
-  if (player === 'OVERCAST')
+  if (player === 'OVERCAST') {
+    const id = await appleId(context);
     return {
       episodes: [],
-      show: {
-        kind: 'subscribe',
-        url: `overcast://x-callback-url/add?url=${encodeURIComponent(context.feedUrl)}`,
-      },
+      show: id ? { kind: 'show', url: `https://overcast.fm/+itunes${id}` } : null,
     };
+  }
 
   if (player === 'POCKET_CASTS') {
     const search = await pocket('search_podcasts', { query: context.showName, limit: 5 });
@@ -234,7 +233,7 @@ export async function resolvePlayerDestination(
 ) {
   // Catalog entries are public; never cache user identity, private URLs, or share timestamps.
   normalizeFeedUrl(context.feedUrl);
-  const key = `podcast-player:v1:${player}:${hashString(context.feedUrl)}`;
+  const key = `podcast-player:v2:${player}:${hashString(context.feedUrl)}`;
   let cached: CachedCatalog | null = null;
   try {
     cached = await cache.get<CachedCatalog>(key, 'json');
@@ -268,13 +267,7 @@ export async function resolvePlayerDestination(
   const matches = catalog.episodes.filter(
     (e) => sameUrl(e.audioUrl, context.audioUrl) || (context.rawGuid && e.guid === context.rawGuid)
   );
-  let destination: PlayerDestination | null =
+  const destination: PlayerDestination | null =
     matches.length === 1 ? { kind: 'episode', url: matches[0].url } : catalog.show;
-  if (!destination && player === 'OVERCAST') {
-    destination = {
-      kind: 'subscribe',
-      url: `overcast://x-callback-url/add?url=${encodeURIComponent(context.feedUrl)}`,
-    };
-  }
   return { player, playerName: names[player], destination, temporarilyUnavailable };
 }

@@ -1160,14 +1160,21 @@ describe('podcast destination ownership and source preservation', () => {
     const before = await db.query.userItems.findFirst({
       where: eq(userItems.id, 'owner-bookmark'),
     });
-    const response = await request('/bookmarks/owner-bookmark/podcast-destination?player=OVERCAST');
+    const directory = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({
+        results: [{ kind: 'podcast', collectionId: 123, feedUrl: 'https://publisher.example/rss' }],
+      })
+    );
+    const response = await request(
+      '/bookmarks/owner-bookmark/podcast-destination?player=OVERCAST'
+    ).finally(() => directory.mockRestore());
     expect(response.status).toBe(200);
     const body = (await response.json()) as any;
     expect(body.originalUrl).toBe('https://overcast.fm/+original?t=90');
     expect(body.publisherUrl).toBe('https://publisher.example/episode');
     expect(body.destination).toEqual({
-      kind: 'subscribe',
-      url: 'overcast://x-callback-url/add?url=https%3A%2F%2Fpublisher.example%2Frss',
+      kind: 'show',
+      url: 'https://overcast.fm/+itunes123',
     });
     expect(
       await db.query.userItems.findFirst({ where: eq(userItems.id, 'owner-bookmark') })
