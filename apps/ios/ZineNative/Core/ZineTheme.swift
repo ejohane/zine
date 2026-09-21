@@ -119,10 +119,14 @@ extension View {
     func zineNavigationBarContentBackdrop(_ background: Color) -> some View {
         overlay(alignment: .top) {
             GeometryReader { geometry in
+                // Cover only the actual top safe area, outside the content.
+                // A fixed navigation-bar minimum obscures in-content titles
+                // when adaptive bars move to a side edge (for example on Duo).
+                let topInset = max(0, geometry.safeAreaInsets.top)
                 background
-                    .frame(height: max(44, geometry.safeAreaInsets.top))
+                    .frame(height: topInset)
                     .frame(maxWidth: .infinity, alignment: .top)
-                    .ignoresSafeArea(edges: .top)
+                    .offset(y: -topInset)
             }
             .allowsHitTesting(false)
             .accessibilityHidden(true)

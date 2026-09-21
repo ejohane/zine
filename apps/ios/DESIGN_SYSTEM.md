@@ -58,6 +58,11 @@ the surrounding theme changes.
   fading in as separate toolbar chrome. The transition style remains independent
   of navigation-bar background ownership and must not be removed as a workaround
   for interactive-pop chrome.
+- Keep the root compact-title toolbar registered independently of navigation
+  depth. The root entry explicitly requests a visible navigation bar; detail
+  and reader entries own their hidden-bar preferences. Do not remove the root
+  principal item while pushing a destination: it must survive returning to a
+  scrolled list, including interactive swipe-back.
 - Do not scatter raw hex, RGB, `Color.primary`, or `Color.secondary` values
   through supported native views. If the product needs a new reusable role,
   add it to `ZineTheme.Role`, define both appearances, and update

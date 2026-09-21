@@ -21,12 +21,6 @@ struct ZineTabNavigationActions {
     var settings: ((SettingsRoute) -> Void)?
 }
 
-enum RootNavigationChrome {
-    static func showsCompactTitle(isAtRoot: Bool) -> Bool {
-        isAtRoot
-    }
-}
-
 private struct ZineTabNavigationActionsKey: EnvironmentKey {
     static let defaultValue = ZineTabNavigationActions()
 }
@@ -173,17 +167,10 @@ private struct AuthenticatedAppView: View {
             .zineTabShellChrome()
             .navigationTitle(selectedRootTitle)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if let compactTitle = selectedCompactRootTitle,
-                   RootNavigationChrome.showsCompactTitle(isAtRoot: navigationPath.isEmpty) {
-                    ToolbarItem(placement: .principal) {
-                        CollapsedListTitle(
-                            title: compactTitle.title,
-                            progress: compactTitle.progress
-                        )
-                    }
-                }
-            }
+            .zineRootNavigationChrome(
+                compactTitle: selectedCompactRootTitle?.title,
+                collapseProgress: selectedCompactRootTitle?.progress ?? 0
+            )
             .environment(\.zineTabNavigationActions, tabNavigationActions)
             .navigationDestination(for: HomeNavigationRoute.self) { route in
                 homeDestination(for: route)
