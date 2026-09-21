@@ -69,17 +69,10 @@ struct ScreenshotHomeTabShell: View {
             .zineTabShellChrome()
             .navigationTitle(selectedRootTitle)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if let compactTitle = selectedCompactRootTitle,
-                   RootNavigationChrome.showsCompactTitle(isAtRoot: navigationPath.isEmpty) {
-                    ToolbarItem(placement: .principal) {
-                        CollapsedListTitle(
-                            title: compactTitle.title,
-                            progress: compactTitle.progress
-                        )
-                    }
-                }
-            }
+            .zineRootNavigationChrome(
+                compactTitle: selectedCompactRootTitle?.title,
+                collapseProgress: selectedCompactRootTitle?.progress ?? 0
+            )
             .environment(\.zineTabNavigationActions, navigationActions)
             .navigationDestination(for: HomeNavigationRoute.self) { route in
                 fixtureDestination(for: route)

@@ -1,8 +1,37 @@
+import SwiftUI
 import UIKit
 import XCTest
 @testable import ZineNative
 
 final class ZineThemeTests: XCTestCase {
+    @MainActor
+    func testNavigationBackdropDoesNotCoverContentWithoutTopSafeArea() throws {
+        // Side-mounted bars can leave no top inset. Test both aspect ratios;
+        // the old 44-point minimum painted over the top of this content.
+        for size in [CGSize(width: 320, height: 640), CGSize(width: 640, height: 320)] {
+            let renderer = ImageRenderer(content:
+                Color.white
+                    .frame(width: size.width, height: size.height)
+                    .zineNavigationBarContentBackdrop(.black)
+            )
+            renderer.scale = 1
+            let image = try XCTUnwrap(renderer.cgImage)
+            let context = try XCTUnwrap(CGContext(
+                data: nil,
+                width: 1,
+                height: 1,
+                bitsPerComponent: 8,
+                bytesPerRow: 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ))
+            let sample = try XCTUnwrap(image.cropping(to: CGRect(x: 20, y: 20, width: 1, height: 1)))
+            context.draw(sample, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            let pixel = try XCTUnwrap(context.data).assumingMemoryBound(to: UInt8.self)
+            XCTAssertEqual([pixel[0], pixel[1], pixel[2]], [255, 255, 255], "Backdrop covered content at \(size)")
+        }
+    }
+
     func testSemanticRolesResolveToApprovedLightPalette() {
         assertPalette(
             style: .light,

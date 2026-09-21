@@ -144,6 +144,21 @@ private struct ContentTypeFilterChip: View {
 }
 
 extension View {
+    func zineRootNavigationChrome(compactTitle: String?, collapseProgress: CGFloat) -> some View {
+        // This belongs to the root navigation entry, not the stack's current
+        // depth. Removing its toolbar on push can lose the principal title
+        // when SwiftUI restores the TabView after a pop (including swipe-back).
+        // Destinations still own their own navigation-bar visibility.
+        toolbarVisibility(.visible, for: .navigationBar)
+            .toolbar {
+                if let compactTitle {
+                    ToolbarItem(placement: .principal) {
+                        CollapsedListTitle(title: compactTitle, progress: collapseProgress)
+                    }
+                }
+            }
+    }
+
     func contentTypeFilterChrome(background: Color = ZineTheme.canvas) -> some View {
         toolbarBackground(background, for: .navigationBar)
             .toolbarBackground(.hidden, for: .navigationBar)
