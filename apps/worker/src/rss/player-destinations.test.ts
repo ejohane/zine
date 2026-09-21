@@ -36,14 +36,57 @@ const episode = {
 };
 describe('podcast player destinations', () => {
   beforeEach(() => vi.restoreAllMocks());
-  it('offers the documented Overcast subscribe prompt without any directory request', async () => {
+  it('opens the verified Overcast show using its native universal-link route', async () => {
     const fetch = vi.spyOn(globalThis, 'fetch');
     const result = await resolvePlayerDestination('OVERCAST', context, cache());
     expect(result.destination).toEqual({
-      kind: 'subscribe',
-      url: 'overcast://x-callback-url/add?url=https%3A%2F%2Fpublisher.example%2Frss',
+      kind: 'show',
+      url: 'https://overcast.fm/+itunes123',
     });
     expect(fetch).not.toHaveBeenCalled();
+  });
+  it('verifies an Overcast +itunes source against the RSS feed before linking', async () => {
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(apple());
+    const result = await resolvePlayerDestination(
+      'OVERCAST',
+      {
+        ...context,
+        sourceUrl: 'https://overcast.fm/+itunes123',
+      },
+      cache()
+    );
+    expect(result.destination).toEqual({ kind: 'show', url: 'https://overcast.fm/+itunes123' });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it('does not send a mismatched feed to an Overcast show or subscribe prompt', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({
+        results: [{ kind: 'podcast', collectionId: 123, feedUrl: 'https://wrong.example/rss' }],
+      })
+    );
+    const result = await resolvePlayerDestination(
+      'OVERCAST',
+      {
+        ...context,
+        sourceUrl: 'https://overcast.fm/+itunes123',
+      },
+      cache()
+    );
+    expect(result.destination).toBeNull();
+  });
+  it('preserves the verified Overcast show during directory outages', async () => {
+    const fetch = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(apple())
+      .mockResolvedValue(new Response(null, { status: 429 }));
+    const kv = cache();
+    const input = { ...context, sourceUrl: 'https://overcast.fm/+itunes123' };
+    await resolvePlayerDestination('OVERCAST', input, kv, 1000);
+    const stale = await resolvePlayerDestination('OVERCAST', input, kv, 3602000);
+    expect(stale.destination).toEqual({ kind: 'show', url: 'https://overcast.fm/+itunes123' });
+    expect(stale.temporarilyUnavailable).toBe(true);
+    await resolvePlayerDestination('OVERCAST', input, kv, 3603000);
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
   it('matches Apple by GUID/audio and caches public catalogs across episode requests', async () => {
     const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(apple([episode]));

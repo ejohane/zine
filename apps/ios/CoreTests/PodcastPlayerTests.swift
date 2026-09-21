@@ -9,8 +9,13 @@ final class PodcastPlayerTests: XCTestCase {
         XCTAssertEqual(url.query, "t=120")
         XCTAssertNil(PodcastPlayer.originalPlayer(for: URL(string: "https://publisher.example/episode")!))
     }
+    func testEveryPreferenceSelectsItsOwnButtonBranding() {
+        for player in PodcastPlayer.allCases {
+            XCTAssertEqual(PodcastPlayer.originalPlayer(for: player.brandingURL), player)
+        }
+    }
     func testHonestLabelsAndDestinationValidation() {
-        let show = PodcastDestination(url: URL(string: "https://overcast.fm/itunes123")!, kind: .show)
+        let show = PodcastDestination(url: URL(string: "https://overcast.fm/+itunes123")!, kind: .show)
         XCTAssertEqual(show.label(for: .overcast), "Open show in Overcast")
         XCTAssertTrue(show.isValid(for: .overcast))
         XCTAssertFalse(show.isValid(for: .applePodcasts))

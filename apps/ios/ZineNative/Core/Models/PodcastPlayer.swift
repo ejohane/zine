@@ -15,6 +15,14 @@ enum PodcastPlayer: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    var brandingURL: URL {
+        switch self {
+        case .overcast: URL(string: "https://overcast.fm")!
+        case .pocketCasts: URL(string: "https://pocketcasts.com")!
+        case .applePodcasts: URL(string: "https://podcasts.apple.com")!
+        }
+    }
+
     static func originalPlayer(for url: URL) -> PodcastPlayer? {
         switch url.host?.lowercased() {
         case "overcast.fm", "www.overcast.fm": .overcast

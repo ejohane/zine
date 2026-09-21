@@ -211,23 +211,30 @@ struct ProviderOpenButton: View {
     let provider: Provider
     let destination: URL
     let onOpen: () -> Void
+    var onActivate: (() -> Void)?
 
     init(
         provider: Provider,
         destination: URL,
-        onOpen: @escaping () -> Void = {}
+        onOpen: @escaping () -> Void = {},
+        onActivate: (() -> Void)? = nil
     ) {
         self.provider = provider
         self.destination = destination
         self.onOpen = onOpen
+        self.onActivate = onActivate
     }
 
     private var action: ProviderOpenAction { provider.openAction(for: destination) }
 
     var body: some View {
         Button {
-            onOpen()
-            openURL(destination)
+            if let onActivate {
+                onActivate()
+            } else {
+                onOpen()
+                openURL(destination)
+            }
         } label: {
             providerLogo
                 .frame(width: Self.iconSize, height: Self.iconSize)
