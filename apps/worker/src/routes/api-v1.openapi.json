@@ -3685,6 +3685,24 @@
           }
         }
       },
+      "PodcastDestinations": {
+        "type": "object",
+        "description": "Saved public player links. Missing entries fall back to the original URL; background enrichment retries unresolved players.",
+        "additionalProperties": false,
+        "properties": {
+          "OVERCAST": { "$ref": "#/components/schemas/SavedPodcastDestination" },
+          "APPLE_PODCASTS": { "$ref": "#/components/schemas/SavedPodcastDestination" },
+          "POCKET_CASTS": { "$ref": "#/components/schemas/SavedPodcastDestination" }
+        }
+      },
+      "SavedPodcastDestination": {
+        "type": "object",
+        "required": ["kind", "url"],
+        "properties": {
+          "kind": { "type": "string", "enum": ["episode", "show"] },
+          "url": { "type": "string", "format": "uri" }
+        }
+      },
       "Item": {
         "type": "object",
         "required": [
@@ -3714,6 +3732,7 @@
           "tags"
         ],
         "properties": {
+          "podcastDestinations": { "$ref": "#/components/schemas/PodcastDestinations" },
           "id": {
             "type": "string",
             "description": "User item ID."
@@ -3853,6 +3872,7 @@
           "progress"
         ],
         "properties": {
+          "podcastDestinations": { "$ref": "#/components/schemas/PodcastDestinations" },
           "id": { "type": "string", "description": "User item ID." },
           "itemId": { "type": "string", "description": "Canonical item ID." },
           "title": { "type": "string" },

@@ -4,10 +4,23 @@ Native Settings includes a device-local default podcast app (Overcast, Pocket Ca
 Apple Podcasts; default Overcast). This preference applies to RSS podcast items.
 Existing player share links continue opening in their original app, including timestamps.
 
-`GET /api/v1/bookmarks/{id}/podcast-destination?player=OVERCAST|APPLE_PODCASTS|POCKET_CASTS`
-requires bookmark-read authorization and checks user ownership before accessing feed
-context. It returns the original URL, publisher URL, and a separate optional destination.
-It does not update content identity, saved links, consumption events, or RSS polling.
+Player destinations are saved on each RSS podcast item in `items.podcast_destinations`.
+Normal bookmark, Inbox, and Home responses include the public `podcastDestinations`
+map; the native app persists it in its existing bookmark/Home caches. Selecting a
+player or opening detail makes no destination request and never disables the circle
+button. Missing or invalid links immediately fall back to the original bookmark URL.
+
+The existing bookmark enrichment consumer resolves all three players, independent
+of the user's preference. The existing five-minute maintenance tick also processes
+up to ten due RSS podcast items, covering unsaved Inbox items and old bookmarks.
+Missing links retry hourly for six attempts, then daily. Successful links survive
+other provider failures. Apple/Pocket show fallbacks can upgrade to episode links;
+completed destinations need no periodic revalidation. RSS ingestion does not wait
+for this work. No new queue, show-identity registry, or account setting is needed.
+
+The older authenticated `GET /api/v1/bookmarks/{id}/podcast-destination` endpoint
+remains available for older app versions. It checks ownership before lookup. The
+current native button does not call it.
 
 Apple catalogs must match the followed feed; episodes match by raw GUID or enclosure.
 Pocket Casts candidates match the show name plus exact enclosure, with ambiguous matches
@@ -26,9 +39,8 @@ The catalog cache namespace is v2 to discard old subscribe destinations.
 
 RSS podcast detail uses the existing 56-point circular action in the action row.
 Its provider icon/color and accessible label track the device's preferred player.
-A small progress indicator covers lookup time. Failed resolution or app opening
-provides an alert with publisher fallback; a long press also exposes the publisher
-page and retry. Original player share links remain intact.
+There is no lookup spinner. App-opening failures offer the original link; a long
+press also exposes that link. Original player share links remain intact.
 
 Native episode/show actions use Universal Links only; if the app cannot handle the URL,
 the UI offers the publisher page rather than silently opening a browser/login page.

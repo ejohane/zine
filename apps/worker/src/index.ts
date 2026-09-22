@@ -1,3 +1,4 @@
+import { backfillPodcastDestinations } from './rss/saved-player-destinations';
 import { retryBookmarkEnrichment } from './enrichment/outbox';
 /**
  * @zine/worker - Cloudflare Workers backend
@@ -409,6 +410,7 @@ export default {
   async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext): Promise<void> {
     if (event.cron === '*/5 * * * *') {
       ctx.waitUntil(retryBookmarkEnrichment(env));
+      ctx.waitUntil(backfillPodcastDestinations(env));
       return;
     }
 

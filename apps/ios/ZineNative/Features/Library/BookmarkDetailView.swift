@@ -10,6 +10,7 @@ struct BookmarkDetailContent: Equatable {
     let id: String
     let title: String
     let thumbnailUrl: URL?
+    let podcastDestinations: [String: PodcastDestination]?
     let canonicalUrl: URL
     let contentType: ContentType
     let provider: Provider
@@ -28,6 +29,7 @@ struct BookmarkDetailContent: Equatable {
         id = bookmark.id
         title = bookmark.title
         thumbnailUrl = bookmark.thumbnailUrl
+        podcastDestinations = bookmark.podcastDestinations
         canonicalUrl = bookmark.canonicalUrl
         contentType = bookmark.contentType
         provider = bookmark.provider
@@ -47,6 +49,7 @@ struct BookmarkDetailContent: Equatable {
         id = item.id
         title = item.title
         thumbnailUrl = item.thumbnailUrl
+        podcastDestinations = item.podcastDestinations
         canonicalUrl = item.canonicalUrl
         contentType = item.contentType
         provider = item.provider
@@ -76,6 +79,7 @@ struct BookmarkDetailContent: Equatable {
         id = userItemID
         title = presentation?.title ?? source.title ?? creator
         thumbnailUrl = presentation?.imageURL
+        podcastDestinations = nil
         canonicalUrl = source.canonicalUrl
         contentType = ContentType(rawValue: source.contentType)
             ?? (source.origin == .x ? .post : .article)
@@ -417,7 +421,7 @@ struct BookmarkDetailView: View {
                 .actionRowHaptic()
                 .padding(.trailing, 8)
             } else if content.contentType == .podcast && content.provider == .rss {
-                PodcastOpenControl(bookmarkID: content.id, publisherURL: content.canonicalUrl, client: client) {
+                PodcastOpenControl(publisherURL: content.canonicalUrl, destinations: content.podcastDestinations) {
                     onExternalOpen(bookmark)
                 }
                 .padding(.trailing, 8)

@@ -69,6 +69,7 @@ struct Bookmark: Codable, Hashable, Identifiable {
     let itemId: String
     let title: String
     let thumbnailUrl: URL?
+    var podcastDestinations: [String: PodcastDestination]? = nil
     let canonicalUrl: URL
     let contentType: ContentType
     let provider: Provider

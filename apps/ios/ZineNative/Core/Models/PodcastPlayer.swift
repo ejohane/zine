@@ -40,8 +40,8 @@ struct PodcastDestinationResponse: Decodable {
     let temporarilyUnavailable: Bool
 }
 
-struct PodcastDestination: Decodable, Equatable {
-    enum Kind: String, Decodable { case episode, show, subscribe }
+struct PodcastDestination: Codable, Hashable {
+    enum Kind: String, Codable { case episode, show, subscribe }
     let url: URL
     let kind: Kind
 
@@ -60,5 +60,17 @@ struct PodcastDestination: Decodable, Equatable {
                 && url.path == "/add"
         }
         return url.scheme == "https" && PodcastPlayer.originalPlayer(for: url) == player
+    }
+}
+
+// Select entirely from the bookmark payload; missing or unsafe links use the original URL.
+struct PodcastOpenTarget: Equatable {
+    let url: URL
+    let destination: PodcastDestination?
+
+    init(player: PodcastPlayer, destinations: [String: PodcastDestination]?, originalURL: URL) {
+        let candidate = destinations?[player.rawValue]
+        destination = candidate.flatMap { $0.isValid(for: player) && $0.kind != .subscribe ? $0 : nil }
+        url = destination?.url ?? originalURL
     }
 }
