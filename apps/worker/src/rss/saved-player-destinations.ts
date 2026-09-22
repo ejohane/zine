@@ -57,8 +57,14 @@ export async function enrichPodcastDestinations(
         );
         if (resolved.destination && resolved.destination.kind !== 'subscribe')
           destinations[player] = { kind: resolved.destination.kind, url: resolved.destination.url };
-      } catch {
-        /* A provider outage must not discard other players' saved links. */
+      } catch (error) {
+        logger.warn('Podcast destination enrichment failed', {
+          operation: 'podcast_destination',
+          stage: 'item_resolution',
+          itemId,
+          player,
+          error,
+        });
       }
     })
   );
@@ -73,6 +79,14 @@ export async function enrichPodcastDestinations(
     .update(items)
     .set({ podcastDestinations: JSON.stringify({ destinations, nextAttemptAt, attempts }) })
     .where(eq(items.id, itemId));
+  logger.info('Podcast destinations saved', {
+    operation: 'podcast_destination',
+    stage: 'persistence',
+    itemId,
+    players: Object.keys(destinations),
+    attempts,
+    nextAttemptAt,
+  });
 }
 
 // Uses the existing five-minute enrichment maintenance tick for Inbox items and backfill.

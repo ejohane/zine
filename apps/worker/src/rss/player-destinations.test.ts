@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolvePlayerDestination, type PlayerContext } from './player-destinations';
 vi.mock('../lib/opengraph', () => ({
@@ -136,6 +137,51 @@ describe('podcast player destinations', () => {
     await resolvePlayerDestination('APPLE_PODCASTS', context, kv, 3603000);
     expect(fetch).toHaveBeenCalledTimes(2);
   });
+  it.each(['429', 'timeout', 'invalid-json', 'invalid-schema'])(
+    'retains a verified Apple show on %s, logs the cause, and upgrades after backoff',
+    async (failure) => {
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      const fetch = vi.spyOn(globalThis, 'fetch');
+      if (failure === 'timeout')
+        fetch.mockRejectedValueOnce(new DOMException('Timed out', 'TimeoutError'));
+      else
+        fetch.mockResolvedValueOnce(
+          failure === '429'
+            ? new Response(null, { status: 429, headers: { 'Retry-After': '120' } })
+            : failure === 'invalid-json'
+              ? new Response('invalid')
+              : Response.json({ results: 'invalid' })
+        );
+      fetch.mockResolvedValue(apple([episode]));
+      const kv = cache();
+      const first = await resolvePlayerDestination('APPLE_PODCASTS', context, kv, 1000);
+      expect(first.destination).toEqual({
+        kind: 'show',
+        url: 'https://podcasts.apple.com/podcast/id123',
+      });
+      expect(first.temporarilyUnavailable).toBe(true);
+      expect(warn).toHaveBeenCalledWith(
+        'Podcast directory lookup failed',
+        expect.objectContaining({
+          stage: 'apple_episode_lookup',
+          errorType:
+            failure === 'timeout'
+              ? 'TimeoutError'
+              : failure === 'invalid-json'
+                ? 'SyntaxError'
+                : failure === 'invalid-schema'
+                  ? 'ZodError'
+                  : 'Error',
+          ...(failure === '429' ? { status: 429, retryAfter: '120' } : {}),
+        })
+      );
+      await resolvePlayerDestination('APPLE_PODCASTS', context, kv, 2000);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      const recovered = await resolvePlayerDestination('APPLE_PODCASTS', context, kv, 301001);
+      expect(recovered.destination?.kind).toBe('episode');
+      expect(recovered.temporarilyUnavailable).toBe(false);
+    }
+  );
   it('backs off a cold Apple directory failure', async () => {
     const fetch = vi
       .spyOn(globalThis, 'fetch')
