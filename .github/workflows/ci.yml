@@ -65,6 +65,9 @@ jobs:
       - name: Build shared package
         run: bun run build --filter=@zine/shared
 
+      - name: Verify Worker migration journal
+        run: bun scripts/check-worker-migrations.mjs
+
       - name: Run worker tests
         run: bun run test:worker:ci
 
