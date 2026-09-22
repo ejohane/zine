@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { logger } from '../lib/logger';
 import { hashString, normalizeFeedUrl } from './url';
 import { scrapeOpenGraph } from '../lib/opengraph';
 
@@ -22,6 +23,14 @@ interface Episode {
 interface Catalog {
   show: PlayerDestination | null;
   episodes: Episode[];
+}
+class AppleEpisodeLookupError extends Error {
+  constructor(
+    readonly show: PlayerDestination,
+    cause: unknown
+  ) {
+    super('Apple episode lookup failed', { cause });
+  }
 }
 interface CachedCatalog {
   catalog: Catalog;
@@ -95,22 +104,58 @@ const pocketEnvelopeSchema = z.object({
   }),
 });
 async function appleJson(url: string) {
-  return appleSchema.parse(await json(url));
+  return json(url, undefined, (value) => appleSchema.parse(value));
 }
 
-async function json(url: string, body?: unknown): Promise<unknown> {
-  const response = await fetch(url, {
-    method: body ? 'POST' : 'GET',
-    headers: {
-      Accept: body ? 'application/json, text/event-stream' : 'application/json',
-      'User-Agent': 'ZinePodcastResolver/1.0 (+https://myzine.app)',
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-    signal: AbortSignal.timeout(5000),
-  });
-  if (!response.ok) throw new Error(`Podcast directory unavailable (${response.status})`);
-  return response.json();
+async function json<T = unknown>(
+  url: string,
+  body?: unknown,
+  parse?: (value: unknown) => T
+): Promise<T> {
+  const startedAt = Date.now();
+  const endpoint = new URL(url);
+  const stage =
+    endpoint.hostname === 'itunes.apple.com'
+      ? endpoint.searchParams.get('entity') === 'podcastEpisode'
+        ? 'apple_episode_lookup'
+        : 'apple_show_lookup'
+      : 'pocket_catalog_lookup';
+  let status: number | undefined;
+  let retryAfter: string | null = null;
+  try {
+    const response = await fetch(url, {
+      method: body ? 'POST' : 'GET',
+      headers: {
+        Accept: body ? 'application/json, text/event-stream' : 'application/json',
+        'User-Agent': 'ZinePodcastResolver/1.0 (+https://myzine.app)',
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: AbortSignal.timeout(5000),
+    });
+    status = response.status;
+    retryAfter = response.headers.get('Retry-After');
+    if (!response.ok) throw new Error(`Podcast directory unavailable (${status})`);
+    const value: unknown = await response.json();
+    return parse ? parse(value) : (value as T);
+  } catch (error) {
+    logger.warn('Podcast directory lookup failed', {
+      operation: 'podcast_destination',
+      stage,
+      status,
+      retryAfter,
+      durationMs: Date.now() - startedAt,
+      errorType: error instanceof Error ? error.name : typeof error,
+      // Zod messages can contain response values; log only structural issue details.
+      error:
+        error instanceof z.ZodError
+          ? error.issues.map(({ code, path }) => ({ code, path }))
+          : error instanceof Error
+            ? error.message
+            : 'Unknown error',
+    });
+    throw error;
+  }
 }
 async function pocket(name: string, args: unknown) {
   const result = pocketEnvelopeSchema.parse(
@@ -209,9 +254,18 @@ async function loadCatalog(player: PodcastPlayer, context: PlayerContext): Promi
   const id = await appleId(context);
   if (!id) return { episodes: [], show: null };
 
-  const data = await appleJson(
-    `https://itunes.apple.com/lookup?id=${id}&entity=podcastEpisode&limit=200`
-  );
+  let data: z.infer<typeof appleSchema>;
+  try {
+    data = await appleJson(
+      `https://itunes.apple.com/lookup?id=${id}&entity=podcastEpisode&limit=200`
+    );
+  } catch (error) {
+    // appleId already verified this show against the RSS feed. Keep that usable link.
+    throw new AppleEpisodeLookupError(
+      { kind: 'show', url: `https://podcasts.apple.com/podcast/id${id}` },
+      error
+    );
+  }
   const show = (data.results ?? []).find(
     (r) => r.kind === 'podcast' && sameUrl(r.feedUrl, context.feedUrl)
   );
@@ -250,7 +304,20 @@ export async function resolvePlayerDestination(
       await cache
         .put(key, JSON.stringify({ catalog, refreshAfter }), { expirationTtl: 604800 })
         .catch(() => {});
-    } catch {
+    } catch (error) {
+      if (error instanceof AppleEpisodeLookupError) {
+        catalog = { ...catalog, show: error.show };
+      }
+      logger.warn('Podcast destination resolution deferred', {
+        operation: 'podcast_destination',
+        player,
+        stage: 'catalog_resolution',
+        feedHash: hashString(context.feedUrl),
+        errorType: error instanceof Error ? error.name : typeof error,
+        retainedShow: Boolean(catalog.show),
+        retainedEpisodes: catalog.episodes.length,
+        retryAt: now + 300000,
+      });
       temporarilyUnavailable = true;
       // Preserve stale verified links and suppress repeated requests during directory outages.
       await cache
