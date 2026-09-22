@@ -1,3 +1,4 @@
+import { savedPlayerLinks, type SavedPlayerLinks } from '../rss/player-destination-data';
 import type { ContentType, UserItemState } from '@zine/shared';
 import {
   Provider,
@@ -30,6 +31,7 @@ export type ItemView = {
   title: string;
   thumbnailUrl: string | null;
   canonicalUrl: string;
+  podcastDestinations?: SavedPlayerLinks;
 
   // Classification
   contentType: ContentType;
@@ -78,6 +80,7 @@ type HomeItemView = Pick<
   | 'title'
   | 'thumbnailUrl'
   | 'canonicalUrl'
+  | 'podcastDestinations'
   | 'contentType'
   | 'provider'
   | 'creator'
@@ -216,6 +219,7 @@ export function toItemView(
     title: item.title,
     thumbnailUrl,
     canonicalUrl: normalizeCanonicalUrlForResponse(userItem.handoffUrl ?? item.canonicalUrl),
+    podcastDestinations: savedPlayerLinks(item.podcastDestinations),
     contentType: item.contentType as ContentType,
     provider: responseProvider as Provider,
     // Creator data from creators table (normalized)
@@ -308,6 +312,7 @@ export function toHomeItemViews(
       title: itemView.title,
       thumbnailUrl: itemView.thumbnailUrl,
       canonicalUrl: itemView.canonicalUrl,
+      podcastDestinations: itemView.podcastDestinations,
       contentType: itemView.contentType,
       provider: itemView.provider,
       creator: itemView.creator,

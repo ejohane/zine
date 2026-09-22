@@ -1103,6 +1103,46 @@ describe.each(['REST', 'tRPC'])('%s manual bookmark save contract', (api) => {
   });
 });
 
+describe('saved player links in normal bookmark responses', () => {
+  it('returns destinations with list, detail and home data without directory requests', async () => {
+    const destinations = {
+      OVERCAST: { kind: 'show', url: 'https://overcast.fm/+itunes123' },
+      APPLE_PODCASTS: { kind: 'episode', url: 'https://podcasts.apple.com/podcast/id123?i=456' },
+      POCKET_CASTS: { kind: 'episode', url: 'https://pca.st/episode/456' },
+    };
+    await db
+      .update(items)
+      .set({
+        contentType: 'PODCAST',
+        provider: 'RSS',
+        podcastDestinations: JSON.stringify({ destinations, nextAttemptAt: null, attempts: 1 }),
+      })
+      .where(eq(items.id, 'item'));
+    const network = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('No directory requests on reads'));
+    try {
+      const detail = await request('/bookmarks/owner-bookmark');
+      expect(detail.status).toBe(200);
+      expect(await detail.json()).toMatchObject({ item: { podcastDestinations: destinations } });
+      const list = await request('/bookmarks');
+      expect(await list.json()).toMatchObject({ items: [{ podcastDestinations: destinations }] });
+      const { toHomeItemViews } = await import('../items/views');
+      const item = (await db.query.items.findFirst({ where: eq(items.id, 'item') }))!;
+      const userItem = (await db.query.userItems.findFirst({
+        where: eq(userItems.id, 'owner-bookmark'),
+      }))!;
+      expect(
+        toHomeItemViews([{ items: item, user_items: userItem, creators: null }])[0]
+          .podcastDestinations
+      ).toEqual(destinations);
+      expect(network).not.toHaveBeenCalled();
+    } finally {
+      network.mockRestore();
+    }
+  });
+});
+
 describe('podcast destination ownership and source preservation', () => {
   it('requires authentication and rejects invalid players and another user bookmark', async () => {
     const unauthenticated = await app.request(

@@ -348,6 +348,7 @@ export const items = sqliteTable(
     summary: text('summary'),
     duration: integer('duration'), // Seconds
     publishedAt: text('published_at'), // ISO8601 (legacy)
+    podcastDestinations: text('podcast_destinations'), // Saved public player links and retry time
     rawMetadata: text('raw_metadata'), // JSON string of provider API response
 
     // Article-specific metadata

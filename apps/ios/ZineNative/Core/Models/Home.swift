@@ -5,6 +5,7 @@ struct HomeItem: Codable, Hashable, Identifiable {
     let itemId: String
     let title: String
     let thumbnailUrl: URL?
+    var podcastDestinations: [String: PodcastDestination]? = nil
     let canonicalUrl: URL
     let contentType: ContentType
     let provider: Provider
@@ -25,6 +26,7 @@ struct HomeItem: Codable, Hashable, Identifiable {
         itemId = bookmark.itemId
         title = bookmark.title
         thumbnailUrl = bookmark.thumbnailUrl
+        podcastDestinations = bookmark.podcastDestinations
         canonicalUrl = bookmark.canonicalUrl
         contentType = bookmark.contentType
         provider = bookmark.provider
@@ -59,12 +61,14 @@ struct HomeItem: Codable, Hashable, Identifiable {
         readingTimeMinutes: Int?,
         bookmarkedAt: String?,
         lastOpenedAt: String?,
-        progress: BookmarkProgress?
+        progress: BookmarkProgress?,
+        podcastDestinations: [String: PodcastDestination]? = nil
     ) {
         self.id = id
         self.itemId = itemId
         self.title = title
         self.thumbnailUrl = thumbnailUrl
+        self.podcastDestinations = podcastDestinations
         self.canonicalUrl = canonicalUrl
         self.contentType = contentType
         self.provider = provider

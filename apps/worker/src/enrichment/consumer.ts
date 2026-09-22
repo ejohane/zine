@@ -1,3 +1,4 @@
+import { enrichPodcastDestinations } from '../rss/saved-player-destinations';
 import { ulid } from 'ulid';
 import { and, desc, eq } from 'drizzle-orm';
 import { normalizeTagKey, normalizeTagName } from '@zine/shared/tags';
@@ -419,6 +420,12 @@ async function processMessage(message: EnrichmentMessage, db: Database, env: Bin
     });
     message.ack();
     return;
+  }
+
+  if (source.item.provider === 'RSS' && source.item.contentType === 'PODCAST') {
+    await enrichPodcastDestinations(db, env, body.itemId).catch((error) => {
+      enrichmentLogger.warn('Podcast player links deferred to background retry', { error });
+    });
   }
 
   const sourceEvidence =
