@@ -153,11 +153,11 @@ final class HomeStore {
             let optimisticIDs = Set(optimisticOpenedItems.map(\.id))
             jumpBackInCandidates = (
                 optimisticOpenedItems + home.jumpBackIn.filter { !optimisticIDs.contains($0.id) }
-            ).sorted {
-                ($0.lastOpenedAt ?? "") > ($1.lastOpenedAt ?? "")
-            }
+            )
         }
-        let jumpBackIn = Array(jumpBackInCandidates.prefix(6))
+        let jumpBackIn = Array(jumpBackInCandidates.sorted {
+            ($0.lastOpenedAt ?? "") > ($1.lastOpenedAt ?? "")
+        }.prefix(7))
         let jumpIDs = Set(jumpBackIn.map(\.id))
         let quickWins = Array(
             home.recentBookmarks

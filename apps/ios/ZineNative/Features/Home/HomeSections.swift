@@ -89,12 +89,14 @@ struct HomeDashboardSectionView: View {
     let section: HomeDashboardSection
     var density: HomeLayoutDensity = .standard
     let transitionNamespace: Namespace.ID
+    var client: APIClient? = nil
 
     var body: some View {
         if density == .compact {
             CondensedHomeDashboardSectionView(
                 section: section,
-                transitionNamespace: transitionNamespace
+                transitionNamespace: transitionNamespace,
+                client: client
             )
         } else {
             standardContent
@@ -180,13 +182,24 @@ struct HomeFeaturedArticleSection: View {
     let sectionID: String
     let horizontalPadding: CGFloat
     let transitionNamespace: Namespace.ID
+    var compactHeight: CGFloat? = nil
+    var eyebrow = "RECENTLY ADDED"
+    var showsSavedLabel = true
+    var articleContentClient: APIClient? = nil
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var articleExcerpt: String?
+
+    private var cardHeight: CGFloat? {
+        dynamicTypeSize.isAccessibilitySize ? nil : compactHeight
+    }
 
     var body: some View {
         HomeNavigationLink(
             route: .articleReader(item, sectionID: sectionID),
             transitionNamespace: transitionNamespace
         ) {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: cardHeight == nil ? 12 : 8) {
                 HStack(alignment: .center, spacing: 9) {
                     CreatorAvatar(
                         imageUrl: item.creatorImageUrl,
@@ -201,7 +214,7 @@ struct HomeFeaturedArticleSection: View {
                             .foregroundStyle(ZineTheme.primaryText)
                             .lineLimit(1)
 
-                        Text("RECENTLY ADDED")
+                        Text(eyebrow)
                             .font(.caption2.weight(.heavy))
                             .tracking(0.8)
                             .foregroundStyle(ZineTheme.brandAccent)
@@ -218,24 +231,32 @@ struct HomeFeaturedArticleSection: View {
                     .font(.title3.weight(.bold))
                     .foregroundStyle(ZineTheme.primaryText)
                     .multilineTextAlignment(.leading)
-                    .lineLimit(3)
+                    .lineLimit(cardHeight == nil ? 3 : 2)
+                    .layoutPriority(cardHeight == nil ? 0 : 2)
 
                 if let excerpt {
                     Text(excerpt)
                         .font(.subheadline)
                         .foregroundStyle(ZineTheme.secondaryText)
                         .multilineTextAlignment(.leading)
-                        .lineLimit(4)
+                        .lineLimit(cardHeight == nil ? 4 : 8)
+                        .layoutPriority(cardHeight == nil ? 0 : 1)
+                }
+
+                if cardHeight != nil && (excerpt?.count ?? 0) < 180 {
+                    Spacer(minLength: 0)
                 }
 
                 if !footerLabels.isEmpty {
                     Text(footerLabels.joined(separator: " · "))
                         .font(.caption.weight(.medium))
                         .foregroundStyle(ZineTheme.tertiaryText)
+                        .layoutPriority(cardHeight == nil ? 0 : 2)
                 }
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: cardHeight, alignment: .topLeading)
             .background(ZineTheme.surface, in: .rect(cornerRadius: 14))
             .overlay {
                 RoundedRectangle(cornerRadius: 14)
@@ -246,15 +267,41 @@ struct HomeFeaturedArticleSection: View {
             .accessibilityHint("Opens the article")
         }
         .padding(.horizontal, horizontalPadding)
+        .task(id: item.id) {
+            await loadArticleExcerpt()
+        }
     }
 
     private var excerpt: String? {
+        if articleContentClient != nil { return articleExcerpt }
         let value = item.summary?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return value.isEmpty ? nil : value
     }
 
+    private func loadArticleExcerpt() async {
+        guard let articleContentClient else { return }
+        articleExcerpt = nil
+
+        if let cached = await articleContentClient.cachedArticleContent(id: item.id),
+           let content = cached.readableContent
+        {
+            guard !Task.isCancelled else { return }
+            articleExcerpt = HomeArticleExcerpt.fromHTML(content)
+            return
+        }
+
+        guard !Task.isCancelled,
+              let response = try? await articleContentClient.getArticleContent(id: item.id),
+              let content = response.readableContent
+        else { return }
+
+        guard !Task.isCancelled else { return }
+        articleExcerpt = HomeArticleExcerpt.fromHTML(content)
+        await articleContentClient.cacheArticleContent(response, id: item.id)
+    }
+
     private var footerLabels: [String] {
-        [item.consumptionLabel, savedLabel].compactMap { $0 }
+        [item.consumptionLabel, showsSavedLabel ? savedLabel : nil].compactMap { $0 }
     }
 
     private var savedLabel: String? {
@@ -262,6 +309,64 @@ struct HomeFeaturedArticleSection: View {
               let date = try? Date(bookmarkedAt, strategy: .iso8601)
         else { return nil }
         return "Saved \(date.formatted(.relative(presentation: .named)))"
+    }
+}
+
+enum HomeArticleExcerpt {
+    private static let paragraphPattern = try! NSRegularExpression(
+        pattern: #"<p\b[^>]*>(.*?)</p\s*>"#,
+        options: [.caseInsensitive, .dotMatchesLineSeparators]
+    )
+    private static let tagPattern = try! NSRegularExpression(pattern: #"<[^>]+>"#)
+    private static let entityPattern = try! NSRegularExpression(pattern: #"&(#(?:x[0-9a-fA-F]+|[0-9]+)|[a-zA-Z]+);"#)
+
+    static func fromHTML(_ html: String) -> String? {
+        let fullRange = NSRange(html.startIndex..<html.endIndex, in: html)
+        var firstParagraph: String?
+        var passages: [String] = []
+        var passageLength = 0
+
+        for match in paragraphPattern.matches(in: html, range: fullRange) {
+            guard let range = Range(match.range(at: 1), in: html) else { continue }
+            let raw = String(html[range])
+            let withoutTags = tagPattern.stringByReplacingMatches(
+                in: raw,
+                range: NSRange(raw.startIndex..<raw.endIndex, in: raw),
+                withTemplate: " "
+            )
+            let decoded = decodeEntities(in: withoutTags)
+            let passage = decoded.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+            guard !passage.isEmpty else { continue }
+            if firstParagraph == nil { firstParagraph = passage }
+            if passages.isEmpty && passage.count < 40 { continue }
+            passages.append(passage)
+            passageLength += passage.count + 1
+            if passageLength >= 500 { break }
+        }
+
+        let excerpt = passages.isEmpty ? firstParagraph : passages.joined(separator: " ")
+        return excerpt.map { String($0.prefix(600)) }
+    }
+
+    private static func decodeEntities(in text: String) -> String {
+        let nsText = text as NSString
+        var decoded = text
+        for match in entityPattern.matches(in: text, range: NSRange(location: 0, length: nsText.length)).reversed() {
+            guard let entityRange = Range(match.range, in: decoded),
+                  let valueRange = Range(match.range(at: 1), in: text)
+            else { continue }
+            let value = String(text[valueRange])
+            let replacement: String?
+            if value.hasPrefix("#x") || value.hasPrefix("#X") {
+                replacement = UInt32(value.dropFirst(2), radix: 16).flatMap(UnicodeScalar.init).map(String.init)
+            } else if value.hasPrefix("#") {
+                replacement = UInt32(value.dropFirst(), radix: 10).flatMap(UnicodeScalar.init).map(String.init)
+            } else {
+                replacement = ["amp": "&", "lt": "<", "gt": ">", "quot": "\"", "apos": "'", "nbsp": " "] [value.lowercased()]
+            }
+            if let replacement { decoded.replaceSubrange(entityRange, with: replacement) }
+        }
+        return decoded
     }
 }
 
@@ -613,17 +718,19 @@ private struct HomeCompactListSection: View {
 }
 
 struct HomeResumeCard: View {
+    static let height: CGFloat = 220
+
     let item: HomeItem
 
     var body: some View {
         CachedRemoteImage(
             url: item.thumbnailUrl,
-            targetSize: CGSize(width: 390, height: 220)
+            targetSize: CGSize(width: 390, height: Self.height)
         ) {
             HomeImagePlaceholder(contentType: item.contentType, iconSize: 42)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 220)
+        .frame(height: Self.height)
         .clipped()
         .overlay {
             LinearGradient(

@@ -339,12 +339,10 @@ private enum ScreenshotHomeFixtures {
             homeItem(
                 id: "resume",
                 title: "Building products that feel inevitable",
-                creator: "Lenny’s Podcast",
-                contentType: .podcast,
-                provider: .spotify,
-                duration: 3_420,
-                minutes: nil,
-                progress: BookmarkProgress(position: 1_368, duration: 3_420, percent: 40)
+                creator: "Every",
+                summary: "The most useful products make a series of small decisions feel inevitable. Their interfaces explain what matters, leave room for the work itself, and give people confidence about what happens next. That clarity is built through careful choices about language, hierarchy, and timing, not a single dramatic feature.",
+                minutes: 12,
+                progress: BookmarkProgress(position: 4, duration: 12, percent: 33)
             ),
             homeItem(
                 id: "resume-2",
@@ -379,6 +377,12 @@ private enum ScreenshotHomeFixtures {
                 title: "Building an enduring creative practice",
                 creator: "The New Yorker",
                 progress: BookmarkProgress(position: 6, duration: 15, percent: 40)
+            ),
+            homeItem(
+                id: "resume-7",
+                title: "What makes a good idea last",
+                creator: "Works in Progress",
+                progress: BookmarkProgress(position: 2, duration: 10, percent: 20)
             ),
         ]),
         .featuredArticle(featuredArticle),

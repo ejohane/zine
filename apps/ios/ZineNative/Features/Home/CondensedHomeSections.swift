@@ -3,6 +3,7 @@ import SwiftUI
 struct CondensedHomeDashboardSectionView: View {
     let section: HomeDashboardSection
     let transitionNamespace: Namespace.ID
+    var client: APIClient? = nil
 
     var body: some View {
         switch section {
@@ -10,7 +11,8 @@ struct CondensedHomeDashboardSectionView: View {
             CondensedJumpBackInSection(
                 items: items,
                 sectionID: section.id,
-                transitionNamespace: transitionNamespace
+                transitionNamespace: transitionNamespace,
+                client: client
             )
         case .inbox(let items):
             CondensedInboxSection(
@@ -116,47 +118,94 @@ private struct CondensedJumpBackInSection: View {
     let items: [HomeItem]
     let sectionID: String
     let transitionNamespace: Namespace.ID
+    var client: APIClient? = nil
 
-    @State private var selectedPage = 0
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    private var carouselItems: [HomeItem] {
-        Array(items.prefix(3))
+    private var columns: [GridItem] {
+        if dynamicTypeSize.isAccessibilitySize {
+            return [GridItem(.flexible())]
+        }
+        return [
+            GridItem(.flexible(), spacing: 8),
+            GridItem(.flexible(), spacing: 8),
+        ]
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 18) {
             CondensedSectionHeader(title: "Jump Back In", route: .jumpBackIn)
+                .padding(.horizontal, 16)
 
-            TabView(selection: $selectedPage) {
-                ForEach(Array(carouselItems.enumerated()), id: \.element.id) { index, item in
+            if let latest = items.first {
+                if latest.contentType == .article {
+                    HomeFeaturedArticleSection(
+                        item: latest,
+                        sectionID: "\(sectionID)-featured",
+                        horizontalPadding: 16,
+                        transitionNamespace: transitionNamespace,
+                        compactHeight: HomeResumeCard.height,
+                        eyebrow: "LAST OPENED",
+                        showsSavedLabel: false,
+                        articleContentClient: client
+                    )
+                } else {
+                    HomeNavigationLink(
+                        route: .item(latest, sectionID: "\(sectionID)-featured"),
+                        transitionNamespace: transitionNamespace
+                    ) {
+                        HomeResumeCard(item: latest)
+                    }
+                    .padding(.horizontal, 16)
+                }
+            }
+
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+                ForEach(items.dropFirst().prefix(6)) { item in
                     HomeNavigationLink(
                         route: .item(item, sectionID: sectionID),
                         transitionNamespace: transitionNamespace
                     ) {
-                        HomeResumeCard(item: item)
+                        CondensedJumpBackInTile(item: item)
                     }
-                    .tag(index)
                 }
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(height: 220)
+            .padding(.horizontal, 16)
+        }
+    }
+}
 
-            HStack(spacing: 7) {
-                ForEach(carouselItems.indices, id: \.self) { index in
-                    Circle()
-                        .fill(index == selectedPage ? ZineTheme.brandAccent : ZineTheme.secondaryText.opacity(0.3))
-                        .frame(width: 7, height: 7)
-                }
+private struct CondensedJumpBackInTile: View {
+    let item: HomeItem
+
+    @ScaledMetric(relativeTo: .subheadline) private var artworkSize: CGFloat = 64
+
+    var body: some View {
+        HStack(spacing: 10) {
+            CachedRemoteImage(
+                url: item.thumbnailUrl,
+                targetSize: CGSize(width: artworkSize, height: artworkSize)
+            ) {
+                HomeImagePlaceholder(contentType: item.contentType, iconSize: 20)
             }
-            .frame(maxWidth: .infinity)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Jump Back In carousel")
-            .accessibilityValue("Page \(selectedPage + 1) of \(carouselItems.count)")
+            .frame(width: artworkSize, height: artworkSize)
+            .clipped()
+
+            Text(item.title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ZineTheme.primaryText)
+                .lineLimit(2)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.trailing, 8)
         }
-        .padding(.horizontal, 16)
-        .onChange(of: carouselItems.map(\.id)) { _, _ in
-            selectedPage = min(selectedPage, max(carouselItems.count - 1, 0))
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: artworkSize)
+        .background(ZineTheme.surface)
+        .clipShape(.rect(cornerRadius: 10))
+        .contentShape(.rect(cornerRadius: 10))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(item.title)
     }
 }
 

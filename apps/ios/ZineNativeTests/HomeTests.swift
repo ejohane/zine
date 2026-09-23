@@ -3,6 +3,32 @@ import XCTest
 @testable import ZineNative
 
 final class HomeTests: XCTestCase {
+    func testFeaturedArticleExcerptUsesVisibleArticleParagraph() {
+        let html = """
+        <h1>Article title</h1>
+        <p>Short intro.</p>
+        <p>The <strong>actual article</strong> begins here &amp; continues with enough text to fill the featured card&#39;s preview.</p>
+        """
+
+        XCTAssertEqual(
+            HomeArticleExcerpt.fromHTML(html),
+            "The actual article begins here & continues with enough text to fill the featured card's preview."
+        )
+        XCTAssertNil(HomeArticleExcerpt.fromHTML("<h1>Title only</h1>"))
+    }
+
+    func testFeaturedArticleExcerptContinuesIntoFollowingParagraph() {
+        let html = """
+        <p>The opening paragraph has enough words to establish the article's first idea.</p>
+        <p>The second paragraph continues the article and gives the card more real content to preview.</p>
+        """
+
+        XCTAssertEqual(
+            HomeArticleExcerpt.fromHTML(html),
+            "The opening paragraph has enough words to establish the article's first idea. The second paragraph continues the article and gives the card more real content to preview."
+        )
+    }
+
     func testCompactHomeHidesQuickWinsCareRideAndFavesWithoutChangingStandardHome() {
         let sections: [HomeDashboardSection] = [
             .quickWins([makeHomeItem(id: "quick", minutes: 5)]),
@@ -39,6 +65,28 @@ final class HomeTests: XCTestCase {
         XCTAssertEqual(
             HomeLayoutDensity.standard.visibleSections(from: sections).map(\.id),
             sections.map(\.id)
+        )
+    }
+
+    func testCompactHomeReplacesFeaturedArticleWhenJumpBackInIsPresent() {
+        let opened = makeHomeItem(id: "opened", minutes: 12)
+        let article = makeHomeItem(id: "featured", minutes: 8)
+        let sections: [HomeDashboardSection] = [
+            .jumpBackIn([opened]),
+            .featuredArticle(article),
+        ]
+
+        XCTAssertEqual(
+            HomeLayoutDensity.compact.visibleSections(from: sections).map(\.id),
+            ["jump-back-in"]
+        )
+        XCTAssertEqual(
+            HomeLayoutDensity.standard.visibleSections(from: sections).map(\.id),
+            ["jump-back-in", "featured-article"]
+        )
+        XCTAssertEqual(
+            HomeLayoutDensity.compact.visibleSections(from: [.featuredArticle(article)]).map(\.id),
+            ["featured-article"]
         )
     }
 
@@ -159,7 +207,7 @@ final class HomeTests: XCTestCase {
     }
 
     @MainActor
-    func testJumpBackInKeepsTheSixMostRecentItems() throws {
+    func testJumpBackInKeepsTheLatestCardAndSixDistinctGridItems() throws {
         let home = HomeResponse(
             recentBookmarks: [],
             jumpBackIn: (0..<8).map {
@@ -185,7 +233,7 @@ final class HomeTests: XCTestCase {
             return XCTFail("Expected Jump Back In to be the first section")
         }
 
-        XCTAssertEqual(items.map(\.id), (0..<6).map { "resume-\($0)" })
+        XCTAssertEqual(items.map(\.id), (1...7).reversed().map { "resume-\($0)" })
     }
 
     @MainActor
