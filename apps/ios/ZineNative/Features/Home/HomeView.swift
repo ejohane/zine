@@ -20,11 +20,17 @@ enum HomeLayoutDensity: Equatable {
 
     func visibleSections(from sections: [HomeDashboardSection]) -> [HomeDashboardSection] {
         guard self == .compact else { return sections }
+        let hasJumpBackIn = sections.contains { section in
+            if case .jumpBackIn = section { return true }
+            return false
+        }
 
         return sections.filter { section in
             switch section {
             case .quickWins:
                 false
+            case .featuredArticle:
+                !hasJumpBackIn
             case .collection(let collection):
                 !Self.hiddenCompactCollectionTitles.contains(
                     collection.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -167,7 +173,8 @@ struct HomeView: View {
                         HomeDashboardSectionView(
                             section: section,
                             density: density,
-                            transitionNamespace: bookmarkTransition
+                            transitionNamespace: bookmarkTransition,
+                            client: client
                         )
                     }
                 }
