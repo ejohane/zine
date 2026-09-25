@@ -62,6 +62,7 @@ private struct AuthenticatedAppView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     private let client: APIClient
+    private let inboxCache: InboxCache
     private let libraryCache: LibraryCache
     private let offlineLibrarySynchronizer: OfflineLibrarySynchronizer
 
@@ -95,6 +96,7 @@ private struct AuthenticatedAppView: View {
             bookmarkMutationOutbox: bookmarkMutationOutbox
         )
         let homeCache = HomeCache(userID: userID)
+        inboxCache = InboxCache(userID: userID)
         self.client = client
         _commandSession = State(initialValue: NativeCommandSession(client: client))
         let libraryCache = LibraryCache(userID: userID)
@@ -383,6 +385,8 @@ private struct AuthenticatedAppView: View {
             HomeSectionListView(
                 route: route,
                 client: client,
+                inboxCache: route == .inbox ? inboxCache : nil,
+                initialItems: route == .inbox ? homeStore.inboxPreviewItems : [],
                 onContentChanged: markBookmarkContentChanged,
                 onExternalOpen: handleExternalOpen,
                 tabReselection: homeTabReselection

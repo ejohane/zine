@@ -29,6 +29,31 @@ struct InboxCacheTests {
         #expect(snapshot?.items.count == 30)
     }
 
+    @Test func removesCommittedInboxItemFromEveryCachedFilter() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let cache = InboxCache(userID: "test-user", baseDirectory: directory)
+        let bookmark = makeBookmark(index: 1)
+        await cache.saveFirstPage(items: [bookmark], nextCursor: nil, query: InboxQuery())
+        await cache.saveFirstPage(
+            items: [bookmark], nextCursor: nil, query: InboxQuery(contentType: .article)
+        )
+
+        await cache.removeFromAllQueries(id: bookmark.id)
+
+        #expect(await cache.load(query: InboxQuery())?.items.isEmpty == true)
+        #expect(await cache.load(query: InboxQuery(contentType: .article))?.items.isEmpty == true)
+
+        let reopenedCache = InboxCache(userID: "test-user", baseDirectory: directory)
+        #expect(await reopenedCache.load(query: InboxQuery())?.items.isEmpty == true)
+        #expect(
+            await reopenedCache.load(query: InboxQuery(contentType: .article))?.items.isEmpty
+                == true
+        )
+    }
+
     private func makeBookmark(index: Int) -> Bookmark {
         Bookmark(
             id: "inbox-\(index)",

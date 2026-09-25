@@ -29,6 +29,11 @@ actor InboxCache {
         return snapshots?[query.cacheKey]
     }
 
+    func loadAll() -> [String: InboxCacheSnapshot] {
+        loadSnapshotsIfNeeded()
+        return snapshots ?? [:]
+    }
+
     func saveFirstPage(items: [Bookmark], nextCursor: String?, query: InboxQuery) {
         loadSnapshotsIfNeeded()
         snapshots?[query.cacheKey] = InboxCacheSnapshot(
@@ -48,6 +53,19 @@ actor InboxCache {
             nextCursor: snapshot.nextCursor,
             savedAt: Date()
         )
+        persistSnapshots()
+    }
+
+    func removeFromAllQueries(id: String) {
+        loadSnapshotsIfNeeded()
+        guard let snapshots else { return }
+        self.snapshots = snapshots.mapValues { snapshot in
+            InboxCacheSnapshot(
+                items: snapshot.items.filter { $0.id != id },
+                nextCursor: snapshot.nextCursor,
+                savedAt: Date()
+            )
+        }
         persistSnapshots()
     }
 

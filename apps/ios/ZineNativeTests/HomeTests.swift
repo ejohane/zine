@@ -498,6 +498,119 @@ final class HomeTests: XCTestCase {
         XCTAssertEqual(snapshot?.inboxItems.first?.id, "inbox-0")
     }
 
+    @MainActor
+    func testInboxSectionShowsPreviewThenCachedPageWhenRefreshFails() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let cache = InboxCache(userID: "test-user", baseDirectory: directory)
+        let cachedItems = (0..<6).map { makeBookmark(index: $0) }
+        await cache.saveFirstPage(items: cachedItems, nextCursor: "next", query: InboxQuery())
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [UnavailableInboxURLProtocol.self]
+        let client = APIClient(
+            baseURL: URL(string: "https://example.com")!,
+            tokenProvider: { "test-token" },
+            session: URLSession(configuration: configuration)
+        )
+        let store = HomeSectionListStore(
+            route: .inbox,
+            client: client,
+            inboxCache: cache,
+            initialItems: Array(cachedItems.prefix(4))
+        )
+
+        XCTAssertEqual(store.items.count, 4)
+        await store.reload()
+        XCTAssertEqual(store.items.map(\.id), cachedItems.map(\.id))
+        XCTAssertEqual(store.nextCursor, "next")
+        XCTAssertFalse(store.isLoading)
+        XCTAssertNotNil(store.errorMessage)
+        XCTAssertNil(store.actionErrorMessage)
+    }
+
+    @MainActor
+    func testInboxFiltersShowMatchingRowsImmediatelyAndReuseSavedPages() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let allItems = [
+            makeBookmark(index: 0),
+            makeBookmark(index: 1, contentType: .podcast),
+            makeBookmark(index: 2),
+        ]
+        let savedArticles = [allItems[0], allItems[2], makeBookmark(index: 3)]
+        let cache = InboxCache(userID: "test-user", baseDirectory: directory)
+        await cache.saveFirstPage(items: allItems, nextCursor: "all-next", query: InboxQuery())
+        await cache.saveFirstPage(
+            items: savedArticles,
+            nextCursor: "article-next",
+            query: InboxQuery(contentType: .article)
+        )
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [UnavailableInboxURLProtocol.self]
+        let client = APIClient(
+            baseURL: URL(string: "https://example.com")!,
+            tokenProvider: { "test-token" },
+            session: URLSession(configuration: configuration)
+        )
+        let store = HomeSectionListStore(
+            route: .inbox,
+            client: client,
+            inboxCache: cache,
+            initialItems: Array(allItems.prefix(2))
+        )
+
+        await store.reload()
+        store.selectInboxFilter(.podcast)
+        XCTAssertEqual(store.items.map(\.id), ["inbox-1"])
+        XCTAssertNil(store.nextCursor)
+        XCTAssertTrue(store.isResolvingInboxFilter)
+
+        store.selectInboxFilter(.article)
+        XCTAssertEqual(store.items.map(\.id), savedArticles.map(\.id))
+        XCTAssertEqual(store.nextCursor, "article-next")
+        XCTAssertFalse(store.isResolvingInboxFilter)
+
+        store.selectInboxFilter(.video)
+        XCTAssertTrue(store.items.isEmpty)
+        XCTAssertTrue(store.isResolvingInboxFilter)
+        await store.reload(contentType: .video)
+        XCTAssertTrue(store.items.isEmpty)
+        XCTAssertFalse(store.isResolvingInboxFilter)
+    }
+
+    @MainActor
+    func testNewerHomePreviewSurvivesAnEmptyInboxCache() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let cache = InboxCache(userID: "test-user", baseDirectory: directory)
+        await cache.saveFirstPage(items: [], nextCursor: nil, query: InboxQuery())
+        let bookmark = makeBookmark(index: 0)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [UnavailableInboxURLProtocol.self]
+        let client = APIClient(
+            baseURL: URL(string: "https://example.com")!,
+            tokenProvider: { "test-token" },
+            session: URLSession(configuration: configuration)
+        )
+        let store = HomeSectionListStore(
+            route: .inbox,
+            client: client,
+            inboxCache: cache,
+            initialItems: [bookmark]
+        )
+
+        await store.reload()
+        XCTAssertEqual(store.items.map(\.id), [bookmark.id])
+    }
+
     private func makeHomeItem(
         id: String,
         minutes: Int,
@@ -527,14 +640,18 @@ final class HomeTests: XCTestCase {
         )
     }
 
-    private func makeBookmark(index: Int, state: String = "INBOX") -> Bookmark {
+    private func makeBookmark(
+        index: Int,
+        state: String = "INBOX",
+        contentType: ContentType = .article
+    ) -> Bookmark {
         Bookmark(
             id: "inbox-\(index)",
             itemId: "item-\(index)",
             title: "Inbox item \(index)",
             thumbnailUrl: nil,
             canonicalUrl: URL(string: "https://example.com/items/\(index)")!,
-            contentType: .article,
+            contentType: contentType,
             provider: .rss,
             creator: "Creator",
             creatorImageUrl: nil,
@@ -556,4 +673,20 @@ final class HomeTests: XCTestCase {
         )
     }
 
+}
+
+private final class UnavailableInboxURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let response = HTTPURLResponse(
+            url: request.url!, statusCode: 503, httpVersion: nil, headerFields: nil
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data())
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
 }
