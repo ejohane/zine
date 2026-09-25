@@ -40,6 +40,8 @@ final class HomeStore {
     private var inboxItems: [Bookmark] = []
     private var optimisticOpenedItems: [String: HomeItem] = [:]
 
+    var inboxPreviewItems: [Bookmark] { inboxItems }
+
     init(client: APIClient, cache: HomeCache) {
         self.client = client
         self.cache = cache

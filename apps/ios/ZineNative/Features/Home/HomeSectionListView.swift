@@ -16,6 +16,8 @@ struct HomeSectionListView: View {
     init(
         route: HomeSectionRoute,
         client: APIClient,
+        inboxCache: InboxCache? = nil,
+        initialItems: [Bookmark] = [],
         onContentChanged: @escaping () -> Void = {},
         onExternalOpen: @escaping (Bookmark) -> Void = { _ in },
         tabReselection: Int = 0
@@ -25,7 +27,12 @@ struct HomeSectionListView: View {
         self.onContentChanged = onContentChanged
         self.onExternalOpen = onExternalOpen
         self.tabReselection = tabReselection
-        _store = State(initialValue: HomeSectionListStore(route: route, client: client))
+        _store = State(initialValue: HomeSectionListStore(
+            route: route,
+            client: client,
+            inboxCache: inboxCache,
+            initialItems: initialItems
+        ))
         _contentType = State(initialValue: route.initialContentTypeFilter)
     }
 
@@ -54,7 +61,12 @@ struct HomeSectionListView: View {
                         store.setBookmarked(changed, isBookmarked: isBookmarked)
                         onContentChanged()
                     },
-                    onBookmarkCommit: { _, _ in onContentChanged() },
+                    onBookmarkCommit: { changed, isBookmarked in
+                        if isBookmarked {
+                            Task { await store.removeCachedInboxItem(id: changed.id) }
+                        }
+                        onContentChanged()
+                    },
                     onExternalOpen: onExternalOpen
                 )
                 .navigationTransition(
@@ -67,10 +79,10 @@ struct HomeSectionListView: View {
             }
             .alert("Couldn’t update inbox", isPresented: actionErrorBinding) {
                 Button("OK", role: .cancel) {
-                    store.dismissError()
+                    store.dismissActionError()
                 }
             } message: {
-                Text(store.errorMessage ?? "Please try again.")
+                Text(store.actionErrorMessage ?? "Please try again.")
             }
     }
 
@@ -88,7 +100,7 @@ struct HomeSectionListView: View {
                     resultRows
                 } header: {
                     ContentTypeFilterBar(
-                        selection: $contentType,
+                        selection: filterSelection,
                         background: ZineTheme.surface
                     )
                         .textCase(nil)
@@ -126,6 +138,16 @@ struct HomeSectionListView: View {
         static let top = "home-section-list-top"
     }
 
+    private var filterSelection: Binding<ContentType?> {
+        Binding(
+            get: { contentType },
+            set: { selected in
+                if route == .inbox { store.selectInboxFilter(selected) }
+                contentType = selected
+            }
+        )
+    }
+
     private func handleTabReselection(using proxy: ScrollViewProxy) {
         FilteredListTabAction.perform(
             isVisible: isVisible,
@@ -133,13 +155,18 @@ struct HomeSectionListView: View {
             hasActiveFilter: contentType != nil,
             proxy: proxy,
             topID: ScrollAnchor.top,
-            resetFilter: { contentType = nil }
+            resetFilter: { filterSelection.wrappedValue = nil }
         )
     }
 
     @ViewBuilder
     private var resultRows: some View {
-        if store.isLoading && store.items.isEmpty {
+        if route == .inbox, store.isResolvingInboxFilter, store.items.isEmpty {
+            ProgressView("Checking inbox…")
+                .frame(maxWidth: .infinity, minHeight: 80)
+                .listRowBackground(ZineTheme.surface)
+                .listRowSeparator(.hidden)
+        } else if store.isLoading && store.items.isEmpty && route != .inbox {
             FilteredListLoadingRow(
                 label: "Loading \(route.title.lowercased())…",
                 background: ZineTheme.surface
@@ -210,8 +237,8 @@ struct HomeSectionListView: View {
 
     private var actionErrorBinding: Binding<Bool> {
         Binding(
-            get: { store.errorMessage != nil && !store.items.isEmpty },
-            set: { if !$0 { store.dismissError() } }
+            get: { store.actionErrorMessage != nil },
+            set: { if !$0 { store.dismissActionError() } }
         )
     }
 
