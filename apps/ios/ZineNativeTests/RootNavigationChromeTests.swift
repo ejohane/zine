@@ -34,6 +34,47 @@ final class RootNavigationChromeTests: XCTestCase {
         }
     }
 
+    func testNestedBookmarkDetailKeepsInteractivePopEnabled() async throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let previousKeyWindow = scene.keyWindow
+        let state = NavigationState()
+        let host = UIHostingController(rootView: NestedDetailHarness(state: state))
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer {
+            window.isHidden = true
+            window.rootViewController = nil
+            previousKeyWindow?.makeKeyAndVisible()
+        }
+
+        try await settle()
+        let navigation = try XCTUnwrap(findNavigationController(in: host))
+        for route in 1...3 {
+            state.path.append(route)
+            try await settle()
+        }
+
+        XCTAssertTrue(navigation.isNavigationBarHidden)
+        let edgePop = try XCTUnwrap(navigation.interactivePopGestureRecognizer)
+        XCTAssertTrue(edgePop.isEnabled, "The nested bookmark must accept the edge swipe")
+        XCTAssertNil(edgePop.delegate, "The hidden bar must not block the edge swipe")
+        if #available(iOS 26.0, *),
+           let contentPop = navigation.interactiveContentPopGestureRecognizer {
+            XCTAssertTrue(contentPop.isEnabled, "The nested bookmark must accept the content swipe")
+        }
+
+        state.path.removeLast()
+        try await settle()
+        XCTAssertFalse(navigation.isNavigationBarHidden, "Popping the bookmark must reveal the creator")
+        XCTAssertTrue(edgePop.isEnabled, "The creator must retain its back swipe")
+
+        state.path.removeLast()
+        try await settle()
+        XCTAssertTrue(navigation.isNavigationBarHidden, "Popping the creator must reveal the first bookmark")
+        XCTAssertTrue(edgePop.isEnabled, "The first bookmark must regain its back swipe")
+    }
+
     private func assertCompactTitleVisible(
         in navigation: UINavigationController,
         file: StaticString = #filePath,
@@ -80,6 +121,29 @@ private struct NavigationHarness: View {
                     .toolbarVisibility(.hidden, for: .navigationBar)
                     .zinePushedDestinationChrome()
             }
+        }
+    }
+}
+
+private struct NestedDetailHarness: View {
+    @ObservedObject var state: NavigationState
+
+    var body: some View {
+        NavigationStack(path: $state.path) {
+            Text("Library")
+                .navigationDestination(for: Int.self) { route in
+                    if route == 2 {
+                        Text("Creator")
+                            .navigationTitle("Creator")
+                    } else {
+                        ScrollView {
+                            Text("Bookmark detail")
+                                .frame(maxWidth: .infinity, minHeight: 800)
+                                .background(BookmarkDetailPopGestureBridge())
+                        }
+                        .toolbarVisibility(.hidden, for: .navigationBar)
+                    }
+                }
         }
     }
 }

@@ -251,9 +251,11 @@ struct BookmarkDetailView: View {
                             )
                             .background(ZineTheme.canvas)
                     }
+                    .background(BookmarkDetailPopGestureBridge())
                 }
                 .coordinateSpace(name: "bookmarkDetailScroll")
                 .ignoresSafeArea(edges: .top)
+                .modifier(BookmarkDetailTopEdgeEffect())
 
                 detailBackButton
                     .padding(.leading, 16)
@@ -849,5 +851,127 @@ struct BookmarkDetailView: View {
         bookmark.tags = tags
         self.bookmark = bookmark
         onUpdate(bookmark)
+    }
+}
+
+private struct BookmarkDetailTopEdgeEffect: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.scrollEdgeEffectHidden(for: .top)
+        } else {
+            content
+        }
+    }
+}
+
+// The hidden navigation bar can disable UIKit's pop gestures after a push
+// through the creator screen. Keep the system gesture on the navigation
+// controller, and let the detail scroll view yield to it.
+struct BookmarkDetailPopGestureBridge: UIViewRepresentable {
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIView(context: Context) -> NavigationAnchor {
+        let view = NavigationAnchor()
+        view.onNavigationControllerAvailable = { [weak coordinator = context.coordinator, weak view] navigation in
+            guard let view else { return }
+            coordinator?.enable(in: navigation, alongside: view.nearestScrollView()?.panGestureRecognizer)
+        }
+        return view
+    }
+
+    func updateUIView(_ view: NavigationAnchor, context: Context) {
+        view.refreshNavigationController()
+    }
+
+    static func dismantleUIView(_ view: NavigationAnchor, coordinator: Coordinator) {
+        view.onNavigationControllerAvailable = nil
+        coordinator.restore()
+    }
+
+    final class NavigationAnchor: UIView {
+        var onNavigationControllerAvailable: ((UINavigationController) -> Void)?
+
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            isUserInteractionEnabled = false
+            backgroundColor = .clear
+        }
+
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            refreshNavigationController()
+        }
+
+        func refreshNavigationController() {
+            guard window != nil else { return }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, let navigation = nearestNavigationController() else { return }
+                onNavigationControllerAvailable?(navigation)
+            }
+        }
+
+        func nearestScrollView() -> UIScrollView? {
+            var view = superview
+            while let current = view {
+                if let scrollView = current as? UIScrollView { return scrollView }
+                view = current.superview
+            }
+            return nil
+        }
+
+        private func nearestNavigationController() -> UINavigationController? {
+            var responder: UIResponder? = self
+            while let next = responder?.next {
+                if let navigation = next as? UINavigationController { return navigation }
+                if let controller = next as? UIViewController,
+                   let navigation = controller.navigationController { return navigation }
+                responder = next
+            }
+            return nil
+        }
+    }
+
+    @MainActor
+    final class Coordinator {
+        private struct Configuration {
+            let gesture: UIGestureRecognizer
+            let delegate: (any UIGestureRecognizerDelegate)?
+            let wasEnabled: Bool
+        }
+
+        private var configurations: [Configuration] = []
+
+        func enable(in navigation: UINavigationController, alongside scrollGesture: UIPanGestureRecognizer?) {
+            var gestures = [navigation.interactivePopGestureRecognizer]
+            if #available(iOS 26.0, *) {
+                gestures.append(navigation.interactiveContentPopGestureRecognizer)
+            }
+
+            for gesture in gestures.compactMap({ $0 }) {
+                if !configurations.contains(where: { $0.gesture === gesture }) {
+                    configurations.append(Configuration(
+                        gesture: gesture,
+                        delegate: gesture.delegate,
+                        wasEnabled: gesture.isEnabled
+                    ))
+                    scrollGesture?.require(toFail: gesture)
+                }
+                gesture.delegate = nil
+                gesture.isEnabled = navigation.viewControllers.count > 1
+            }
+        }
+
+        func restore() {
+            for configuration in configurations {
+                if configuration.gesture.delegate == nil {
+                    configuration.gesture.delegate = configuration.delegate
+                }
+                configuration.gesture.isEnabled = configuration.wasEnabled
+            }
+            configurations.removeAll()
+        }
     }
 }
