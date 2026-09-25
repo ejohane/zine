@@ -137,6 +137,7 @@ struct ArticleReaderView: View {
         .sensoryFeedback(.impact(weight: .heavy, intensity: 1), trigger: bookmarkHapticTrigger)
         .sensoryFeedback(.impact(weight: .heavy, intensity: 1), trigger: completionHapticTrigger)
         .accessibilityAction(.escape) { dismiss() }
+        .statusBarHidden(!showsChrome)
         .toolbarVisibility(.hidden, for: .navigationBar)
         .zinePushedDestinationChrome()
         .task(id: store.metadata.bookmarkID) {

@@ -284,7 +284,7 @@ struct ArticleHTMLView: UIViewRepresentable {
         webView.scrollView.delegate = context.coordinator
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.scrollView.keyboardDismissMode = .interactive
-        webView.scrollView.showsVerticalScrollIndicator = false
+        webView.scrollView.showsVerticalScrollIndicator = true
         webView.scrollView.alwaysBounceVertical = true
         webView.isOpaque = false
         webView.backgroundColor = .clear
