@@ -1,4 +1,7 @@
 import Foundation
+import UIKit
+import SwiftUI
+import WebKit
 import XCTest
 @testable import ZineNative
 
@@ -29,6 +32,68 @@ final class ArticleReaderTests: XCTestCase {
         XCTAssertTrue(html.contains("script-src 'none'"))
         XCTAssertTrue(html.contains("frame-src 'none'"))
         XCTAssertTrue(html.contains("<article><p>Readable body</p></article>"))
+    }
+
+    @MainActor
+    func testMergedReaderHostsHeaderInTheArticleScrollView() async throws {
+        let response = try JSONDecoder().decode(
+            ArticleContentResponse.self, from: Data(Self.availableJSON.utf8)
+        )
+        let document = ArticleReaderDocument(metadata: Self.metadata(), response: response)
+        let reader = ArticleHTMLView(
+            document: document, initialProgress: 0, initialPosition: nil,
+            fontScale: 1, fontFamily: .system,
+            onProgressChanged: { _ in }, onScrollSettled: { _ in },
+            onChromeVisibilityChanged: { _ in }, onPositionChanged: { _ in }, onOpenURL: { _ in },
+            bookmarkHeader: ArticleBookmarkReaderHeader(
+                content: AnyView(Text("Bookmark header").frame(height: 180)),
+                palette: .fallback, jumpRequest: 0, onScroll: { _, _ in }
+            )
+        )
+        let host = UIHostingController(rootView: reader)
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil }
+        func webView(in view: UIView) -> WKWebView? {
+            if let web = view as? WKWebView { return web }
+            for child in view.subviews { if let web = webView(in: child) { return web } }
+            return nil
+        }
+        // Wait for WebKit layout and document navigation, not a fixed launch delay.
+        var web: WKWebView?
+        for _ in 0..<100 {
+            host.view.layoutIfNeeded()
+            web = webView(in: host.view)
+            if let web, !web.isLoading, web.scrollView.contentInset.top > 0 { break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        let webView = try XCTUnwrap(web)
+        XCTAssertEqual(webView.scrollView.contentInset.top, 180, accuracy: 1)
+        XCTAssertEqual(webView.scrollView.contentOffset.y, -180, accuracy: 1)
+        let nativeHeader = webView.scrollView.subviews.first { $0.frame.minY < 0 }
+        XCTAssertNotNil(nativeHeader, "Bookmark header must be inside the reader's existing scroll surface")
+        XCTAssertEqual(host.children.count, 1, "The hosted header must have view-controller containment")
+    }
+
+    func testMergedReaderKeepsPaletteAndOmitsDuplicateBookmarkHeader() throws {
+        let response = try JSONDecoder().decode(
+            ArticleContentResponse.self, from: Data(Self.availableJSON.utf8)
+        )
+        let palette = ZineTheme.ArtworkPalette(hue: 0.6, saturation: 0.6, brightness: 0.22)
+        let html = ArticleHTMLDocumentBuilder.makeHTML(
+            for: ArticleReaderDocument(metadata: Self.metadata(), response: response),
+            bookmarkPalette: palette
+        )
+        XCTAssertFalse(html.contains("<header>"))
+        XCTAssertFalse(html.contains("<h1>A dependable reader</h1>"))
+        XCTAssertTrue(html.contains("<main><article><p>Readable body</p></article></main>"))
+        XCTAssertTrue(html.contains("html, body { background: \(palette.readerBackgroundCSS)"))
+        XCTAssertTrue(html.contains("body { padding-top: 24px; }"))
+        XCTAssertTrue(html.contains("script-src 'none'"))
+        // Contextual overrides follow dark-mode rules, so system appearance cannot replace the creator color.
+        XCTAssertGreaterThan(html.range(of: "html, body { background:")!.lowerBound,
+                             html.range(of: "@media (prefers-color-scheme: dark)")!.lowerBound)
     }
 
     func testHTMLDocumentAppliesReaderFontScaleToTypographyOnly() throws {

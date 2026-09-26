@@ -18,6 +18,16 @@ struct CreatorView: View {
     @State private var store: CreatorStore
     @State private var selectedSection: ContentSection = .bookmarked
     @State private var renderedSection: ContentSection = .bookmarked
+    @State private var artworkPalette = ZineTheme.ArtworkPalette.fallback
+    @State private var headerBottom: CGFloat = 0
+    @State private var titleBottom: CGFloat = .greatestFiniteMagnitude
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var avatarURL: URL? { store.profile?.imageUrl ?? fallbackImageUrl }
+    private var creatorName: String { store.profile?.name ?? fallbackName }
+    private var headerTitleProgress: CGFloat {
+        min(max((headerBottom + 16 - titleBottom) / 32, 0), 1)
+    }
 
     init(
         creatorId: String,
@@ -51,10 +61,31 @@ struct CreatorView: View {
             .padding(.top, 16)
             .padding(.bottom, 40)
         }
-        .navigationTitle(store.profile?.name ?? fallbackName)
+        .coordinateSpace(name: "creatorScroll")
+        .background(artworkPalette.background.ignoresSafeArea())
+        .foregroundStyle(artworkPalette.primaryText)
+        .tint(artworkPalette.primaryText)
+        .preferredColorScheme(.dark)
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarVisibility(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text(creatorName)
+                    .font(.headline)
+                    .foregroundStyle(artworkPalette.primaryText)
+                    .lineLimit(1)
+                    .opacity(headerTitleProgress)
+                    .accessibilityHidden(headerTitleProgress < 0.5)
+            }
+        }
         .toolbarBackground(.hidden, for: .navigationBar)
-        .zineNavigationBarContentBackdrop(ZineTheme.canvas)
+        .zineNavigationBarContentBackdrop(artworkPalette.background)
+        .onGeometryChange(for: CGFloat.self) { geometry in
+            geometry.frame(in: .global).minY
+        } action: { headerBottom = $0 }
+        .onChange(of: avatarURL) { _, _ in artworkPalette = .fallback }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: artworkPalette)
         .task { await store.reload() }
         .refreshable { await store.reload() }
     }
@@ -62,51 +93,60 @@ struct CreatorView: View {
     private var creatorHeader: some View {
         VStack(spacing: 12) {
             CreatorAvatar(
-                imageUrl: store.profile?.imageUrl ?? fallbackImageUrl,
-                creator: store.profile?.name ?? fallbackName,
+                imageUrl: avatarURL,
+                creator: creatorName,
                 contentType: .article,
-                size: 88
+                size: 160,
+                onImageLoaded: { image in
+                    artworkPalette = ZineTheme.ArtworkPalette.make(from: image)
+                }
             )
 
             VStack(spacing: 5) {
-                Text(store.profile?.name ?? fallbackName)
+                Text(creatorName)
                     .font(.title2.bold())
                     .multilineTextAlignment(.center)
+                    .opacity(1 - headerTitleProgress)
+                    .accessibilityHidden(headerTitleProgress >= 0.5)
+                    .onGeometryChange(for: CGFloat.self) { geometry in
+                        geometry.frame(in: .global).maxY
+                    } action: { titleBottom = $0 }
 
                 if let handle = store.profile?.handle, !handle.isEmpty {
                     Text(handle)
                         .font(.subheadline)
-                        .foregroundStyle(ZineTheme.secondaryText)
+                        .foregroundStyle(artworkPalette.secondaryText)
                 }
             }
 
             if let description = store.profile?.description, !description.isEmpty {
                 Text(description)
                     .font(.subheadline)
-                    .foregroundStyle(ZineTheme.secondaryText)
+                    .foregroundStyle(artworkPalette.secondaryText)
                     .multilineTextAlignment(.center)
                     .lineLimit(5)
             }
 
-            if let externalUrl = store.profile?.externalUrl,
-                let provider = store.profile?.provider
-            {
-                ProviderLinkButton(
-                    provider: provider,
-                    destination: externalUrl,
-                    title: provider.creatorActionTitle
-                )
+            if let externalUrl = store.profile?.externalUrl {
+                Link(destination: externalUrl) {
+                    Label(
+                        (store.profile?.provider ?? fallbackProvider).creatorActionTitle,
+                        systemImage: "arrow.up.right"
+                    )
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                    .foregroundStyle(artworkPalette.actionForeground)
+                    .background(artworkPalette.actionBackground, in: Capsule())
+                }
+                .buttonStyle(.plain)
                 .padding(.top, 8)
-            } else if let externalUrl = store.profile?.externalUrl {
-                Link("View creator", destination: externalUrl)
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.top, 8)
             }
 
             if let error = store.profileErrorMessage {
                 Text("Some profile details couldn’t be loaded. \(error)")
                     .font(.caption)
-                    .foregroundStyle(ZineTheme.secondaryText)
+                    .foregroundStyle(artworkPalette.secondaryText)
                     .multilineTextAlignment(.center)
             }
         }
@@ -215,7 +255,7 @@ struct CreatorView: View {
                     .font(.headline)
                 Text("\(bookmarks.count)")
                     .font(.subheadline)
-                    .foregroundStyle(ZineTheme.secondaryText)
+                    .foregroundStyle(artworkPalette.secondaryText)
             }
 
             if isLoading && bookmarks.isEmpty {
@@ -225,7 +265,7 @@ struct CreatorView: View {
             } else if bookmarks.isEmpty {
                 Text(emptyMessage)
                     .font(.subheadline)
-                    .foregroundStyle(ZineTheme.secondaryText)
+                    .foregroundStyle(artworkPalette.secondaryText)
                     .padding(.vertical, 8)
             } else {
                 bookmarkRows(bookmarks, isCompleted: isCompleted)
@@ -270,7 +310,7 @@ struct CreatorView: View {
                 }
 
                 if bookmark.id != bookmarks.last?.id {
-                    Divider().padding(.leading, 106)
+                    Rectangle().fill(artworkPalette.divider).frame(height: 1).padding(.leading, 106)
                 }
             }
         }
@@ -308,7 +348,7 @@ struct CreatorView: View {
                         .buttonStyle(.plain)
 
                         if item.id != store.latestContent.last?.id {
-                            Divider().padding(.leading, 106)
+                            Rectangle().fill(artworkPalette.divider).frame(height: 1).padding(.leading, 106)
                         }
                     }
                 }
@@ -321,11 +361,11 @@ struct CreatorView: View {
             Text(title).font(.subheadline.weight(.semibold))
             Text(message)
                 .font(.caption)
-                .foregroundStyle(ZineTheme.secondaryText)
+                .foregroundStyle(artworkPalette.secondaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(ZineTheme.surface, in: .rect(cornerRadius: 12))
+        .background(artworkPalette.controlBackground, in: .rect(cornerRadius: 12))
     }
 
     private func creatorContentRow(
@@ -341,9 +381,9 @@ struct CreatorView: View {
                 targetSize: CGSize(width: 94, height: 60)
             ) {
                 ZStack {
-                    ZineTheme.raised
+                    artworkPalette.controlBackground
                     Image(systemName: placeholderSystemImage)
-                        .foregroundStyle(ZineTheme.secondaryText)
+                        .foregroundStyle(artworkPalette.secondaryText)
                 }
             }
             .frame(width: 94, height: 60)
@@ -352,18 +392,18 @@ struct CreatorView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ZineTheme.primaryText)
+                    .foregroundStyle(artworkPalette.primaryText)
                     .lineLimit(2)
                 Text(metadataLabel)
                     .font(.caption)
-                    .foregroundStyle(ZineTheme.secondaryText)
+                    .foregroundStyle(artworkPalette.secondaryText)
                     .lineLimit(1)
             }
 
             Spacer(minLength: 0)
             Image(systemName: accessorySystemImage)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(ZineTheme.tertiaryText)
+                .foregroundStyle(artworkPalette.tertiaryText)
         }
         .contentShape(Rectangle())
     }

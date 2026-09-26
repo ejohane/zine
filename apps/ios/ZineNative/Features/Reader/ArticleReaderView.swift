@@ -24,6 +24,7 @@ struct ArticleReaderView: View {
     @State private var hasRecordedOpen = false
     @State private var hasRestoredLocalProgress = false
     @State private var chromeVisible = true
+    @State private var bookmarkHeaderVisible = true
     @State private var presentedSheet: ArticleReaderSheet?
     @State private var articleLinks: [ArticleReaderLink]?
     @State private var linksFailed = false
@@ -38,6 +39,8 @@ struct ArticleReaderView: View {
     private let onFinishedCommit: (Bool) -> Void
     private let onTagsChanged: ([BookmarkTag]) -> Void
     private let client: APIClient
+    private let synchronizedBookmark: Bookmark?
+    private let bookmarkHeader: ArticleBookmarkReaderHeader?
     private let loadsOnAppear: Bool
 
     init(
@@ -45,6 +48,8 @@ struct ArticleReaderView: View {
         client: APIClient,
         initialPhase: ArticleReaderPhase = .loading,
         loadsOnAppear: Bool = true,
+        bookmarkHeader: ArticleBookmarkReaderHeader? = nil,
+        synchronizedBookmark: Bookmark? = nil,
         onRead: @escaping () -> Void = {},
         onProgressSaved: @escaping (BookmarkProgress) -> Void = { _ in },
         onFinishedChanged: @escaping (Bool, BookmarkChangePhase) -> Void = { _, _ in },
@@ -68,12 +73,14 @@ struct ArticleReaderView: View {
         self.onTagsChanged = onTagsChanged
         self.client = client
         self.loadsOnAppear = loadsOnAppear
+        self.bookmarkHeader = bookmarkHeader
+        self.synchronizedBookmark = synchronizedBookmark
     }
 
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .top) {
-                ZineTheme.surface
+                readerBackground
                     .ignoresSafeArea()
 
                 phaseContent(topInset: geometry.safeAreaInsets.top)
@@ -89,6 +96,7 @@ struct ArticleReaderView: View {
                 if store.readyDocument != nil {
                     HStack(spacing: 0) {
                         Button {
+                            playContentControlHaptic()
                             presentedSheet = .tags
                         } label: {
                             readerControlSymbol("tag")
@@ -98,6 +106,7 @@ struct ArticleReaderView: View {
                         .accessibilityIdentifier("article-reader-edit-tags")
 
                         Button {
+                            playContentControlHaptic()
                             presentedSheet = .links
                         } label: {
                             readerControlSymbol("link")
@@ -112,7 +121,7 @@ struct ArticleReaderView: View {
                         } label: {
                             readerControlSymbol(store.isFinished ? "checkmark.circle.fill" : "checkmark.circle")
                                 .frame(width: 48, height: 48)
-                                .foregroundStyle(store.isFinished ? .green : ZineTheme.primaryText)
+                                .foregroundStyle(store.isFinished ? .green : readerForeground)
                                 .contentTransition(.symbolEffect(.replace))
                         }
                         .disabled(store.isUpdatingFinished)
@@ -121,9 +130,9 @@ struct ArticleReaderView: View {
                         .accessibilityIdentifier("article-reader-completion")
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(ZineTheme.primaryText)
-                    .background(ZineTheme.surface.opacity(0.96), in: Capsule())
-                    .overlay { Capsule().stroke(ZineTheme.border, lineWidth: 1) }
+                    .foregroundStyle(readerForeground)
+                    .background(readerControlBackground, in: Capsule())
+                    .overlay { Capsule().stroke(readerDivider, lineWidth: 1) }
                     .padding(.trailing, 12)
                     .padding(.bottom, 8)
                     .opacity(showsChrome ? 1 : 0)
@@ -137,8 +146,8 @@ struct ArticleReaderView: View {
         .sensoryFeedback(.impact(weight: .heavy, intensity: 1), trigger: bookmarkHapticTrigger)
         .sensoryFeedback(.impact(weight: .heavy, intensity: 1), trigger: completionHapticTrigger)
         .accessibilityAction(.escape) { dismiss() }
-        .statusBarHidden(!showsChrome)
-        .toolbarVisibility(.hidden, for: .navigationBar)
+        .statusBarHidden(!showsChrome && (bookmarkHeader == nil || !bookmarkHeaderVisible))
+        .toolbarVisibility(bookmarkHeader != nil && bookmarkHeaderVisible ? .visible : .hidden, for: .navigationBar)
         .zinePushedDestinationChrome()
         .task(id: store.metadata.bookmarkID) {
             commandSession?.reader = store
@@ -180,8 +189,10 @@ struct ArticleReaderView: View {
                 scrollProgress = store.initialProgressFraction
                 lastPersistedProgress = store.initialProgressFraction
             }
-            recordOpenIfNeeded()
+            if bookmarkHeader == nil { recordOpenIfNeeded() }
         }
+        .onChange(of: synchronizedBookmark?.isFinished, initial: true) { _, _ in reconcileBookmark() }
+        .onChange(of: synchronizedBookmark?.tags, initial: true) { _, _ in reconcileBookmark() }
         .onChange(of: store.tags) { _, _ in commandSession?.recordUIChange("reader.tags") }
         .onChange(of: store.isFinished) { _, _ in commandSession?.recordUIChange("reader.finished") }
         .onChange(of: store.progressFraction) { _, _ in commandSession?.recordUIChange("reader.progress") }
@@ -220,8 +231,11 @@ struct ArticleReaderView: View {
             get: { actionErrorMessage != nil },
             set: { if !$0 { actionErrorMessage = nil } }
         )) {
-            Button("Try Again", action: toggleFinished)
-            Button("Cancel", role: .cancel) {}
+            Button("Try Again") {
+                playContentControlHaptic()
+                toggleFinished()
+            }
+            Button("Cancel", role: .cancel) { playContentControlHaptic() }
         } message: {
             Text(actionErrorMessage ?? "Please try again.")
         }
@@ -229,6 +243,35 @@ struct ArticleReaderView: View {
 
     @ViewBuilder
     private func phaseContent(topInset: CGFloat) -> some View {
+        if let bookmarkHeader, store.readyDocument == nil {
+            ScrollView {
+                VStack(spacing: 0) {
+                    bookmarkHeader.content
+                    pendingContent
+                        .frame(maxWidth: .infinity, minHeight: 240)
+                        .foregroundStyle(readerForeground)
+                        .padding(.bottom, 48)
+                }
+            }
+            .ignoresSafeArea(.container, edges: .top)
+        } else {
+            pendingOrReadyContent(topInset: topInset)
+        }
+    }
+
+    @ViewBuilder
+    private var pendingContent: some View {
+        switch store.phase {
+        case .loading: loadingView(label: "Loading article…")
+        case .preparing: loadingView(label: "Getting the article ready…")
+        case let .unavailable(message): unavailableView(message: message, retryable: false)
+        case let .failed(message): unavailableView(message: message, retryable: true)
+        case .ready: EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func pendingOrReadyContent(topInset: CGFloat) -> some View {
         switch store.phase {
         case .loading:
             loadingView(label: "Loading article…")
@@ -250,6 +293,7 @@ struct ArticleReaderView: View {
             Text(label)
                 .font(.headline)
             Button("Open Original") {
+                playContentControlHaptic()
                 openOriginal()
             }
             .buttonStyle(.bordered)
@@ -273,7 +317,8 @@ struct ArticleReaderView: View {
                 Task { await client.saveArticleReadingPosition(id: store.metadata.bookmarkID, position: position) }
             },
             onOpenURL: { openURL($0) },
-            topContentInset: topInset,
+            topContentInset: bookmarkHeader == nil ? topInset : 0,
+            bookmarkHeader: configuredBookmarkHeader,
             onLinksLoaded: { result in
                 switch result {
                 case let .success(links): articleLinks = links; linksFailed = false
@@ -293,11 +338,13 @@ struct ArticleReaderView: View {
         } actions: {
             if retryable {
                 Button("Try Again") {
+                    playContentControlHaptic()
                     Task { await store.load() }
                 }
                 .buttonStyle(.borderedProminent)
             }
             Button("Open Original") {
+                playContentControlHaptic()
                 openOriginal()
             }
             .buttonStyle(.bordered)
@@ -307,20 +354,22 @@ struct ArticleReaderView: View {
     private var readerChrome: some View {
         HStack(spacing: 10) {
             Button {
+                playContentControlHaptic()
                 dismiss()
             } label: {
                 readerControlSymbol("chevron.left")
             }
             .buttonStyle(.plain)
-            .foregroundStyle(ZineTheme.primaryText)
-            .background(ZineTheme.surface.opacity(0.96), in: Circle())
-            .overlay { Circle().stroke(ZineTheme.border, lineWidth: 1) }
+            .foregroundStyle(readerForeground)
+            .background(readerControlBackground, in: Circle())
+            .overlay { Circle().stroke(readerDivider, lineWidth: 1) }
             .accessibilityLabel("Back")
 
             Spacer(minLength: 8)
 
             HStack(spacing: 0) {
                 Button {
+                    playContentControlHaptic()
                     presentedSheet = .appearance
                 } label: {
                     readerControlSymbol("textformat.size")
@@ -333,23 +382,30 @@ struct ArticleReaderView: View {
                 }
                 .accessibilityLabel("Share article")
                 .accessibilityIdentifier("article-reader-share")
+                .actionRowHaptic(style: .heavy, enabled: bookmarkHeader != nil)
 
                 Menu {
-                    Button("Open Original", systemImage: "safari", action: openOriginal)
+                    Button("Open Original", systemImage: "safari") {
+                        playContentControlHaptic()
+                        openOriginal()
+                    }
                     Button(
                         store.isFinished ? "Mark Unfinished" : "Mark Complete",
-                        systemImage: store.isFinished ? "arrow.uturn.backward.circle" : "checkmark.circle",
-                        action: toggleFinished
-                    )
+                        systemImage: store.isFinished ? "arrow.uturn.backward.circle" : "checkmark.circle"
+                    ) {
+                        playContentControlHaptic()
+                        toggleFinished()
+                    }
                     .disabled(store.isUpdatingFinished)
                 } label: {
                     readerControlSymbol("ellipsis")
                 }
                 .accessibilityLabel("More article actions")
+                .actionRowHaptic(style: .heavy, enabled: bookmarkHeader != nil)
             }
-            .foregroundStyle(ZineTheme.primaryText)
-            .background(ZineTheme.surface.opacity(0.96), in: Capsule())
-            .overlay { Capsule().stroke(ZineTheme.border, lineWidth: 1) }
+            .foregroundStyle(readerForeground)
+            .background(readerControlBackground, in: Capsule())
+            .overlay { Capsule().stroke(readerDivider, lineWidth: 1) }
         }
         .padding(.horizontal, 12)
         .frame(height: 56)
@@ -365,8 +421,41 @@ struct ArticleReaderView: View {
             .contentShape(Rectangle())
     }
 
+    private func playContentControlHaptic() {
+        guard bookmarkHeader != nil else { return }
+        ActionRowHaptics.play(style: .heavy)
+    }
+
+    private func reconcileBookmark() {
+        guard bookmarkHeader != nil, let synchronizedBookmark, !store.isUpdatingFinished else { return }
+        store.reconcile(synchronizedBookmark)
+    }
+
+    private var readerDivider: Color { bookmarkHeader?.palette.divider ?? ZineTheme.border }
+    private var readerBackground: Color { bookmarkHeader?.palette.background ?? ZineTheme.surface }
+    private var readerForeground: Color { bookmarkHeader?.palette.primaryText ?? ZineTheme.primaryText }
+    private var readerControlBackground: Color {
+        bookmarkHeader?.palette.background.opacity(0.96) ?? ZineTheme.surface.opacity(0.96)
+    }
+
+    private var configuredBookmarkHeader: ArticleBookmarkReaderHeader? {
+        guard let bookmarkHeader else { return nil }
+        return ArticleBookmarkReaderHeader(
+            content: bookmarkHeader.content,
+            palette: bookmarkHeader.palette,
+            jumpRequest: bookmarkHeader.jumpRequest,
+            onScroll: { offset, height in
+                bookmarkHeader.onScroll(offset, height)
+                commandSession?.route = offset < 0 ? "bookmark" : "reader"
+                bookmarkHeaderVisible = offset < 0
+                if offset >= 0 { recordOpenIfNeeded() }
+            }
+        )
+    }
+
     private var showsChrome: Bool {
-        chromeVisible || voiceOverEnabled || store.readyDocument == nil
+        if bookmarkHeader != nil && bookmarkHeaderVisible { return false }
+        return chromeVisible || voiceOverEnabled || store.readyDocument == nil
     }
 
     private var progressWriteKey: Int {
@@ -399,7 +488,7 @@ struct ArticleReaderView: View {
     }
 
     private func flushProgress() {
-        guard store.readyDocument != nil,
+        guard hasRecordedOpen, store.readyDocument != nil,
               abs(scrollProgress - lastPersistedProgress) >= 0.0001
         else { return }
         let progress = scrollProgress

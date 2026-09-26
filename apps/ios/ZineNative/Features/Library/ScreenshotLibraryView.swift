@@ -123,7 +123,9 @@ struct ScreenshotBookmarkDetailView: View {
     var body: some View {
         NavigationStack {
             BookmarkDetailView(
-                bookmark: ScreenshotFixtures.bookmarks[0],
+                bookmark: ProcessInfo.processInfo.arguments.contains("-screenshot-bookmark-detail-fixture-youtube")
+                    ? ScreenshotFixtures.bookmarks[2]
+                    : ScreenshotFixtures.bookmarks[0],
                 client: client,
                 onUpdate: { _ in }
             )
@@ -145,7 +147,9 @@ private enum ScreenshotFixtures {
                 string: "https://i.scdn.co/image/ab6765630000ba8a116b917b6fbd4a810de9a368"
             ),
             duration: 2_846,
-            summary: "A conversation about building, taste, and using AI without losing the thread.\nRead more at https://example.com. 👋 More notes: https://example.org."
+            creatorImageUrl: URL(string: "https://i.scdn.co/image/ab6765630000ba8a116b917b6fbd4a810de9a368"),
+            canonicalUrl: URL(string: "https://open.spotify.com/episode/5GfE3SOjEXEQZNUpFG4T61"),
+            summary: "A conversation about building software with taste, making room for careful thought, and using AI without losing your own point of view."
         ),
         make(
             id: "2",
@@ -158,12 +162,15 @@ private enum ScreenshotFixtures {
         ),
         make(
             id: "3",
-            title: "Why AI Agents Don’t Actually Understand You",
-            creator: "Latent Space",
+            title: "The Craziest Coding Contest Ever",
+            creator: "The PrimeTime",
             provider: .youtube,
             contentType: .video,
-            duration: 2_846,
-            summary: "A conversation about models, intent, and what today’s agents still miss."
+            thumbnailUrl: URL(string: "https://i.ytimg.com/vi/-BhcQURVjJg/hqdefault.jpg"),
+            duration: 1_962,
+            creatorImageUrl: URL(string: "https://yt3.ggpht.com/Eu_xR4JfLlrruwj1lrmfDiOpe8GARBs8M0hgQ6NsGhQ0qC8S-po9HEHw1W21sPN2BHO6EHXrSwM=s800-c-k-c0x00ffffff-no-rj"),
+            canonicalUrl: URL(string: "https://www.youtube.com/watch?v=-BhcQURVjJg"),
+            summary: "A creative coding competition that turns technical problem solving into something worth watching."
         ),
         make(
             id: "4",
@@ -213,6 +220,7 @@ private enum ScreenshotFixtures {
         contentType: ContentType,
         thumbnailUrl: URL? = nil,
         duration: Int? = nil,
+        creatorImageUrl: URL? = nil,
         readingTime: Int? = nil,
         canonicalUrl: URL? = nil,
         summary: String
@@ -226,7 +234,7 @@ private enum ScreenshotFixtures {
             contentType: contentType,
             provider: provider,
             creator: creator,
-            creatorImageUrl: nil,
+            creatorImageUrl: creatorImageUrl,
             creatorId: nil,
             publisher: creator,
             summary: summary,

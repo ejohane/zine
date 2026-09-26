@@ -5,6 +5,7 @@ struct PodcastOpenControl: View {
     let publisherURL: URL
     let destinations: [String: PodcastDestination]?
     let onOpen: () -> Void
+    var hapticStyle: UIImpactFeedbackGenerator.FeedbackStyle = .light
 
     @AppStorage(PodcastPlayer.preferenceKey) private var preference = PodcastPlayer.overcast.rawValue
     @Environment(\.openURL) private var openURL
@@ -16,18 +17,18 @@ struct PodcastOpenControl: View {
     }
 
     var body: some View {
-        ProviderOpenButton(provider: .web, destination: player.brandingURL, onActivate: activate)
+        ProviderOpenButton(provider: .web, destination: player.brandingURL, onActivate: activate, hapticStyle: hapticStyle)
             .accessibilityIdentifier("podcast-player-open")
             .accessibilityLabel(target.destination?.label(for: player) ?? "Open original link")
             .accessibilityHint(target.destination?.kind == .show
                                ? "Opens the show. Choose the episode from its list."
                                : "")
             .contextMenu {
-                Button("Open original link", action: openPublisher)
+                Button("Open original link", action: openPublisherWithFeedback)
             }
             .alert("Couldn’t open \(player.title)", isPresented: $appUnavailable) {
-                Button("Open original link", action: openPublisher)
-                Button("Cancel", role: .cancel) {}
+                Button("Open original link", action: openPublisherWithFeedback)
+                Button("Cancel", role: .cancel) { ActionRowHaptics.play(style: hapticStyle) }
             } message: {
                 Text("Check that the app is installed. You can also choose another podcast app in Settings.")
             }
@@ -45,5 +46,10 @@ struct PodcastOpenControl: View {
 
     private func openPublisher() {
         openURL(publisherURL) { accepted in if accepted { onOpen() } }
+    }
+
+    private func openPublisherWithFeedback() {
+        ActionRowHaptics.play(style: hapticStyle)
+        openPublisher()
     }
 }

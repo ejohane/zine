@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { execFile, execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
@@ -222,6 +222,39 @@ function buildRawSqlite() {
   rmSync(RAW_DB, { force: true });
   const rawSql = readFileSync(RAW_SQL, 'utf8');
   runSqlite(RAW_DB, rawSql);
+}
+
+export function snapshotHasCurrentMigrationBaseline(db) {
+  const hasColumn = (table, name) =>
+    db.query(`PRAGMA table_info(${quoteIdentifier(table)})`)
+      .all()
+      .some((column) => column.name === name);
+
+  // The production export can have the schema through 0033 while its
+  // d1_migrations rows still carry older migration names. Check the newest
+  // schema additions before reconciling that local copy of the history.
+  return (
+    hasColumn('user_items', 'handoff_url') &&
+    hasColumn('rss_feeds', 'source_player') &&
+    hasColumn('items', 'podcast_destinations')
+  );
+}
+
+function reconcileSnapshotMigrationHistory() {
+  const db = new Database(RAW_DB);
+  try {
+    if (!snapshotHasCurrentMigrationBaseline(db)) return;
+
+    const migrationNames = readdirSync(join(WORKER_DIR, 'src/db/migrations'))
+      .filter((name) => /^\d{4}_.*\.sql$/.test(name) && Number(name.slice(0, 4)) <= 33);
+    const insert = db.query('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)');
+    db.transaction(() => {
+      for (const name of migrationNames) insert.run(name);
+    })();
+    console.log(`Reconciled ${migrationNames.length} migration names in the local snapshot.`);
+  } finally {
+    db.close();
+  }
 }
 
 function sanitizeSqlite() {
@@ -808,6 +841,7 @@ async function main() {
   exportProductionD1();
   buildRawSqlite();
   sanitizeSqlite();
+  reconcileSnapshotMigrationHistory();
   dumpSanitizedSql();
   printCounts();
   const articleBodyObjects = await downloadArticleBodies();

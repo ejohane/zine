@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { Database } from 'bun:sqlite';
 
-import { collectArticleBodyObjects, parseSyncOptions } from './sync-prod-user-to-local.mjs';
+import {
+  collectArticleBodyObjects,
+  parseSyncOptions,
+  snapshotHasCurrentMigrationBaseline,
+} from './sync-prod-user-to-local.mjs';
 
 const databases: Database[] = [];
 
@@ -79,5 +83,29 @@ describe('collectArticleBodyObjects', () => {
         contentType: 'application/json; charset=utf-8',
       },
     ]);
+  });
+});
+
+describe('snapshotHasCurrentMigrationBaseline', () => {
+  test('recognizes a production snapshot that already includes the latest local schema', () => {
+    const database = new Database(':memory:');
+    databases.push(database);
+    database.exec(`
+      CREATE TABLE user_items (handoff_url TEXT);
+      CREATE TABLE rss_feeds (source_player TEXT);
+      CREATE TABLE items (podcast_destinations TEXT);
+    `);
+    expect(snapshotHasCurrentMigrationBaseline(database)).toBe(true);
+  });
+
+  test('does not reconcile an older snapshot that still needs migrations', () => {
+    const database = new Database(':memory:');
+    databases.push(database);
+    database.exec(`
+      CREATE TABLE user_items (handoff_url TEXT);
+      CREATE TABLE rss_feeds (source_player TEXT);
+      CREATE TABLE items (title TEXT);
+    `);
+    expect(snapshotHasCurrentMigrationBaseline(database)).toBe(false);
   });
 });

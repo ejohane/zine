@@ -1,8 +1,30 @@
 import SwiftUI
+import UIKit
 
 enum ProviderLogo: Equatable {
     case asset(String)
     case system(String)
+}
+
+/// Uses the existing service marks as silhouettes on monochrome controls.
+struct ProviderLogoView: View {
+    let logo: ProviderLogo
+
+    var body: some View {
+        image
+            .resizable()
+            .scaledToFit()
+            .accessibilityHidden(true)
+    }
+
+    private var image: Image {
+        switch logo {
+        case let .asset(name):
+            Image(name).renderingMode(.template)
+        case let .system(name):
+            Image(systemName: name).renderingMode(.template)
+        }
+    }
 }
 
 struct ProviderOpenAction {
@@ -212,23 +234,27 @@ struct ProviderOpenButton: View {
     let destination: URL
     let onOpen: () -> Void
     var onActivate: (() -> Void)?
+    let hapticStyle: UIImpactFeedbackGenerator.FeedbackStyle
 
     init(
         provider: Provider,
         destination: URL,
         onOpen: @escaping () -> Void = {},
-        onActivate: (() -> Void)? = nil
+        onActivate: (() -> Void)? = nil,
+        hapticStyle: UIImpactFeedbackGenerator.FeedbackStyle = .light
     ) {
         self.provider = provider
         self.destination = destination
         self.onOpen = onOpen
         self.onActivate = onActivate
+        self.hapticStyle = hapticStyle
     }
 
     private var action: ProviderOpenAction { provider.openAction(for: destination) }
 
     var body: some View {
         Button {
+            ActionRowHaptics.play(style: hapticStyle)
             if let onActivate {
                 onActivate()
             } else {
@@ -252,7 +278,6 @@ struct ProviderOpenButton: View {
             }
         }
         .accessibilityLabel(action.accessibilityLabel)
-        .actionRowHaptic()
     }
 
     @ViewBuilder

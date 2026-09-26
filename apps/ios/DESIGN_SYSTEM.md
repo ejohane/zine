@@ -96,6 +96,24 @@ them to create parallel app chrome or palette logic.
 Third-party account UI may inherit its SDK or system appearance. Zine-owned
 containers around it should still use the semantic palette where possible.
 
+The media, article, and X post bookmark-detail proof of concept uses the contextual
+`ZineTheme.ArtworkPalette` roles. It derives one dark tonal background from a
+creator's avatar and uses that color continuously behind the artwork,
+title, actions, and description. Its foreground, divider, and control roles are
+derived for that surface. Articles and X posts without artwork begin with the
+title and creator, without a placeholder hero. Articles retain their primary
+Read in Zine action; X posts use a monochrome Open in X action. Both share the
+same palette. Other non-media
+details retain the standard semantic palette. Standalone reader destinations retain their neutral appearance. This contextual
+treatment does not change the app-wide brand accent. Episodes with the same
+creator avatar share a palette; missing or failed avatars use the neutral
+fallback rather than the episode cover.
+
+Creator pages use the same contextual avatar palette across their header,
+provider action, saved and latest content lists, and empty states. Palette
+extraction uses one fixed avatar image-processing size on both creator and
+bookmark pages, so display size does not change the resulting colors.
+
 ## Verification
 
 When changing a semantic role or applying the palette to a new screen:

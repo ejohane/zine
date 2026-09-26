@@ -30,7 +30,56 @@ enum ArticleReaderFontSize: String, CaseIterable, Identifiable {
     }
 }
 
+/// Type erasure is confined to the UIKit hosting boundary.
+struct ArticleBookmarkReaderHeader {
+    let content: AnyView
+    let palette: ZineTheme.ArtworkPalette
+    let jumpRequest: Int
+    let onScroll: (CGFloat, CGFloat) -> Void
+}
+
 private final class ArticleReaderWebView: WKWebView {
+    var headerController: UIHostingController<AnyView>?
+    var onHeaderLayout: ((CGFloat) -> Void)?
+    private var headerHeight: CGFloat = 0
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard let host = headerController, bounds.width > 0 else { return }
+        let height = ceil(host.sizeThatFits(in: CGSize(width: bounds.width, height: .greatestFiniteMagnitude)).height)
+        guard height.isFinite, height > 0 else { return }
+        host.view.frame = CGRect(x: 0, y: -height, width: bounds.width, height: height)
+        if abs(height - headerHeight) > 0.5 {
+            let wasAtHeader = scrollView.contentOffset.y <= -headerHeight + 1
+            headerHeight = height
+            scrollView.contentInset.top = height
+            if wasAtHeader { scrollView.contentOffset.y = -height }
+            onHeaderLayout?(height)
+        }
+    }
+
+    func installHeader(_ content: AnyView) {
+        if let host = headerController {
+            host.rootView = content
+        } else {
+            let host = UIHostingController(rootView: content)
+            host.sizingOptions = .intrinsicContentSize
+            host.safeAreaRegions = []
+            host.view.backgroundColor = .clear
+            headerController = host
+            scrollView.addSubview(host.view)
+        }
+        setNeedsLayout()
+    }
+
+    func removeHeader() {
+        headerController?.willMove(toParent: nil)
+        headerController?.view.removeFromSuperview()
+        headerController?.removeFromParent()
+        headerController = nil
+        onHeaderLayout = nil
+    }
+
     var onNavigationControllerAvailable: ((UINavigationController) -> Void)?
 
     override func didMoveToWindow() {
@@ -38,11 +87,25 @@ private final class ArticleReaderWebView: WKWebView {
         guard window != nil else { return }
 
         DispatchQueue.main.async { [weak self] in
-            guard let self,
-                  let navigationController = nearestNavigationController()
-            else { return }
-            onNavigationControllerAvailable?(navigationController)
+            guard let self else { return }
+            if let host = headerController, host.parent == nil,
+               let owner = nearestViewController() {
+                owner.addChild(host)
+                host.didMove(toParent: owner)
+            }
+            if let navigationController = nearestNavigationController() {
+                onNavigationControllerAvailable?(navigationController)
+            }
         }
+    }
+
+    private func nearestViewController() -> UIViewController? {
+        var responder: UIResponder? = self
+        while let next = responder?.next {
+            if let controller = next as? UIViewController { return controller }
+            responder = next
+        }
+        return nil
     }
 
     private func nearestNavigationController() -> UINavigationController? {
@@ -67,7 +130,8 @@ enum ArticleHTMLDocumentBuilder {
         for document: ArticleReaderDocument,
         fontScale: Double = ArticleReaderFontSize.standard.scale,
         fontFamily: ArticleReaderFontFamily = .system,
-        topContentInset: CGFloat = 0
+        topContentInset: CGFloat = 0,
+        bookmarkPalette: ZineTheme.ArtworkPalette? = nil
     ) -> String {
         let metadata = document.metadata
         let readingTime = metadata.readingTimeMinutes.map { "\($0) min read" }
@@ -79,6 +143,23 @@ enum ArticleHTMLDocumentBuilder {
             .compactMap { $0 }
             .joined(separator: "<span aria-hidden=\"true\">·</span>")
         let body = document.response.readableContent ?? ""
+        let appHeader = bookmarkPalette == nil ? """
+          <header>
+            <h1>\(escape(metadata.title))</h1>
+            <div class="meta">\(meta)</div>
+            <hr class="title-rule" aria-hidden="true">
+          </header>
+        """ : ""
+        let contextualStyle = bookmarkPalette.map { palette in
+            """
+            html, body { background: \(palette.readerBackgroundCSS); color: rgba(255,255,255,0.82); }
+            body { padding-top: 24px; }
+            h1, h2, h3, h4, h5, h6, a { color: white; }
+            blockquote, figcaption { color: rgba(255,255,255,0.82); }
+            pre { background: rgba(255,255,255,0.10); }
+            hr { border-color: rgba(255,255,255,0.18); }
+            """
+        } ?? ""
 
         return """
         <!doctype html>
@@ -218,14 +299,11 @@ enum ArticleHTMLDocumentBuilder {
             @media (max-width: 420px) {
               body { padding-left: 20px; padding-right: 20px; }
             }
+            \(contextualStyle)
           </style>
         </head>
         <body>
-          <header>
-            <h1>\(escape(metadata.title))</h1>
-            <div class="meta">\(meta)</div>
-            <hr class="title-rule" aria-hidden="true">
-          </header>
+          \(appHeader)
           <main>\(body)</main>
         </body>
         </html>
@@ -263,6 +341,7 @@ struct ArticleHTMLView: UIViewRepresentable {
     let onPositionChanged: (ArticleReadingPosition) -> Void
     let onOpenURL: (URL) -> Void
     var topContentInset: CGFloat = 0
+    var bookmarkHeader: ArticleBookmarkReaderHeader? = nil
     var onLinksLoaded: (Result<[ArticleReaderLink], Error>) -> Void = { _ in }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -297,6 +376,7 @@ struct ArticleHTMLView: UIViewRepresentable {
             guard let webView else { return }
             coordinator?.enableInteractivePop(in: navigationController, alongside: webView.scrollView.panGestureRecognizer)
         }
+        context.coordinator.configureHeader(in: webView)
         context.coordinator.load(document, in: webView)
         return webView
     }
@@ -307,6 +387,7 @@ struct ArticleHTMLView: UIViewRepresentable {
 
     static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
         coordinator.capturePosition(in: webView)
+        (webView as? ArticleReaderWebView)?.removeHeader()
         coordinator.restoreInteractivePopConfiguration()
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "reader", contentWorld: ArticleReaderScript.world)
         (webView as? ArticleReaderWebView)?.onNavigationControllerAvailable = nil
@@ -327,6 +408,8 @@ struct ArticleHTMLView: UIViewRepresentable {
         private var popGestureConfigurations: [PopGestureConfiguration] = []
         private var loadedHash: String?
         private weak var webView: WKWebView?
+        private var headerHeight: CGFloat = 0
+        private var lastJumpRequest = 0
         private var ready = false
         private var latestPosition: ArticleReadingPosition?
 
@@ -368,12 +451,27 @@ struct ArticleHTMLView: UIViewRepresentable {
             popGestureConfigurations.removeAll()
         }
 
+        func configureHeader(in view: WKWebView) {
+            guard let view = view as? ArticleReaderWebView, let header = parent.bookmarkHeader else { return }
+            view.installHeader(header.content)
+            view.backgroundColor = header.palette.backgroundUIColor
+            view.scrollView.backgroundColor = header.palette.backgroundUIColor
+            view.onHeaderLayout = { [weak self, weak view] height in
+                guard let self, let view else { return }
+                headerHeight = height
+                DispatchQueue.main.async { [weak self, weak view] in
+                    guard let self, let view else { return }
+                    parent.bookmarkHeader?.onScroll(view.scrollView.contentOffset.y, height)
+                }
+            }
+        }
+
         func load(_ document: ArticleReaderDocument, in webView: WKWebView) {
             self.webView = webView
             ready = false
             loadedHash = document.contentHash
             webView.loadHTMLString(
-                ArticleHTMLDocumentBuilder.makeHTML(for: document, fontScale: parent.fontScale, fontFamily: parent.fontFamily, topContentInset: parent.topContentInset),
+                ArticleHTMLDocumentBuilder.makeHTML(for: document, fontScale: parent.fontScale, fontFamily: parent.fontFamily, topContentInset: parent.topContentInset, bookmarkPalette: parent.bookmarkHeader?.palette),
                 baseURL: document.metadata.canonicalURL
             )
         }
@@ -381,9 +479,28 @@ struct ArticleHTMLView: UIViewRepresentable {
         func update(_ next: ArticleHTMLView, in webView: WKWebView) {
             let appearanceChanged = parent.fontScale != next.fontScale || parent.fontFamily != next.fontFamily
             let layoutChanged = parent.topContentInset != next.topContentInset
+            let paletteChanged = parent.bookmarkHeader?.palette != next.bookmarkHeader?.palette
             parent = next
+            configureHeader(in: webView)
             if loadedHash != next.document.contentHash { load(next.document, in: webView); return }
             guard ready else { return }
+            if let header = parent.bookmarkHeader {
+                if paletteChanged {
+                    run("document.documentElement.style.background = '\(header.palette.readerBackgroundCSS)'; document.body.style.background = '\(header.palette.readerBackgroundCSS)';", in: webView)
+                }
+                if header.jumpRequest != lastJumpRequest {
+                    lastJumpRequest = header.jumpRequest
+                    webView.scrollView.setContentOffset(CGPoint(x: 0, y: 0), animated: false)
+                    let position = latestPosition ?? parent.initialPosition
+                    if let position, let data = try? JSONEncoder().encode(position),
+                       let json = String(data: data, encoding: .utf8), position.contentHash == loadedHash {
+                        run("window.zineReader.restore(\(json));", in: webView)
+                    } else {
+                        run("window.zineReader.restore({nodeIndex:-1, fraction:\(position?.fraction ?? parent.initialProgress)});", in: webView)
+                    }
+                    UIAccessibility.post(notification: .layoutChanged, argument: webView)
+                }
+            }
             if layoutChanged { run("window.zineReader.layout(\(parent.topContentInset));", in: webView) }
             if appearanceChanged { applyAppearance(in: webView) }
         }
@@ -411,11 +528,19 @@ struct ArticleHTMLView: UIViewRepresentable {
             } else {
                 json = "{nodeIndex:-1, fraction:\(fallback)}"
             }
-            run("window.zineReader.restore(\(json));", in: webView)
-            applyAppearance(in: webView)
+            if parent.bookmarkHeader == nil {
+                run("window.zineReader.restore(\(json));", in: webView)
+                applyAppearance(in: webView)
+            } else {
+                webView.scrollView.setContentOffset(CGPoint(x: 0, y: -headerHeight), animated: false)
+            }
         }
 
         private func applyAppearance(in webView: WKWebView) {
+            if parent.bookmarkHeader != nil, webView.scrollView.contentOffset.y < 0 {
+                run("document.documentElement.style.setProperty('--reader-font-scale', '\(parent.fontScale)'); document.documentElement.style.setProperty('--reader-font-family', '\(parent.fontFamily.css)');", in: webView)
+                return
+            }
             run("window.zineReader.appearance(\(parent.fontScale), '\(parent.fontFamily.css)');", in: webView)
         }
 
@@ -439,6 +564,7 @@ struct ArticleHTMLView: UIViewRepresentable {
         }
 
         private func acceptPosition(_ body: [String: Any]) {
+            guard parent.bookmarkHeader == nil || (webView?.scrollView.contentOffset.y ?? -1) >= 0 else { return }
             guard let nodeIndex = body["nodeIndex"] as? Int,
                   let offset = body["offset"] as? Int,
                   let quote = body["quote"] as? String,
@@ -473,6 +599,10 @@ struct ArticleHTMLView: UIViewRepresentable {
         }
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            if let header = parent.bookmarkHeader {
+                let y = scrollView.contentOffset.y
+                DispatchQueue.main.async { header.onScroll(y, self.headerHeight) }
+            }
             guard ready else { return }
             let maximum = max(scrollView.contentSize.height - scrollView.bounds.height, 0)
             let offset = min(max(scrollView.contentOffset.y, 0), maximum)
@@ -481,7 +611,9 @@ struct ArticleHTMLView: UIViewRepresentable {
                 parent.onChromeVisibilityChanged(visible)
             }
             guard scrollView.isDragging || scrollView.isDecelerating else { return }
-            parent.onProgressChanged(progress(in: scrollView))
+            if parent.bookmarkHeader == nil || scrollView.contentOffset.y >= 0 {
+                parent.onProgressChanged(progress(in: scrollView))
+            }
             if let visible = chrome.update(offset: offset) { parent.onChromeVisibilityChanged(visible) }
         }
 
@@ -497,6 +629,7 @@ struct ArticleHTMLView: UIViewRepresentable {
         func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) { settled(scrollView) }
         private func settled(_ scrollView: UIScrollView) {
             chrome.end()
+            guard parent.bookmarkHeader == nil || scrollView.contentOffset.y >= 0 else { return }
             parent.onScrollSettled(progress(in: scrollView))
             if endState.settled(
                 offset: scrollView.contentOffset.y,
