@@ -37,8 +37,8 @@ Native UI uses `apps/ios/ZineNative/Core/ZineTheme.swift` and the
 
 ## Development and verification
 
-`bun run dev:worktree` owns the Worker, web services, and native simulator preview.
-The native app's API URL is configured separately in `Local.xcconfig`; see the
+`bun run dev:worktree` owns the Worker, web services, and native Simulator build/install/launch.
+Startup passes the selected local API URL into the native build; see the
 [native README](../apps/ios/README.md).
 
 `bun run test` runs Worker and web tests. Native XCTest is run through the

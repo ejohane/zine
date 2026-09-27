@@ -75,7 +75,11 @@ For browser-level manual verification, use the real app instead of Storybook fir
 
 1. Start the backend/worktree stack from the repo root: `bun run dev:worktree`
 2. Open the exact web URL printed by the stack; it already starts Vite.
-3. Sign in with Clerk using the approved Bitwarden credentials.
+3. Confirm the approved local-origin Clerk instance, matching Worker JWKS, and
+   local data subject described in [the web authentication setup](../local-development.md#web-authentication-is-a-separate-setup).
+   The native production Clerk key does not support localhost browser login.
+4. Sign in with Clerk using the allowlisted credentials for that instance and the
+   protected `agent-secrets` workflow.
 
 ### Auth behavior in local development
 

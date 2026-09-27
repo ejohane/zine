@@ -10,24 +10,31 @@ The production Clerk publishable key, native application registration, callback
 scheme, associated domain, Apple Team ID, and Sign in with Apple entitlement are
 configured for `app.zine.native`.
 
-For a development Clerk instance or local worker, copy
-`Configuration/Local.xcconfig.example` to `Configuration/Local.xcconfig` and
-override the relevant values there.
+For the normal Simulator development flow, run `ZINE_DEV_HOST=localhost bun run
+dev:worktree` from the repository root. It supplies the selected local API URL
+and host-scoped HTTP allowance to both the app and share extension while using
+the checked-in native Clerk key. See [the local development guide](../../docs/local-development.md).
+No local configuration file is required for this flow.
 
-The API defaults to `https://api.myzine.app`. Override
-`ZINE_API_BASE_URL` in `Local.xcconfig` for local worker development.
-
-For an HTTP API on a named host or IP address, also opt the development build
-into one host-scoped ATS exception:
+Manual Xcode builds default to `https://api.myzine.app`. For manual local builds,
+set `ZINE_API_BASE_URL` in `Configuration/Local.xcconfig` and add the HTTP allowance
+for that specific host:
 
 ```xcconfig
-ZINE_API_BASE_URL = http:/$()/100.92.242.50:8787
-INFOPLIST_PREPROCESSOR_DEFINITIONS = $(inherited) ZINE_ALLOW_INSECURE_LOCAL_API=1 ZINE_ATS_EXCEPTION_DOMAIN=100.92.242.50
+ZINE_API_BASE_URL = http:/$()/localhost:8770
+INFOPLIST_PREPROCESSOR_DEFINITIONS = $(inherited) ZINE_ALLOW_INSECURE_LOCAL_API=1 ZINE_ATS_EXCEPTION_DOMAIN=localhost
 ```
 
-`bun run dev:worktree` derives these settings from its selected local API URL.
-Production builds omit `ZINE_ALLOW_INSECURE_LOCAL_API` and retain strict ATS in
-both the app and Share Extension.
+Replace the example port with the running local Worker's port. Verify the built
+API URL before manual verification writes. Production builds must omit the local
+HTTP allowance to retain strict ATS in the app and extension.
+
+Use `Configuration/Local.xcconfig.example` as a reference for intentional
+configuration overrides, such as a development Clerk instance or provider app.
+Its Clerk override is commented out to retain the checked-in native key. Enable
+it only after replacing `pk_test_replace_me` with the real key for the intended instance.
+A development Clerk instance also needs matching Worker JWKS and local data
+identity as described in the local guide.
 
 ## Build
 
@@ -41,7 +48,7 @@ All new iOS product work, verification, and deployment belongs in this project.
 Select the `ZineNative` scheme in Xcode and use Product → Test to run
 `ZineNativeTests`. These tests are separate from the root JavaScript test command.
 
-For the dedicated simulator used by the preview workflow:
+For the dedicated Simulator used by the local development workflow:
 
 ```sh
 xcodebuild -project apps/ios/ZineNative.xcodeproj -scheme ZineNative \
@@ -50,39 +57,37 @@ xcodebuild -project apps/ios/ZineNative.xcodeproj -scheme ZineNative \
 
 Run this command from the repository root.
 
-## Browser simulator preview
+## Run in Apple Simulator
 
-Run the native app in Zine's dedicated Simulator and mirror it into a browser:
-
-```sh
-bun run ios:preview
-```
-
-The normal worktree development command starts this preview alongside the
-worker, web app, and other development services by default:
+Start the worktree stack and native app:
 
 ```sh
-bun run dev:worktree
+ZINE_DEV_HOST=localhost bun run dev:worktree
 ```
 
 The command boots `iPhone 17 — Zine`, builds and installs the current
-`ZineNative` checkout, launches `app.zine.native`, and starts the `serve-sim`
-preview. Its default URL is `http://localhost:3200`. Keep the command running
-while using the preview; Control-C stops only the helper attached to Zine's
-simulator.
+`ZineNative` checkout against the selected local API, launches `app.zine.native`,
+and opens the device in Apple Simulator. Use computer use directly in the
+Simulator app for login, taps, scrolling, and visual verification. Follow the
+[verified sign-in procedure](../../docs/local-development.md#sign-in-directly-in-apple-simulator):
+retrieve allowlisted Bitwarden credentials with `secretsctl` and use the native
+`setValue` action on the current settable Clerk fields. Generic typing and paste
+are not proof that credential entry worked.
 
-Set `ZINE_SIMULATOR_NAME` or `ZINE_SIMULATOR_UDID` to use another Simulator.
-Set `ZINE_SKIP_IOS_BUILD=1` to relaunch an already installed build without
-rebuilding it. Set `ZINE_SERVE_SIM=0` when running `dev:worktree` to disable the
-native preview. Additional `serve-sim` options can follow `--` when using the
-standalone command, for example:
+Set `ZINE_SIMULATOR_NAME` or `ZINE_SIMULATOR_UDID` to select another device.
+Set `ZINE_SKIP_IOS_BUILD=1` to relaunch an already installed build; startup checks
+that both the app and share extension target this worktree's local API.
+
+To build and launch against an already running local stack:
 
 ```sh
-bun run ios:preview -- --theme dark --panes tools
+ZINE_LOCAL_API_URL=http://localhost:WORKER_PORT bun run ios:simulator
 ```
 
-This workflow requires Apple Silicon, Xcode command-line tools, and the Node 22
-version pinned by the repository.
+This workflow requires macOS, Xcode command-line tools, and the Node 22 version
+pinned by the repository. Coordinate device ownership with other active tasks.
+Stopping the stack stops its services and any in-progress native build; the
+Simulator remains available for inspection.
 
 ## Reader routing fixture
 
@@ -102,7 +107,7 @@ values.
 ## Share extension
 
 The `ZineShareExtension` target appears as Zine in the iOS share sheet for web
-links. It loads a bookmark preview from the production REST API and lets the
+links. It loads a bookmark preview from the configured REST API (production by default) and lets the
 user save the link to their Zine library without opening the full app.
 
 The app and extension share the Clerk session through the
