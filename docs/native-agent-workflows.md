@@ -37,7 +37,9 @@ Every command below uses the same prefix:
 bun run native:agent remote SIMULATOR_UUID COMMAND --expect-session SESSION
 ```
 
-Inspect `identity` first. Verify the worktree, build, Simulator, local API endpoint,
+After the authenticated Debug app is running, inspect `identity` first (it is
+called without `--expect-session`; subsequent commands use its returned session).
+Follow [the setup and sign-in flow](native-cli-development.md#switch-to-the-running-app). Verify the worktree, build, Simulator, local API endpoint,
 and expiry. Keep requests serial. `state.get` returns the current structured state;
 `events.get` returns the bounded event history. Ordinary failed commands exit 1.
 
@@ -121,7 +123,10 @@ These async jobs currently cover the backend's YouTube/Spotify subscription job
 system. RSS, Gmail, and X have separate provider-specific endpoints and are not
 silently represented as part of that job.
 
-## Verification of this extension
+## Historical verification of this extension
+
+These results describe the original extension verification, not a fresh run.
+Use the current local-development guide for setup and verification.
 
 Implementation proceeded reader → Library → bookmark lifecycle → sync, with a
 live pass before advancing to each next workflow.
@@ -129,7 +134,7 @@ live pass before advancing to each next workflow.
 - Desktop: all six scenarios and 19 tests (including shared persistence tests) pass.
 - Native: 32 focused reader/cache/outbox tests pass; Debug builds install and launch on
   `iPhone 17 — Zine Agent` using `dev:worktree`.
-- Browser: live `serve-sim` frames plus real taps and scrolling verified restored
+- Simulator UI: observed frames plus real taps and scrolling verified restored
   article position after process restart, Search result navigation, empty search,
   filters, detail tag editing, archive, re-save, and Library interaction after sync.
 - Live commands: video query returned 30 loaded items and pagination returned 60

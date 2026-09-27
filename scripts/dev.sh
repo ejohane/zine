@@ -15,7 +15,7 @@ set -e
 #   3. Requires real Clerk authentication; never copies Worker secrets
 #   4. Generates web .env.local with a reachable API URL
 #   5. Starts a public dev proxy when non-localhost access is needed
-#   6. Builds, launches, and serves the native iOS app in the browser
+#   6. Builds, installs, and launches the native iOS app in Apple Simulator
 #   7. Starts all services via turbo
 #
 # USAGE:
@@ -23,7 +23,6 @@ set -e
 #   ZINE_WORKER_PORT=8888 bun run dev:worktree          # Override port
 #   ZINE_DEV_HOST=100.92.242.50 bun run dev:worktree    # Override mobile/API host
 #   ZINE_API_PORT=8890 bun run dev:worktree             # Override public API port
-#   ZINE_SERVE_SIM=0 bun run dev:worktree               # Disable native preview
 #   bun run dev:reset && bun run dev:worktree          # Back up and provision fresh data
 #
 # =============================================================================
@@ -245,18 +244,17 @@ if [ "$PUBLIC_API_PORT" != "$WORKER_PORT" ]; then
   PROXY_PID=$!
 fi
 
-if [ "${ZINE_SERVE_SIM:-1}" != "0" ]; then
-  echo "   📱 Starting native iOS preview with serve-sim..."
-  bash ./scripts/ios-simulator-preview.sh &
-  IOS_PREVIEW_PID=$!
-else
-  echo "   ℹ️  Native iOS preview disabled (ZINE_SERVE_SIM=0)"
-fi
-
 echo ""
 echo "   Starting services..."
 echo ""
 
 bun run dev &
 SERVICES_PID=$!
+
+echo "   📱 Building and launching Zine in Apple Simulator..."
+bash ./scripts/ios-simulator.sh &
+IOS_SIMULATOR_PID=$!
+wait "$IOS_SIMULATOR_PID"
+IOS_SIMULATOR_PID=""
+
 wait "$SERVICES_PID"

@@ -1,6 +1,9 @@
-// Copy this file to Local.xcconfig and use the publishable key for Zine's
-// Clerk instance. Local.xcconfig is ignored by the repository's *.local rule.
-ZINE_CLERK_PUBLISHABLE_KEY = pk_test_replace_me
+// Optional overrides for manual Xcode builds or a different Clerk instance.
+// dev:worktree supplies its local API build settings; this file is not required.
+// Local.xcconfig is ignored by the repository's *.local rule.
+// Leave the Clerk override commented to retain the working checked-in native key.
+// For a different instance, uncomment and replace the placeholder with its real key.
+// ZINE_CLERK_PUBLISHABLE_KEY = pk_test_replace_me
 
 // Optional Google OAuth overrides for a development Google project.
 // ZINE_GOOGLE_CLIENT_ID = 123.apps.googleusercontent.com

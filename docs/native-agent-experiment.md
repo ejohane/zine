@@ -49,8 +49,8 @@ ZINE_SIMULATOR_NAME='iPhone 17 — Zine Agent' \
 bun run dev:worktree
 ```
 
-Open the exact serve-sim URL printed by the command. Sign in through the normal
-native Clerk screen with the allowlisted account. The local dataset retains the
+Use computer use directly in Apple Simulator. Sign in through the normal
+native Clerk screen using [the protected sign-in procedure](local-development.md#sign-in-directly-in-apple-simulator) with the allowlisted account. The local dataset retains the
 real Clerk subject and sanitizes provider credentials. No interactive auth bypass
 or exported app token is used. The startup checks the installed app's API URL.
 
@@ -127,7 +127,7 @@ simulator UUID, build hash, source worktree, API endpoint, and fresh session UUI
 The containing directory has mode 0700. Requests are bounded to 64 KiB. Identity
 output omits the capability. There is no network listener or physical-device bridge.
 Relaunching changes the capability/session; expiry or task cancellation disables
-processing. Close the preview and stop its scoped dev processes after verification.
+processing. Stop the scoped dev processes after verification.
 
 The UI registers its existing LibraryStore and ArticleReaderStore instances and
 navigation/action closures in NativeCommandSession. Commands never instantiate a
@@ -147,7 +147,7 @@ On 2026-09-12 in worktree 703a:
   authentication-task dataset contains 4,261 user items and 582 local article bodies.
 - Bridge Library/detail/reader commands, progress 0.42, tag replacement, completion,
   flush, and unfinished reload passed against the authenticated local Worker.
-- The live serve-sim frame showed the actual reader; a physical-style pointer swipe
+- The observed Simulator UI showed the actual reader; a physical-style pointer swipe
   moved WebKit content, and a back swipe revealed the changed tag and completion
   checkmark on detail. Reloaded Library visibly omitted the completed article.
 - Reopening the reader returned progress 0.42 and the saved tag/completion state.
@@ -167,11 +167,15 @@ successful sample; test bodies took about 0.8 seconds. Live commands took roughl
 0.8–2.1 seconds including `simctl` discovery and real network work. These are different
 coverage levels, not an assertion that UI or network checks can run in milliseconds.
 
-Raw command results and streamed screenshot evidence are retained locally in
+Raw command results and Simulator UI evidence are retained locally in
 `.local-data/native-agent-evidence/`. No merge, production deployment, phone install,
 full application parity review, or broad benchmark was performed.
 
-## Coordinated dependencies
+## Historical coordinated dependencies
+
+This section records the original experiment integration, not a current setup
+recipe. Current startup provisions its own sanitized snapshot and never copies
+another worktree's state.
 
 The authenticated-development task supplied the startup/data/process-cleanup scripts, Worker auth
 middleware and bindings, Worker dev environment flag, and Turbo environment wiring
