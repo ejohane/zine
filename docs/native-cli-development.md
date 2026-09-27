@@ -10,7 +10,7 @@ the CLI invokes the same stores, API client, caches, and mutation outbox.
 | ---------------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
 | Headless tests and scenarios | Fast regression checks for reader recovery, Library queries, bookmark lifecycle, and sync-job handling | macOS 14+ and a Swift 5.10+ toolchain; isolated fixtures, no Simulator, Worker, login, or production data |
 | Remote Simulator commands    | Real app stores, navigation, persistence, and authenticated local API integration                      | Running Debug Simulator app with the bridge explicitly enabled and a local loopback Worker                |
-| Live UI interaction          | Gestures, rendering, keyboard input, navigation presentation, and visible recovery                     | Live `serve-sim` frame, Browser computer-use interaction, and an observed final state                     |
+| Live UI interaction          | Gestures, rendering, keyboard input, navigation presentation, and visible recovery                     | Computer use directly in Apple Simulator and an observed final state                                      |
 
 Headless runs do not fetch live account data or prove external-provider ingestion.
 They do not render SwiftUI or WebKit. Remote commands do not prove that a user
@@ -81,8 +81,9 @@ ZINE_SIMULATOR_NAME='SIMULATOR_NAME' \
 bun run dev:worktree
 ```
 
-Open the exact printed `serve-sim` URL in the Codex in-app Browser, confirm a
-live frame, and sign in through native Clerk. In another terminal:
+Use computer use directly in Apple Simulator, confirm the selected device and
+foreground Zine app, and follow [the protected native sign-in procedure](local-development.md#sign-in-directly-in-apple-simulator).
+The command bridge is optional and does not handle credential entry. In another terminal:
 
 ```sh
 bun run native:agent remote SIMULATOR_UUID identity
@@ -105,7 +106,7 @@ Use [the command reference](native-agent-workflows.md#live-commands) and
 [the result/transport contract](native-agent-experiment.md#version-1-contract)
 for arguments, delivery states, timeout recovery, and scope. Inspect the relevant
 visible UI after actual taps/scrolling before claiming UI verification. Stop only
-this task's dev stack and preview when finished, unless keeping a session open
+this task's dev stack when finished, unless keeping a session open
 was requested.
 
 If identity is missing, check the installed Debug Simulator build, bridge launch

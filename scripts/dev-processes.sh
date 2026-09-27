@@ -1,7 +1,7 @@
 #!/bin/bash
 # Shared lifecycle for the worktree orchestrator and its focused process test.
 PROXY_PID=""
-IOS_PREVIEW_PID=""
+IOS_SIMULATOR_PID=""
 SERVICES_PID=""
 
 collect_process_tree() {
@@ -29,7 +29,7 @@ stop_process_tree() {
 cleanup() {
   trap - EXIT INT TERM HUP
   stop_process_tree "$SERVICES_PID"
-  stop_process_tree "$IOS_PREVIEW_PID"
+  stop_process_tree "$IOS_SIMULATOR_PID"
   stop_process_tree "$PROXY_PID"
 }
 

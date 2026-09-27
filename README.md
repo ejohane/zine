@@ -19,22 +19,24 @@ Use Bun 1.3.4 and the Node 22 version pinned in `.nvmrc`:
 
 ```bash
 bun install
-bun run dev:worktree
+ZINE_DEV_HOST=localhost bun run dev:worktree
 ```
 
 The worktree command selects service ports, provisions sanitized production D1
 and article bodies only when local state is absent, and starts the services plus
-the native iOS simulator preview. It requires Apple Silicon and Xcode. Sign in
-with real Clerk credentials from Bitwarden using the `agent-secrets` workflow.
-See [authenticated local development](docs/local-development.md).
+the native iOS app in Apple Simulator. It requires macOS and Xcode. Use computer
+use directly in Simulator to sign in with the allowlisted Bitwarden credentials.
+The verified native sign-in flow uses `setValue` on Clerk's settable email and
+secure password fields. See [authenticated local development](docs/local-development.md)
+for protected credential transfer, startup troubleshooting, and cleanup.
 
 The native simulator build receives this worktree's selected local API URL.
 Existing local edits survive normal restarts. To explicitly refresh, stop the
 stack and run `bun run data:prod:local -- --yes --include-article-bodies`; this
 backs up existing state. Worker secrets are never copied from other worktrees.
 
-Use `bun run dev` for workspace services without the native preview. Standalone
-`bun run ios:preview` requires `ZINE_LOCAL_API_URL` pointing to your local Worker;
+Use `bun run dev` for workspace services without launching the native app. Standalone
+`bun run ios:simulator` requires `ZINE_LOCAL_API_URL` pointing to your local Worker;
 a reused installed build must match that URL.
 
 ## Validation

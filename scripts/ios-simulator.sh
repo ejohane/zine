@@ -4,13 +4,11 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 project_path="$repo_root/apps/ios/ZineNative.xcodeproj"
-derived_data_path="$repo_root/.local-data/ios-simulator-preview-derived-data"
-serve_sim_path="$repo_root/node_modules/.bin/serve-sim"
+derived_data_path="$repo_root/.local-data/ios-simulator-derived-data"
 simulator_name="${ZINE_SIMULATOR_NAME:-iPhone 17 — Zine}"
 simulator_udid="${ZINE_SIMULATOR_UDID:-}"
 bundle_id="app.zine.native"
 build_pid=""
-serve_sim_pid=""
 local_api_build_settings=()
 
 case "${ZINE_LOCAL_API_URL:?Start with bun run dev:worktree to select a local API}" in
@@ -24,23 +22,16 @@ case "${ZINE_LOCAL_API_URL:?Start with bun run dev:worktree to select a local AP
     ;;
 esac
 
-cleanup_serve_sim() {
+cleanup_build() {
   trap - EXIT INT TERM HUP
   if [[ -n "$build_pid" ]] && kill -0 "$build_pid" 2>/dev/null; then
     kill "$build_pid" 2>/dev/null || true
     wait "$build_pid" 2>/dev/null || true
   fi
-  if [[ -n "$serve_sim_pid" ]] && kill -0 "$serve_sim_pid" 2>/dev/null; then
-    kill "$serve_sim_pid" 2>/dev/null || true
-    wait "$serve_sim_pid" 2>/dev/null || true
-  fi
-  if [[ -n "$simulator_udid" ]]; then
-    "$serve_sim_path" --kill "$simulator_udid" >/dev/null 2>&1 || true
-  fi
 }
 
-if [[ "$(uname -s)" != "Darwin" || "$(uname -m)" != "arm64" ]]; then
-  echo "serve-sim requires an Apple Silicon Mac." >&2
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "The iOS Simulator requires macOS and Xcode." >&2
   exit 1
 fi
 
@@ -50,11 +41,6 @@ for command_name in node xcodebuild xcrun; do
     exit 1
   fi
 done
-
-if [[ ! -x "$serve_sim_path" ]]; then
-  echo "serve-sim is not installed. Run 'bun install' from the repository root." >&2
-  exit 1
-fi
 
 if [[ -z "$simulator_udid" ]]; then
   simulator_udid="$(node -e '
@@ -84,8 +70,7 @@ if ! xcrun simctl list devices available | grep -F "$simulator_udid" >/dev/null;
   exit 1
 fi
 
-"$serve_sim_path" --kill "$simulator_udid" >/dev/null 2>&1 || true
-trap cleanup_serve_sim EXIT
+trap cleanup_build EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM HUP
 
@@ -132,8 +117,6 @@ fi
 echo "Verified installed share extension API: $installed_extension_api_url"
 xcrun simctl launch --terminate-running-process "$simulator_udid" "$bundle_id"
 
-echo "Starting the Zine simulator preview for $simulator_name ($simulator_udid)."
-echo "Press Control-C to stop the preview and its Zine-scoped helper."
-"$serve_sim_path" "$simulator_udid" --fit "$@" &
-serve_sim_pid=$!
-wait "$serve_sim_pid"
+open -a Simulator --args -CurrentDeviceUDID "$simulator_udid"
+echo "Zine is running in Apple Simulator: $simulator_name ($simulator_udid)."
+echo "Use computer use directly in the Simulator app for login and UI verification."

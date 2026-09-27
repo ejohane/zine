@@ -23,7 +23,7 @@
 - Install dependencies: `bun install`
 - Start all dev tasks: `bun run dev`
 - Start the web app only: `bun run dev:web`
-- Worktree-safe dev startup with native `serve-sim` preview: `bun run dev:worktree`
+- Worktree-safe dev startup with Apple Simulator: `bun run dev:worktree`
 - Back up worktree state before fresh provisioning: `bun run dev:reset`
 - Run repository tests (worker + web unit/component): `bun run test`
 - Run web unit/component tests: `bun run test:web`
@@ -72,32 +72,32 @@
   - Falls back to `localhost` when Tailscale is unavailable
   - Starts a small local HTTP proxy for non-localhost phone access because local `workerd` is not directly reachable on the Tailscale interface
   - Builds, installs, and launches `apps/ios/ZineNative.xcodeproj` in the dedicated Zine Simulator
-  - Starts a scoped `serve-sim` browser preview and stops it with the rest of the dev stack
-  - Handles SIGINT, SIGTERM, and SIGHUP through `scripts/dev-processes.sh`, stopping the tracked Bun/Turbo descendants, preview, and proxy even in non-TTY sessions
+  - Opens the selected device in Apple Simulator for direct computer-use interaction
+  - Handles SIGINT, SIGTERM, and SIGHUP through `scripts/dev-processes.sh`, stopping the tracked Bun/Turbo descendants, native build, and proxy even in non-TTY sessions
 - Before using a shared simulator, coordinate ownership with other active tasks; select a dedicated alternate when needed.
-- When ending a verification session, stop its orchestrator and confirm its Worker, web, archive, proxy (if used), and preview ports are released. Never use blanket process-name kills or stop another task's services.
+- When ending a verification session, stop its orchestrator and confirm its Worker, web, archive, and proxy (if used) ports are released. Never use blanket process-name kills or stop another task's services.
 - Override worker port with `ZINE_WORKER_PORT=<port> bun run dev:worktree`.
+- For Simulator-only development, use `ZINE_DEV_HOST=localhost bun run dev:worktree`; the optional Debug bridge requires this loopback host.
 - Override the mobile/API host with `ZINE_DEV_HOST=<host> bun run dev:worktree`.
 - Override the public API port with `ZINE_API_PORT=<port> bun run dev:worktree`.
 - Override the simulator with `ZINE_SIMULATOR_NAME=<name>` or `ZINE_SIMULATOR_UDID=<udid>`.
 - Skip an intentional repeat native build with `ZINE_SKIP_IOS_BUILD=1 bun run dev:worktree`.
-- Disable the native preview only when explicitly required with `ZINE_SERVE_SIM=0 bun run dev:worktree`.
 
 ### Required Local Development and Verification Workflow
 
 - Use `.codex/skills/zine-local-development/SKILL.md` for every request to implement, run, test, verify, debug, inspect, or visually review local Zine runtime behavior.
-- For live app integration and UI verification, `bun run dev:worktree` is the default local entrypoint. It starts the canonical native app and `serve-sim`; do not launch a parallel preview unless the task explicitly requires an isolated alternate simulator.
-- For native UI verification, open the exact `serve-sim` URL printed by the command in the Codex in-app Browser and use the Browser plugin's computer-use surface to exercise the relevant user journey.
-- A successful native build, test run, install, launch, loaded preview page, or shell-only `simctl` interaction is not UI verification. Require a real streamed frame, computer-use interaction, and visible final state.
-- Report automated checks, build, install, launch, live stream, computer-use interaction, and UI observation as separate evidence states.
-- If the host cannot provide the simulator or Browser computer-use surface, run every remaining safe check but report native UI verification as skipped or blocked; never substitute a static screenshot or logs.
+- For live app integration and UI verification, `bun run dev:worktree` is the default local entrypoint. It builds, installs, and launches the canonical native app in Apple Simulator.
+- For native UI verification, use computer use directly with the Apple Simulator app. Confirm the selected device and foreground Zine app, then exercise the relevant user journey.
+- A successful native build, test run, install, launch, or shell-only `simctl` interaction is not UI verification. Require computer-use interaction in the Simulator app and a visibly observed final state.
+- Report automated checks, build, install, launch, computer-use interaction, and UI observation as separate evidence states.
+- If the host cannot provide the Simulator app or native computer-use surface, run every remaining safe check but report native UI verification as skipped or blocked; never substitute a static screenshot or logs.
 
 ### Production-Shaped Local Data
 
 - To refresh local D1 and reader bodies from the primary production account, run `bun run data:prod:local -- --yes --include-article-bodies` from the repo root.
 - The script exports production D1, keeps only `user_31ejjz59G6mTX1SIyErOi0fwu4A`, retains that Clerk user ID by default (or remaps to the explicit `ZINE_LOCAL_USER_ID` Clerk subject), sanitizes sensitive fields, and restores the result into `apps/worker/.wrangler/state`.
 - Stop `bun run dev:worktree` before running the restore. The script refuses to replace local Wrangler state while this worktree's Worker is running; restart the dev stack after the sync.
-- Add `--include-article-bodies` when local reader work needs the production article corpus. This downloads only current v2 artifacts and legacy HTML objects referenced by the sanitized user snapshot from production R2, then restores them into the local `ARTICLE_CONTENT` bucket.
+- Include `--include-article-bodies` for snapshots used by `dev:worktree`; startup requires a compatible snapshot with bodies. This downloads only current v2 artifacts and legacy HTML objects referenced by the sanitized user snapshot from production R2, then restores them into the local `ARTICLE_CONTENT` bucket.
 - Sensitive production values are not meant to survive this flow:
   - OAuth tokens in `provider_connections` are replaced with local redacted placeholders.
   - Provider connections are marked `EXPIRED`.
@@ -108,14 +108,14 @@
 
 ### Authenticated Local Verification
 
-- Use real Clerk login for both native and web manual verification. Read the shared `agent-secrets` skill, then `secretsctl current`, `metadata`, and `check` before credential use. Fill credentials through the protected clipboard workflow; never print or persist them.
+- Use real Clerk login for both native and web manual verification. Read the shared `agent-secrets` skill, then `secretsctl current`, `metadata`, and `check` before credential use. For native sign-in, transfer each credential through the protected clipboard workflow into the current settable Clerk field with native computer-use `setValue`; ordinary typing and paste were unreliable. Use fresh element indices and inspect credential-bearing state privately. Follow `docs/local-development.md#sign-in-directly-in-apple-simulator`; never print, screenshot, or persist credential values.
 - `bun run dev:worktree` supplies the selected LOCAL API URL to the native build. No verification writes should go to production. Check the built app configuration before reusing an installed build.
 - The default sanitized snapshot preserves `user_31ejjz59G6mTX1SIyErOi0fwu4A`, the account selected by the export and the current Bitwarden Zine login. For a different Clerk account, set `ZINE_LOCAL_USER_ID=user_...` consistently for refresh and startup. Obtain the ID from the authenticated account; never map arbitrary authenticated users onto one local identity.
 - Startup provisions D1/R2 only when local state is absent. Existing unrecognized state, old `dev-user-001` snapshots, or snapshots without bodies cause an actionable stop. Refresh explicitly after stopping this worktree's Worker. The restore backs up existing state; startup never unconditionally refreshes or copies another worktree's state.
-- Native uses the existing Clerk publishable key. That production key rejects localhost browser origins. Web verification requires an approved local-origin Clerk instance, matching Worker JWKS configuration, and a snapshot owned by its authenticated subject; see `docs/local-development.md`. Missing configuration or an origin/login/MFA failure is a blocker to report, not permission to fall back to bypass.
+- Native uses the existing Clerk publishable key. It works for native sign-in but rejects localhost browser origins. Web verification requires an approved local-origin Clerk instance, matching Worker JWKS configuration, and a snapshot owned by its authenticated subject; see `docs/local-development.md`. Missing configuration or an origin/login/MFA failure is a blocker to report, not permission to fall back to bypass.
 - Worker auth bypass is restricted to explicit isolated tests (`ENVIRONMENT=test`, `TEST_AUTH_BYPASS=true`). Web smoke tests explicitly set `VITE_TEST_AUTH_BYPASS=true` on a localhost development server with mocked APIs. Never use these settings for manual verification.
 - Debug screenshot fixtures and unit/integration fixtures remain useful deterministic test inputs. They are not proof of authenticated runtime behavior.
-- Require a live streamed frame and computer-use login/navigation through populated Library, bookmark detail, and reader for local reader verification. Report auth, sanitized D1/R2 refresh, build/install/launch, live stream, interactions and visible final state separately.
+- Require direct Simulator computer-use login/navigation through populated Library, bookmark detail, and reader for local reader verification. Report auth, sanitized D1/R2 refresh, build/install/launch, interactions and visible final state separately.
 - If Library is empty, inspect this worktree's local D1 `users` and `user_items` IDs against the authenticated Clerk subject. Do not disable auth, copy live tokens, or point the app at production to compensate.
 - See `docs/local-development.md` for provisioning, refresh, recovery, and credential instructions.
 
@@ -138,7 +138,7 @@
 
 ## Additional Agent Context
 
-- Native iOS setup and architecture guidance lives in `apps/ios/README.md`; it documents the supported client configuration and preview workflow.
+- Native iOS setup and architecture guidance lives in `apps/ios/README.md`; it documents the supported client configuration and Simulator workflow.
 - Web testing guidance lives in `docs/web/testing.md`.
 
 ## Design System Workflow
