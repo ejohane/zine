@@ -313,6 +313,7 @@ function parseSubstack(url: URL): ParsedLink | null {
  * Supported formats:
  * - twitter.com/USERNAME/status/STATUS_ID
  * - x.com/USERNAME/status/STATUS_ID
+ * - x.com/i/broadcasts/BROADCAST_ID
  *
  */
 function parseTwitter(url: URL): ParsedLink | null {
@@ -325,6 +326,18 @@ function parseTwitter(url: URL): ParsedLink | null {
 
   // Match /USERNAME/status/STATUS_ID pattern
   const pathParts = url.pathname.split('/').filter(Boolean);
+
+  if (pathParts.length === 3 && pathParts[0] === 'i' && pathParts[1] === 'broadcasts') {
+    const broadcastId = pathParts[2];
+    if (!broadcastId || !/^[\w-]+$/.test(broadcastId)) return null;
+
+    return {
+      provider: Provider.X,
+      contentType: ContentType.POST,
+      providerId: `broadcast:${broadcastId}`,
+      canonicalUrl: `https://x.com/i/broadcasts/${broadcastId}`,
+    };
+  }
 
   if (pathParts.length >= 3 && pathParts[1] === 'status') {
     const statusId = pathParts[2]?.split('?')[0] ?? null;
