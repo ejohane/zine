@@ -375,6 +375,17 @@ describe('parseLink', () => {
   });
 
   describe('Twitter/X', () => {
+    describe('broadcast URLs', () => {
+      it('classifies X broadcasts as posts and normalizes their URL', () => {
+        expect(parseLink('https://mobile.x.com/i/broadcasts/1yxBePQkRmaJN?s=20')).toEqual({
+          provider: Provider.X,
+          contentType: ContentType.POST,
+          providerId: 'broadcast:1yxBePQkRmaJN',
+          canonicalUrl: 'https://x.com/i/broadcasts/1yxBePQkRmaJN',
+        });
+      });
+    });
+
     describe('status URLs', () => {
       it('parses twitter.com status URLs', () => {
         const result = parseLink('https://twitter.com/elonmusk/status/1234567890123456789');
