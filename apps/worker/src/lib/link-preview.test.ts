@@ -424,6 +424,36 @@ describe('link-preview', () => {
     });
 
     describe('Twitter/X URLs', () => {
+      it('previews a broadcast as an X post using its Open Graph metadata', async () => {
+        mockScrapeOpenGraph.mockResolvedValue({
+          title: 'Darren Shepherd',
+          description: 'The Context ft. AutonomyAI',
+          image: 'https://pbs.twimg.com/broadcast-thumbnail.jpg',
+          author: 'Darren Shepherd',
+          authorImageUrl: null,
+          siteName: 'X',
+          url: 'https://x.com/i/broadcasts/1yxBePQkRmaJN',
+        });
+
+        const result = await fetchLinkPreview('https://x.com/i/broadcasts/1yxBePQkRmaJN');
+
+        expect(result).toMatchObject({
+          provider: Provider.X,
+          contentType: ContentType.POST,
+          providerId: 'broadcast:1yxBePQkRmaJN',
+          canonicalUrl: 'https://x.com/i/broadcasts/1yxBePQkRmaJN',
+          title: 'Darren Shepherd',
+          description: 'The Context ft. AutonomyAI',
+          source: 'opengraph',
+        });
+        expect(mockScrapeOpenGraph).toHaveBeenCalledWith(
+          'https://x.com/i/broadcasts/1yxBePQkRmaJN'
+        );
+        expect(mockFetchFxTwitterByUrl).not.toHaveBeenCalled();
+        expect(mockFetchTwitterOEmbed).not.toHaveBeenCalled();
+        expect(mockExtractArticle).not.toHaveBeenCalled();
+      });
+
       it('fetches via FxTwitter for twitter.com URLs', async () => {
         mockFetchFxTwitterByUrl.mockResolvedValue({
           code: 200,

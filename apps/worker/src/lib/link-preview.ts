@@ -779,6 +779,11 @@ async function mapFxTwitterToPreview(
  * 3. Fallback
  */
 async function fetchXProviderPreview(parsedLink: ParsedLink): Promise<LinkPreviewResult | null> {
+  // Broadcasts are X content, but FxTwitter and tweet oEmbed only accept status URLs.
+  if (parsedLink.providerId.startsWith('broadcast:')) {
+    return fetchViaOpenGraph(parsedLink);
+  }
+
   // Try FxTwitter first
   const fxResponse = await fetchFxTwitterByUrl(parsedLink.canonicalUrl);
 
