@@ -9,6 +9,20 @@ enum ActionRowHaptics {
     }
 }
 
+/// Native ShareLink and Menu own their actions, so trigger feedback when pressed.
+struct ActionRowHapticButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    var enabled = true
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .onChange(of: configuration.isPressed) { _, pressed in
+                guard pressed && enabled && isEnabled else { return }
+                ActionRowHaptics.play(style: .heavy)
+            }
+    }
+}
+
 private struct ActionRowHapticModifier: ViewModifier {
     @Environment(\.isEnabled) private var isEnabled
     let style: UIImpactFeedbackGenerator.FeedbackStyle

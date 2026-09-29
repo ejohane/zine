@@ -101,11 +101,19 @@ The media, article, and X post bookmark-detail proof of concept uses the context
 creator's avatar and uses that color continuously behind the artwork,
 title, actions, and description. Its foreground, divider, and control roles are
 derived for that surface. Articles and X posts without artwork begin with the
-title and creator, without a placeholder hero. Articles retain their primary
-Read in Zine action; X posts use a monochrome Open in X action. Both share the
+title and creator, without a placeholder hero. Articles flow directly into
+their reading content below the header; X posts use a monochrome Open in X action. Both share the
 same palette. Other non-media
-details retain the standard semantic palette. Standalone reader destinations retain their neutral appearance. This contextual
-treatment does not change the app-wide brand accent. Episodes with the same
+details retain the standard semantic palette. Home article cards resume in the
+same bookmark/content page at their saved reading position; ordinary bookmark
+entries begin at the header. The article header offers a quiet Continue reading
+row above the divider when an unfinished
+article has progress that rounds above zero. A compact tonal pill sits close to
+the divider and jumps to the saved text position with a heavy haptic. Its darker
+background and compact caption distinguish it from the main action controls;
+the touch target remains at least 44 points. Article text begins 32 points below
+the divider.
+This contextual treatment does not change the app-wide brand accent. Episodes with the same
 creator avatar share a palette; missing or failed avatars use the neutral
 fallback rather than the episode cover.
 
@@ -113,6 +121,35 @@ Creator pages use the same contextual avatar palette across their header,
 provider action, saved and latest content lists, and empty states. Palette
 extraction uses one fixed avatar image-processing size on both creator and
 bookmark pages, so display size does not change the resulting colors.
+
+The palette experiment balances colored pixel coverage with a modest saturation
+preference. Bright, pale colors receive a gradual penalty rather than being
+excluded; grayscale and very dark pixels still fall back to neutral. Colored
+surfaces follow Zine's Appearance setting. Light uses the brighter tones at a
+shared relative luminance of 0.075, with saturation between 0.50 and 0.80. Dark
+uses the deeper tones at HSB brightness 0.22, with saturation between 0.32 and
+0.72. System follows the device. Both variants retain the same creator hue;
+changing appearance resolves the cached color without reloading the avatar.
+White titles retain at least 7:1 contrast; secondary text and metadata retain
+at least 4.5:1. Neutral fallback brightness remains unchanged. This applies to
+bookmark details, creator pages, and their contextual article bodies.
+
+Reading controls use one bottom bar, ordered bookmark, complete, tag,
+appearance, then More. Share, original-source access, copy link, and article
+links live in More. The bookmark header controls remain unchanged across
+content types. Native back navigation stays in the same place when reader
+controls are visible; immersive reading hides the controls together.
+The bottom bar uses native regular, interactive Liquid Glass on iOS 26 and
+later, with the existing solid capsule on earlier versions. Contextual reading
+uses dark glass to maintain contrast with its light controls.
+
+Tags, reader appearance, and article-link sheets use
+`ZineTheme.ContentSheetPalette`: an opaque charcoal surface with a restrained
+hint of the existing creator palette, lifted slightly above the page. White
+primary actions use black text; supporting text, grouped controls, and separators
+share sheet-specific semantic roles. Sheets keep native rounding, drag indicators,
+and medium/large detents. Standalone reader sheets use neutral charcoal and do
+not extract creator colors. System share sheets retain their native appearance.
 
 ## Verification
 

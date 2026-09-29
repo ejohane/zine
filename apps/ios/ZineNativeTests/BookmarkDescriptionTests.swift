@@ -3,6 +3,23 @@ import XCTest
 @testable import ZineNative
 
 final class BookmarkDescriptionTests: XCTestCase {
+    func testContextualLinksAndChaptersUseReadableForeground() {
+        let text = "00:00 Intro\n00:30 Next topic\nVisit https://example.com for details."
+        let result = BookmarkDescription.attributedText(
+            text,
+            youtubeURL: URL(string: "https://www.youtube.com/watch?v=cvxjqbfLVk0")!,
+            duration: 60,
+            linkColor: .white
+        )
+        let links = result.runs.filter { $0.link != nil }
+        XCTAssertEqual(links.map { String(result[$0.range].characters) }, ["00:00", "00:30", "https://example.com"])
+        for run in links {
+            XCTAssertEqual(run.foregroundColor, .white)
+            XCTAssertEqual(run.font, .body.weight(.medium))
+        }
+        XCTAssertTrue(result.runs.filter { $0.link == nil }.allSatisfy { $0.foregroundColor == nil })
+    }
+
     func testLinksPreserveUnicodeLineBreaksAndExcludeTrailingPunctuation() {
         let text = "👋 Read https://example.com/article?q=one&v=2.\nThen (https://example.org/next)."
         let result = BookmarkDescription.attributedText(text)

@@ -4,7 +4,7 @@ struct HomeNavigationRoute: Hashable {
     enum Destination: Hashable {
         case item(HomeItem)
         case bookmark(Bookmark)
-        case articleReader(HomeItem)
+        case resumeArticle(HomeItem)
     }
 
     let destination: Destination
@@ -24,9 +24,9 @@ struct HomeNavigationRoute: Hashable {
         )
     }
 
-    static func articleReader(_ item: HomeItem, sectionID: String) -> HomeNavigationRoute {
+    static func resumeArticle(_ item: HomeItem, sectionID: String) -> HomeNavigationRoute {
         HomeNavigationRoute(
-            destination: .articleReader(item),
+            destination: .resumeArticle(item),
             sourceID: "\(sectionID)-\(item.id)"
         )
     }
@@ -196,7 +196,7 @@ struct HomeFeaturedArticleSection: View {
 
     var body: some View {
         HomeNavigationLink(
-            route: .articleReader(item, sectionID: sectionID),
+            route: .resumeArticle(item, sectionID: sectionID),
             transitionNamespace: transitionNamespace
         ) {
             VStack(alignment: .leading, spacing: cardHeight == nil ? 12 : 8) {

@@ -6,11 +6,18 @@ private enum ArticleReaderSheet: String, Identifiable {
     var id: String { rawValue }
 }
 
+struct ArticleReaderBookmarkControl {
+    let isBookmarked: Bool
+    let isDisabled: Bool
+    let toggle: () -> Void
+}
+
 struct ArticleReaderView: View {
     @Environment(\.nativeCommandSession) private var commandSession
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.colorScheme) private var colorScheme
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
@@ -39,6 +46,8 @@ struct ArticleReaderView: View {
     private let onFinishedCommit: (Bool) -> Void
     private let onTagsChanged: ([BookmarkTag]) -> Void
     private let client: APIClient
+    private let onNavigationVisibilityChanged: (Bool) -> Void
+    private let bookmarkControl: ArticleReaderBookmarkControl?
     private let synchronizedBookmark: Bookmark?
     private let bookmarkHeader: ArticleBookmarkReaderHeader?
     private let loadsOnAppear: Bool
@@ -50,6 +59,8 @@ struct ArticleReaderView: View {
         loadsOnAppear: Bool = true,
         bookmarkHeader: ArticleBookmarkReaderHeader? = nil,
         synchronizedBookmark: Bookmark? = nil,
+        bookmarkControl: ArticleReaderBookmarkControl? = nil,
+        onNavigationVisibilityChanged: @escaping (Bool) -> Void = { _ in },
         onRead: @escaping () -> Void = {},
         onProgressSaved: @escaping (BookmarkProgress) -> Void = { _ in },
         onFinishedChanged: @escaping (Bool, BookmarkChangePhase) -> Void = { _, _ in },
@@ -75,6 +86,8 @@ struct ArticleReaderView: View {
         self.loadsOnAppear = loadsOnAppear
         self.bookmarkHeader = bookmarkHeader
         self.synchronizedBookmark = synchronizedBookmark
+        self.bookmarkControl = bookmarkControl
+        self.onNavigationVisibilityChanged = onNavigationVisibilityChanged
     }
 
     var body: some View {
@@ -84,62 +97,17 @@ struct ArticleReaderView: View {
                     .ignoresSafeArea()
 
                 phaseContent(topInset: geometry.safeAreaInsets.top)
-
-                readerChrome
-                    .opacity(showsChrome ? 1 : 0)
-                    .offset(y: showsChrome || reduceMotion ? 0 : -12)
-                    .allowsHitTesting(showsChrome)
-                    .accessibilityHidden(!showsChrome)
-                    .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: showsChrome)
             }
-            .overlay(alignment: .bottomTrailing) {
+            .overlay(alignment: .bottom) {
                 if store.readyDocument != nil {
-                    HStack(spacing: 0) {
-                        Button {
-                            playContentControlHaptic()
-                            presentedSheet = .tags
-                        } label: {
-                            readerControlSymbol("tag")
-                                .frame(width: 48, height: 48)
-                        }
-                        .accessibilityLabel(store.tags.isEmpty ? "Add tags" : "Edit tags")
-                        .accessibilityIdentifier("article-reader-edit-tags")
-
-                        Button {
-                            playContentControlHaptic()
-                            presentedSheet = .links
-                        } label: {
-                            readerControlSymbol("link")
-                                .frame(width: 48, height: 48)
-                        }
-                        .accessibilityLabel("Article links")
-                        .accessibilityIdentifier("article-reader-links")
-
-                        Button {
-                            completionHapticTrigger += 1
-                            toggleFinished()
-                        } label: {
-                            readerControlSymbol(store.isFinished ? "checkmark.circle.fill" : "checkmark.circle")
-                                .frame(width: 48, height: 48)
-                                .foregroundStyle(store.isFinished ? .green : readerForeground)
-                                .contentTransition(.symbolEffect(.replace))
-                        }
-                        .disabled(store.isUpdatingFinished)
-                        .accessibilityLabel(store.isFinished ? "Mark unfinished" : "Mark complete")
-                        .accessibilityHint("Updates the article immediately")
-                        .accessibilityIdentifier("article-reader-completion")
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(readerForeground)
-                    .background(readerControlBackground, in: Capsule())
-                    .overlay { Capsule().stroke(readerDivider, lineWidth: 1) }
-                    .padding(.trailing, 12)
-                    .padding(.bottom, 8)
-                    .opacity(showsChrome ? 1 : 0)
-                    .offset(y: showsChrome || reduceMotion ? 0 : 12)
-                    .allowsHitTesting(showsChrome)
-                    .accessibilityHidden(!showsChrome)
-                    .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: showsChrome)
+                    readerActionBar
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 8)
+                        .opacity(showsChrome ? 1 : 0)
+                        .offset(y: showsChrome || reduceMotion ? 0 : 12)
+                        .allowsHitTesting(showsChrome)
+                        .accessibilityHidden(!showsChrome)
+                        .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: showsChrome)
                 }
             }
         }
@@ -147,7 +115,11 @@ struct ArticleReaderView: View {
         .sensoryFeedback(.impact(weight: .heavy, intensity: 1), trigger: completionHapticTrigger)
         .accessibilityAction(.escape) { dismiss() }
         .statusBarHidden(!showsChrome && (bookmarkHeader == nil || !bookmarkHeaderVisible))
-        .toolbarVisibility(bookmarkHeader != nil && bookmarkHeaderVisible ? .visible : .hidden, for: .navigationBar)
+        .toolbarVisibility(showsNavigation ? .visible : .hidden, for: .navigationBar)
+        .onChange(of: showsNavigation, initial: true) { _, visible in
+            onNavigationVisibilityChanged(visible)
+        }
+        .tint(readerForeground)
         .zinePushedDestinationChrome()
         .task(id: store.metadata.bookmarkID) {
             commandSession?.reader = store
@@ -212,13 +184,14 @@ struct ArticleReaderView: View {
         .sheet(item: $presentedSheet) { destination in
             switch destination {
             case .links:
-                ArticleReaderLinksSheet(links: articleLinks, failed: linksFailed, saveStates: linkSaveStates, onSave: saveLink)
+                ArticleReaderLinksSheet(links: articleLinks, failed: linksFailed, saveStates: linkSaveStates, palette: bookmarkHeader?.palette, onSave: saveLink)
             case .appearance:
-                ArticleReaderAppearanceSheet(textScale: $textScale, fontFamily: $storedFontFamily)
+                ArticleReaderAppearanceSheet(textScale: $textScale, fontFamily: $storedFontFamily, palette: bookmarkHeader?.palette)
             case .tags:
                 ArticleTagEditorView(
                     bookmarkID: store.metadata.bookmarkID,
                     initialTags: store.tags,
+                    palette: bookmarkHeader?.palette,
                     client: client,
                     saveTags: store.setTags,
                     onSaved: { tags in
@@ -351,73 +324,108 @@ struct ArticleReaderView: View {
         }
     }
 
-    private var readerChrome: some View {
-        HStack(spacing: 10) {
+    @ViewBuilder
+    private var readerActionBar: some View {
+        if #available(iOS 26.0, *) {
+            readerActionBarContent
+                .glassEffect(.regular.interactive(), in: Capsule())
+                // Creator palettes use light controls over a dark reading surface.
+                .environment(\.colorScheme, bookmarkHeader != nil ? .dark : colorScheme)
+        } else {
+            readerActionBarContent
+                .background(readerControlBackground, in: Capsule())
+                .overlay { Capsule().stroke(readerDivider, lineWidth: 1) }
+        }
+    }
+
+    private var readerActionBarContent: some View {
+        HStack(spacing: 0) {
+            if let bookmarkControl {
+                Button {
+                    bookmarkControl.toggle()
+                } label: {
+                    readerControlSymbol(bookmarkControl.isBookmarked ? "bookmark.fill" : "bookmark")
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .disabled(bookmarkControl.isDisabled)
+                .accessibilityLabel(bookmarkControl.isBookmarked ? "Remove bookmark" : "Bookmark")
+                .accessibilityIdentifier("article-reader-bookmark")
+            }
+
+            if bookmarkControl?.isBookmarked != false {
+                Button {
+                    if bookmarkHeader != nil {
+                        ActionRowHaptics.play(style: .heavy)
+                    } else {
+                        completionHapticTrigger += 1
+                    }
+                    toggleFinished()
+                } label: {
+                    readerControlSymbol(store.isFinished ? "checkmark.circle.fill" : "checkmark.circle")
+                        .foregroundStyle(store.isFinished ? .green : readerForeground)
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .disabled(store.isUpdatingFinished)
+                .accessibilityLabel(store.isFinished ? "Mark unfinished" : "Mark complete")
+                .accessibilityIdentifier("article-reader-completion")
+            }
+
             Button {
                 playContentControlHaptic()
-                dismiss()
+                presentedSheet = .tags
             } label: {
-                readerControlSymbol("chevron.left")
+                readerControlSymbol("tag")
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(readerForeground)
-            .background(readerControlBackground, in: Circle())
-            .overlay { Circle().stroke(readerDivider, lineWidth: 1) }
-            .accessibilityLabel("Back")
+            .accessibilityLabel("Edit tags")
+            .accessibilityIdentifier("article-reader-edit-tags")
 
-            Spacer(minLength: 8)
+            Button {
+                playContentControlHaptic()
+                presentedSheet = .appearance
+            } label: {
+                readerControlSymbol("textformat.size")
+            }
+            .accessibilityLabel("Reader appearance")
+            .accessibilityIdentifier("article-reader-appearance")
 
-            HStack(spacing: 0) {
-                Button {
-                    playContentControlHaptic()
-                    presentedSheet = .appearance
-                } label: {
-                    readerControlSymbol("textformat.size")
-                }
-                .accessibilityLabel("Reader appearance")
-                .accessibilityIdentifier("article-reader-appearance")
-
+            Menu {
                 ShareLink(item: store.metadata.canonicalURL) {
-                    readerControlSymbol("square.and.arrow.up")
+                    Label("Share", systemImage: "square.and.arrow.up")
                 }
-                .accessibilityLabel("Share article")
                 .accessibilityIdentifier("article-reader-share")
-                .actionRowHaptic(style: .heavy, enabled: bookmarkHeader != nil)
+                .buttonStyle(ActionRowHapticButtonStyle(enabled: bookmarkHeader != nil))
 
-                Menu {
-                    Button("Open Original", systemImage: "safari") {
-                        playContentControlHaptic()
-                        openOriginal()
-                    }
-                    Button(
-                        store.isFinished ? "Mark Unfinished" : "Mark Complete",
-                        systemImage: store.isFinished ? "arrow.uturn.backward.circle" : "checkmark.circle"
-                    ) {
-                        playContentControlHaptic()
-                        toggleFinished()
-                    }
-                    .disabled(store.isUpdatingFinished)
-                } label: {
-                    readerControlSymbol("ellipsis")
+                Button("Open Original", systemImage: "arrow.up.forward.app") {
+                    playContentControlHaptic()
+                    openOriginal()
                 }
-                .accessibilityLabel("More article actions")
-                .actionRowHaptic(style: .heavy, enabled: bookmarkHeader != nil)
+                Button("Copy Link", systemImage: "doc.on.doc") {
+                    playContentControlHaptic()
+                    UIPasteboard.general.url = store.metadata.canonicalURL
+                }
+                Divider()
+                Button("Article Links", systemImage: "link") {
+                    playContentControlHaptic()
+                    presentedSheet = .links
+                }
+                .accessibilityIdentifier("article-reader-links")
+            } label: {
+                readerControlSymbol("ellipsis")
             }
-            .foregroundStyle(readerForeground)
-            .background(readerControlBackground, in: Capsule())
-            .overlay { Capsule().stroke(readerDivider, lineWidth: 1) }
+            .accessibilityLabel("More actions")
+            .buttonStyle(ActionRowHapticButtonStyle(enabled: bookmarkHeader != nil))
         }
-        .padding(.horizontal, 12)
-        .frame(height: 56)
-        .frame(maxWidth: .infinity)
+        .buttonStyle(.plain)
+        .foregroundStyle(readerForeground)
+        .padding(4)
         .accessibilityIdentifier("article-reader-chrome")
     }
 
     private func readerControlSymbol(_ name: String) -> some View {
         Image(systemName: name)
-            .font(.system(size: 20))
+            .font(.system(size: 21, weight: .medium))
             .symbolRenderingMode(.monochrome)
-            .frame(width: 44, height: 44)
+            .frame(width: 48, height: 48)
             .contentShape(Rectangle())
     }
 
@@ -444,6 +452,8 @@ struct ArticleReaderView: View {
             content: bookmarkHeader.content,
             palette: bookmarkHeader.palette,
             jumpRequest: bookmarkHeader.jumpRequest,
+            resumesReading: bookmarkHeader.resumesReading,
+            minimumScrollTravel: bookmarkHeader.minimumScrollTravel,
             onScroll: { offset, height in
                 bookmarkHeader.onScroll(offset, height)
                 commandSession?.route = offset < 0 ? "bookmark" : "reader"
@@ -451,6 +461,10 @@ struct ArticleReaderView: View {
                 if offset >= 0 { recordOpenIfNeeded() }
             }
         )
+    }
+
+    private var showsNavigation: Bool {
+        showsChrome || (bookmarkHeader != nil && bookmarkHeaderVisible)
     }
 
     private var showsChrome: Bool {
@@ -515,7 +529,11 @@ struct ArticleReaderView: View {
     private func saveLink(_ link: ArticleReaderLink) {
         guard linkSaveStates[link.id] != .saving, linkSaveStates[link.id] != .saved else { return }
         linkSaveStates[link.id] = .saving
-        bookmarkHapticTrigger += 1
+        if bookmarkHeader != nil {
+            ActionRowHaptics.play(style: .heavy)
+        } else {
+            bookmarkHapticTrigger += 1
+        }
         Task {
             do {
                 _ = try await client.saveBookmark(url: link.url)
@@ -539,16 +557,28 @@ private struct ArticleReaderLinksSheet: View {
     let links: [ArticleReaderLink]?
     let failed: Bool
     let saveStates: [String: ArticleLinkSaveState]
+    var palette: ZineTheme.ArtworkPalette? = nil
+    private var sheetPalette: ZineTheme.ContentSheetPalette { .init(artwork: palette) }
     let onSave: (ArticleReaderLink) -> Void
 
     var body: some View {
         NavigationStack {
             Group {
                 if failed {
-                    ContentUnavailableView("Couldn’t load links", systemImage: "link", description: Text("Close and reopen the article to try again."))
+                    ContentUnavailableView {
+                        Label("Couldn’t load links", systemImage: "link")
+                    } description: {
+                        Text("Close and reopen the article to try again.")
+                            .foregroundStyle(sheetPalette.secondaryText)
+                    }
                 } else if let links {
                     if links.isEmpty {
-                        ContentUnavailableView("No links in this article", systemImage: "link", description: Text("Links to other pages will appear here."))
+                        ContentUnavailableView {
+                            Label("No links in this article", systemImage: "link")
+                        } description: {
+                            Text("Links to other pages will appear here.")
+                                .foregroundStyle(sheetPalette.secondaryText)
+                        }
                     } else {
                         List {
                             Section {
@@ -558,22 +588,23 @@ private struct ArticleReaderLinksSheet: View {
                                             VStack(alignment: .leading, spacing: 6) {
                                                 Text(link.title)
                                                     .font(.body.weight(.medium))
-                                                    .foregroundStyle(ZineTheme.primaryText)
+                                                    .foregroundStyle(sheetPalette.primaryText)
                                                 if !link.context.isEmpty {
                                                     Text(link.context)
                                                         .font(.subheadline)
-                                                        .foregroundStyle(ZineTheme.secondaryText)
+                                                        .foregroundStyle(sheetPalette.secondaryText)
                                                         .lineLimit(4)
                                                 }
                                                 Label(link.destination, systemImage: "arrow.up.right")
                                                     .font(.caption)
-                                                    .foregroundStyle(ZineTheme.secondaryText)
+                                                    .foregroundStyle(sheetPalette.secondaryText)
                                             }
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                             .contentShape(Rectangle())
                                         }
                                         .buttonStyle(.plain)
                                         .accessibilityHint("Opens externally")
+                                        .actionRowHaptic(style: .heavy)
                                         VStack(spacing: 4) {
                                             Button { onSave(link) } label: {
                                                 Image(systemName: saveStates[link.id] == .saving || saveStates[link.id] == .saved ? "bookmark.fill" : "bookmark")
@@ -582,15 +613,16 @@ private struct ArticleReaderLinksSheet: View {
                                                     .contentShape(Rectangle())
                                             }
                                             .buttonStyle(.borderless)
+                                            .background(sheetPalette.controlBackground, in: Circle())
                                             .disabled(saveStates[link.id] == .saving || saveStates[link.id] == .saved)
-                                            .foregroundStyle(ZineTheme.inlineLink)
+                                            .foregroundStyle(sheetPalette.primaryText)
                                             .accessibilityLabel(saveStates[link.id] == .saved ? "Saved to Zine" : "Save to Zine")
                                             .accessibilityValue(saveStates[link.id] == .saving ? "Saving" : "")
                                         }
                                         .overlay(alignment: .bottom) {
                                             Group {
                                                 if saveStates[link.id] == .saved || saveStates[link.id] == .saving {
-                                                    Text("Saved")
+                                                    Text(saveStates[link.id] == .saving ? "Saving" : "Saved")
                                                 } else if saveStates[link.id] == .failed {
                                                     Text("Try again")
                                                 }
@@ -598,15 +630,16 @@ private struct ArticleReaderLinksSheet: View {
                                             .font(.caption2)
                                             .offset(y: 14)
                                         }
-                                        .foregroundStyle(ZineTheme.secondaryText)
+                                        .foregroundStyle(sheetPalette.secondaryText)
                                     }
                                     .frame(minHeight: 72)
                                     .padding(.vertical, 6)
-                                    .listRowBackground(ZineTheme.surface)
+                                    .listRowBackground(Color.clear)
+                                    .listRowSeparatorTint(sheetPalette.divider)
                                 }
                             } header: {
                                 Text("\(links.count) \(links.count == 1 ? "link" : "links")")
-                                    .foregroundStyle(ZineTheme.secondaryText)
+                                    .foregroundStyle(sheetPalette.secondaryText)
                             }
                         }
                         .listStyle(.plain)
@@ -617,20 +650,28 @@ private struct ArticleReaderLinksSheet: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(ZineTheme.surface)
-            .foregroundStyle(ZineTheme.primaryText)
+            .background(sheetPalette.background)
+            .foregroundStyle(sheetPalette.primaryText)
             .navigationTitle("Article links")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    ActionRowHaptics.play(style: .heavy)
+                    dismiss()
+                } label: {
+                    Text("Done").contentSheetPrimaryAction(sheetPalette)
                 }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(sheetPalette.background)
             }
         }
-        .tint(ZineTheme.inlineLink)
-        .presentationBackground(ZineTheme.surface)
+        .tint(sheetPalette.primaryText)
+        .contentSheetStyle(sheetPalette)
         .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
+
     }
 }
 
@@ -638,51 +679,89 @@ private struct ArticleReaderAppearanceSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var textScale: Double
     @Binding var fontFamily: String
+    var palette: ZineTheme.ArtworkPalette? = nil
+
+    private var sheetPalette: ZineTheme.ContentSheetPalette { .init(artwork: palette) }
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Typeface") {
-                    Picker("Typeface", selection: $fontFamily) {
-                        ForEach(ArticleReaderFontFamily.allCases) { family in
-                            Text(family.title).tag(family.rawValue)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Typeface")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(sheetPalette.secondaryText)
+                        VStack(spacing: 0) {
+                            ForEach(ArticleReaderFontFamily.allCases) { family in
+                                Button {
+                                    guard fontFamily != family.rawValue else { return }
+                                    ActionRowHaptics.play(style: .heavy)
+                                    fontFamily = family.rawValue
+                                } label: {
+                                    HStack {
+                                        Text(family.title)
+                                        Spacer()
+                                        Image(systemName: fontFamily == family.rawValue ? "checkmark.circle.fill" : "circle")
+                                            .foregroundStyle(fontFamily == family.rawValue ? sheetPalette.primaryText : sheetPalette.secondaryText)
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .frame(minHeight: 50)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityAddTraits(fontFamily == family.rawValue ? .isSelected : [])
+                                if family != ArticleReaderFontFamily.allCases.last {
+                                    Rectangle().fill(sheetPalette.divider).frame(height: 1).padding(.horizontal, 16)
+                                }
+                            }
                         }
+                        .background(sheetPalette.controlBackground, in: .rect(cornerRadius: 16))
                     }
-                    .pickerStyle(.inline)
-                    .labelsHidden()
-                }
-                .listRowBackground(ZineTheme.surface)
-                Section {
-                    Slider(value: $textScale, in: 0.85...1.6, step: 0.05) {
-                        Text("Text size")
-                    } minimumValueLabel: {
-                        Image(systemName: "textformat.size.smaller")
-                    } maximumValueLabel: {
-                        Image(systemName: "textformat.size.larger")
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Text size").font(.subheadline.weight(.semibold))
+                            Spacer()
+                            Text("\(Int((textScale * 100).rounded()))%")
+                                .monospacedDigit()
+                        }
+                        .foregroundStyle(sheetPalette.secondaryText)
+                        Slider(value: $textScale, in: 0.85...1.6, step: 0.05) {
+                            Text("Text size")
+                        } minimumValueLabel: {
+                            Image(systemName: "textformat.size.smaller")
+                        } maximumValueLabel: {
+                            Image(systemName: "textformat.size.larger")
+                        } onEditingChanged: { editing in
+                            if !editing { ActionRowHaptics.play(style: .heavy) }
+                        }
+                        .accessibilityValue("\(Int((textScale * 100).rounded())) percent")
+                        .accessibilityIdentifier("article-reader-text-size")
+                        Text("Applies to all articles. Your reading position stays in place.")
+                            .font(.footnote)
+                            .foregroundStyle(sheetPalette.secondaryText)
                     }
-                    .accessibilityValue("\(Int((textScale * 100).rounded())) percent")
-                    .accessibilityIdentifier("article-reader-text-size")
-                } header: {
-                    Text("Text size")
-                } footer: {
-                    Text("Applies to all articles. Your reading position stays in place.")
                 }
-                .listRowBackground(ZineTheme.surface)
+                .padding(20)
             }
-            .scrollContentBackground(.hidden)
-            .background(ZineTheme.canvas)
-            .foregroundStyle(ZineTheme.primaryText)
-            .tint(ZineTheme.brandAccent)
+            .background(sheetPalette.background)
             .navigationTitle("Appearance")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    ActionRowHaptics.play(style: .heavy)
+                    dismiss()
+                } label: {
+                    Text("Done").contentSheetPrimaryAction(sheetPalette)
                 }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(sheetPalette.background)
             }
         }
+        .contentSheetStyle(sheetPalette)
         .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
     }
 }
 
@@ -697,6 +776,7 @@ struct ArticleTagEditorView: View {
     @State private var loadErrorMessage: String?
     @State private var saveErrorMessage: String?
 
+    private let sheetPalette: ZineTheme.ContentSheetPalette
     private let bookmarkID: String
     private let client: APIClient
     private let saveTags: ([String]) async throws -> [BookmarkTag]
@@ -705,10 +785,12 @@ struct ArticleTagEditorView: View {
     init(
         bookmarkID: String,
         initialTags: [BookmarkTag],
+        palette: ZineTheme.ArtworkPalette? = nil,
         client: APIClient,
         saveTags: @escaping ([String]) async throws -> [BookmarkTag],
         onSaved: @escaping ([BookmarkTag]) -> Void
     ) {
+        sheetPalette = .init(artwork: palette)
         self.bookmarkID = bookmarkID
         self.client = client
         self.saveTags = saveTags
@@ -720,12 +802,15 @@ struct ArticleTagEditorView: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
-                TextField("Add or search tags", text: $query)
-                    .textFieldStyle(.roundedBorder)
+                TextField("Add or search tags", text: $query, prompt: Text("Add or search tags").foregroundStyle(sheetPalette.secondaryText))
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 48)
+                    .background(sheetPalette.controlBackground, in: .rect(cornerRadius: 14))
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.done)
                     .onSubmit(addQuery)
+                    .disabled(isSaving)
                     .accessibilityLabel("Tag input")
 
                 if normalizedQuery.count > BookmarkShareStore.maximumTagLength {
@@ -738,10 +823,13 @@ struct ArticleTagEditorView: View {
                     } label: {
                         Label("Create \"\(normalizedQuery)\"", systemImage: "plus")
                             .lineLimit(1)
+                            .foregroundStyle(sheetPalette.primaryText)
+                            .padding(.horizontal, 14)
+                            .frame(minHeight: 44)
+                            .background(sheetPalette.controlBackground, in: Capsule())
                     }
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(.capsule)
-                    .disabled(selectedTagNames.count >= BookmarkShareStore.maximumTagCount)
+                    .buttonStyle(.plain)
+                    .disabled(isSaving || selectedTagNames.count >= BookmarkShareStore.maximumTagCount)
                 }
 
                 if isLoading, availableTags.isEmpty {
@@ -749,15 +837,16 @@ struct ArticleTagEditorView: View {
                         ProgressView()
                             .controlSize(.small)
                         Text("Loading tags…")
-                            .foregroundStyle(ZineTheme.secondaryText)
+                            .foregroundStyle(sheetPalette.secondaryText)
                     }
                 } else if let loadErrorMessage {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(loadErrorMessage)
                             .font(.caption)
-                            .foregroundStyle(ZineTheme.secondaryText)
+                            .foregroundStyle(sheetPalette.secondaryText)
                         Spacer()
                         Button("Retry") {
+                            ActionRowHaptics.play(style: .heavy)
                             Task { await loadTags() }
                         }
                         .font(.caption.weight(.semibold))
@@ -765,38 +854,66 @@ struct ArticleTagEditorView: View {
                 }
 
                 ScrollView {
-                    LazyVStack(spacing: 8) {
+                    LazyVStack(spacing: 0) {
                         ForEach(filteredTags) { tag in
                             tagRow(tag)
+                            if tag.id != filteredTags.last?.id {
+                                Rectangle().fill(sheetPalette.divider).frame(height: 1).padding(.horizontal, 14)
+                            }
                         }
+                    }
+                    .background(sheetPalette.controlBackground, in: .rect(cornerRadius: 16))
+                    .clipShape(.rect(cornerRadius: 16))
+                    if !isLoading && filteredTags.isEmpty {
+                        Text(query.isEmpty ? "No tags yet. Add your first tag above." : "No matching tags.")
+                            .font(.subheadline)
+                            .foregroundStyle(sheetPalette.secondaryText)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 24)
                     }
                 }
 
                 if selectedTagNames.count >= BookmarkShareStore.maximumTagCount {
                     Text("You can add up to \(BookmarkShareStore.maximumTagCount) tags.")
                         .font(.caption)
-                        .foregroundStyle(ZineTheme.secondaryText)
+                        .foregroundStyle(sheetPalette.secondaryText)
                 }
             }
             .padding(16)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .background(ZineTheme.canvas)
-            .navigationTitle("Article tags")
+            .background(sheetPalette.background)
+            .navigationTitle("Tags")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        ActionRowHaptics.play(style: .heavy)
+                        dismiss()
+                    }
                         .disabled(isSaving)
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(isSaving ? "Saving…" : "Save") {
-                        Task { await save() }
+            }
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    ActionRowHaptics.play(style: .heavy)
+                    Task { await save() }
+                } label: {
+                    HStack(spacing: 8) {
+                        if isSaving { ProgressView().tint(sheetPalette.actionForeground) }
+                        Text(isSaving ? "Saving…" : "Save")
                     }
-                    .fontWeight(.semibold)
-                    .disabled(isSaving)
+                    .contentSheetPrimaryAction(sheetPalette)
+                    .opacity(isSaving ? 0.65 : 1)
                 }
+                .buttonStyle(.plain)
+                .disabled(isSaving)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(sheetPalette.background)
             }
         }
+        .contentSheetStyle(sheetPalette)
         .presentationDetents([.medium, .large])
         .interactiveDismissDisabled(isSaving)
         .task { await loadTags() }
@@ -838,22 +955,19 @@ struct ArticleTagEditorView: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(isSelected ? ZineTheme.brandAccent : ZineTheme.secondaryText)
+                    .foregroundStyle(isSelected ? sheetPalette.primaryText : sheetPalette.secondaryText)
                 Text(tag.name)
-                    .foregroundStyle(ZineTheme.primaryText)
+                    .foregroundStyle(sheetPalette.primaryText)
                 Spacer()
             }
             .padding(.horizontal, 14)
             .frame(minHeight: 48)
-            .background(ZineTheme.surface, in: .rect(cornerRadius: 14))
-            .overlay {
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(ZineTheme.border, lineWidth: 1)
-            }
+            .background(isSelected ? sheetPalette.selectedBackground : .clear)
+            .opacity(isDisabled ? 0.45 : 1)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(isDisabled)
+        .disabled(isDisabled || isSaving)
         .accessibilityLabel("\(tag.name) tag")
         .accessibilityValue(isSelected ? "Selected" : "Not selected")
     }
@@ -862,6 +976,7 @@ struct ArticleTagEditorView: View {
         guard canCreateQuery,
               selectedTagNames.count < BookmarkShareStore.maximumTagCount
         else { return }
+        ActionRowHaptics.play(style: .heavy)
         let name = normalizedQuery
         availableTags.insert(BookmarkTag(id: "local-\(UUID().uuidString)", name: name), at: 0)
         selectedTagNames.append(name)
@@ -869,6 +984,7 @@ struct ArticleTagEditorView: View {
     }
 
     private func toggleTag(named name: String) {
+        ActionRowHaptics.play(style: .heavy)
         let key = tagKey(name)
         if containsTag(named: name) {
             selectedTagNames.removeAll { tagKey($0) == key }

@@ -107,13 +107,33 @@ struct BookmarkDetailContent: Equatable {
     }
 }
 
+/// Scroll extent calculation for the article reader's hosted bookmark header.
+enum BookmarkDetailScrollExtent {
+    static func collapseTravel(actionTop: CGFloat, headerBottom: CGFloat, scrollOrigin: CGFloat) -> CGFloat {
+        max(actionTop + scrollOrigin - headerBottom, 0)
+    }
+
+    static func bottomInset(viewportHeight: CGFloat, contentHeight: CGFloat, requiredOffset: CGFloat) -> CGFloat {
+        max(viewportHeight + requiredOffset - contentHeight, 0)
+    }
+}
+
+enum BookmarkArtworkLayout {
+    static let bottomSpacing: CGFloat = 16
+
+    static func parallaxOffset(for offset: CGFloat) -> CGFloat {
+        // Keep the complete rounded artwork above the following content surface.
+        offset > 0 ? -offset : min(-offset * 0.35, bottomSpacing)
+    }
+}
+
 struct BookmarkDetailView: View {
     @Environment(\.nativeCommandSession) private var commandSession
     @State private var showsReader = false
     @State private var showsArticleCreator = false
     @State private var articleJumpRequest = 0
     @State private var articleScrollOffset: CGFloat = 0
-    @State private var articleReaderActive = false
+    @State private var articleNavigationVisible = true
     @State private var showsTagEditor = false
     @State private var showsPodcastFollow = false
     @Environment(\.openURL) private var openURL
@@ -129,11 +149,14 @@ struct BookmarkDetailView: View {
     @State private var subscriptionSettings: BookmarkSubscriptionSettings?
     @State private var isSavingSubscriptionSettings = false
     @State private var errorMessage: String?
+    @State private var isOpeningExternal = false
     @State private var artworkPalette: ZineTheme.ArtworkPalette?
+    @State private var sourceActionTop: CGFloat = 0
     @State private var headerBottom: CGFloat = 0
     @State private var titleBottom: CGFloat = .greatestFiniteMagnitude
 
     private let initialContent: BookmarkDetailContent
+    private var resumesArticleReading = false
     let client: APIClient
     let onUpdate: (Bookmark) -> Void
     let onBookmarkChange: (Bookmark, Bool, BookmarkChangePhase) -> Void
@@ -167,12 +190,14 @@ struct BookmarkDetailView: View {
     init(
         item: HomeItem,
         client: APIClient,
+        resumesArticleReading: Bool = false,
         onUpdate: @escaping (Bookmark) -> Void,
         onBookmarkChange: @escaping (Bookmark, Bool, BookmarkChangePhase) -> Void = { _, _, _ in },
         onBookmarkCommit: @escaping (Bookmark, Bool) -> Void = { _, _ in },
         onExternalOpen: @escaping (Bookmark?, HomeItem) -> Void = { _, _ in }
     ) {
         initialContent = BookmarkDetailContent(item: item)
+        self.resumesArticleReading = resumesArticleReading
         _bookmark = State(initialValue: nil)
         _isBookmarked = State(initialValue: true)
         _finishedState = State(initialValue: OptimisticFinishedState(
@@ -232,6 +257,18 @@ struct BookmarkDetailView: View {
             client: client,
             bookmarkHeader: bookmarkHeader,
             synchronizedBookmark: bookmarkHeader == nil ? nil : bookmark,
+            bookmarkControl: bookmarkHeader == nil ? nil : ArticleReaderBookmarkControl(
+                isBookmarked: isBookmarked,
+                isDisabled: bookmark == nil || isSavingBookmark,
+                toggle: {
+                    ActionRowHaptics.play(style: .heavy)
+                    Task { await toggleBookmark() }
+                }
+            ),
+            onNavigationVisibilityChanged: { visible in
+                guard bookmarkHeader != nil else { return }
+                articleNavigationVisible = visible
+            },
             onRead: { onExternalOpen(bookmark) },
             onProgressSaved: updateReadingProgress,
             onFinishedChanged: updateFinishedState,
@@ -243,6 +280,12 @@ struct BookmarkDetailView: View {
 
     private var content: BookmarkDetailContent {
         bookmark.map { BookmarkDetailContent(bookmark: $0) } ?? initialContent
+    }
+
+    private var continueReadingPercent: Int? {
+        guard !finishedState.isFinished, let progress = content.progress else { return nil }
+        let percent = Int((min(max(progress.fraction, 0), 1) * 100).rounded())
+        return percent > 0 ? percent : nil
     }
 
     private var usesArtworkDetail: Bool {
@@ -266,7 +309,7 @@ struct BookmarkDetailView: View {
     }
 
     private var activeArtworkPalette: ZineTheme.ArtworkPalette? {
-        usesContextualDetail ? artworkPalette ?? .fallback : nil
+        usesContextualDetail ? (artworkPalette ?? .fallback).resolved(for: colorScheme) : nil
     }
 
     private var detailPrimaryText: Color {
@@ -296,13 +339,16 @@ struct BookmarkDetailView: View {
                         content: AnyView(articleBookmarkHeader(viewport: viewport.size)),
                         palette: activeArtworkPalette ?? .fallback,
                         jumpRequest: articleJumpRequest,
+                        resumesReading: resumesArticleReading,
+                        minimumScrollTravel: BookmarkDetailScrollExtent.collapseTravel(
+                            actionTop: sourceActionTop, headerBottom: headerBottom, scrollOrigin: 0
+                        ),
                         onScroll: { offset, height in
                             articleScrollOffset = min(offset + height, height)
-                            articleReaderActive = offset >= 0
                         }
                     ))
                 } else {
-                    ScrollView {
+                    BookmarkDetailCollapsingScrollView(headerBottom: headerBottom) {
                         VStack(spacing: 0) {
                             if showsContextualArtwork {
                                 mediaHero(height: heroHeight, viewport: viewport.size)
@@ -318,16 +364,10 @@ struct BookmarkDetailView: View {
                                     details
                                 }
                             }
-                                .frame(
-                                    minHeight: max(viewport.size.height - heroHeight, 0),
-                                    alignment: .top
-                                )
                                 .background(activeArtworkPalette?.background ?? ZineTheme.canvas)
                         }
                         .background(BookmarkDetailPopGestureBridge())
                     }
-                    .coordinateSpace(name: "bookmarkDetailScroll")
-                    .ignoresSafeArea(edges: .top)
                     .modifier(BookmarkDetailTopEdgeEffect())
                 }
 
@@ -339,7 +379,7 @@ struct BookmarkDetailView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarVisibility(articleReaderActive ? .hidden : .visible, for: .navigationBar)
+        .toolbarVisibility(usesArticleDetail && !articleNavigationVisible ? .hidden : .visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text(content.title)
@@ -352,7 +392,9 @@ struct BookmarkDetailView: View {
             }
         }
         .tint(detailPrimaryText)
-        .preferredColorScheme(usesArtworkDetail ? .dark : nil)
+        // Both contextual tones use white content over a colored surface.
+        // Resolve the palette from app appearance, but keep native chrome legible.
+        .toolbarColorScheme(usesContextualDetail ? .dark : nil, for: .navigationBar)
         .zinePushedDestinationChrome()
         .zineNavigationBarContentBackdrop(activeArtworkPalette?.background ?? ZineTheme.canvas)
         .navigationDestination(isPresented: $showsReader) { readerDestination }
@@ -375,7 +417,7 @@ struct BookmarkDetailView: View {
             }
         }
         .sheet(isPresented: $showsTagEditor) {
-            ArticleTagEditorView(bookmarkID: content.id, initialTags: content.tags, client: client,
+            ArticleTagEditorView(bookmarkID: content.id, initialTags: content.tags, palette: activeArtworkPalette, client: client,
                 saveTags: { names in try await saveDetailTags(names).value }, onSaved: updateTags)
         }
         .sheet(isPresented: $showsPodcastFollow) {
@@ -430,6 +472,7 @@ struct BookmarkDetailView: View {
                     usesArticleDetail ? geometry.frame(in: .named("articleBookmarkHeader")).maxY : geometry.frame(in: .global).maxY
                 } action: { titleBottom = $0 }
 
+
             creatorRow
                 .frame(maxWidth: .infinity)
                 .padding(.top, 8)
@@ -445,23 +488,14 @@ struct BookmarkDetailView: View {
             .foregroundStyle(activeArtworkPalette?.tertiaryText ?? ZineTheme.tertiaryText)
             .padding(.top, 8)
 
-            if usesArticleDetail {
-                Button {
-                    ActionRowHaptics.play(style: .heavy)
-                    articleJumpRequest += 1
-                } label: {
-                    Label("Read in Zine", systemImage: "book.pages")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity, minHeight: 52)
-                        .foregroundStyle(ZineTheme.onAccent)
-                        .background(activeArtworkPalette?.actionBackground ?? ZineTheme.surface, in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 24)
-            }
-
             contextualOpenButton
-                .padding(.top, usesArticleDetail ? 12 : 24)
+                .onGeometryChange(for: CGFloat.self) { geometry in
+                    geometry.frame(in: usesArticleDetail ? .named("articleBookmarkHeader") : .global).minY
+                } action: { if usesArticleDetail { sourceActionTop = $0 } }
+                .background {
+                    if !usesArticleDetail { BookmarkDetailScrollTarget() }
+                }
+                .padding(.top, 24)
 
             HStack(spacing: 16) {
                 bookmarkActions
@@ -469,18 +503,44 @@ struct BookmarkDetailView: View {
                 ShareLink(item: content.canonicalUrl) {
                     actionIcon(systemName: "square.and.arrow.up")
                 }
-                .buttonStyle(.plain)
                 .accessibilityLabel("Share")
-                .actionRowHaptic(style: .heavy)
+                .buttonStyle(ActionRowHapticButtonStyle())
                 moreMenu
             }
             .padding(.top, 18)
 
             if usesArticleDetail {
+                if let percent = continueReadingPercent {
+                    Button {
+                        ActionRowHaptics.play(style: .heavy)
+                        articleJumpRequest += 1
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text("Continue reading")
+                            Text("· \(percent)%")
+                                .foregroundStyle(detailSecondaryText)
+                            Image(systemName: "arrow.down")
+                                .accessibilityHidden(true)
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(detailPrimaryText)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background((activeArtworkPalette ?? .fallback).resumeControlBackground, in: Capsule())
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityHint("Jump to your last reading position")
+                    .accessibilityIdentifier("article-continue-reading")
+                    .padding(.top, 12)
+                }
+
                 Rectangle()
                     .fill(activeArtworkPalette?.divider ?? ZineTheme.border)
                     .frame(height: 1)
-                    .padding(.top, 22)
+                    .padding(.top, continueReadingPercent == nil ? 22 : 6)
             } else if let summary = content.summary, !summary.isEmpty {
                 Rectangle()
                     .fill(activeArtworkPalette?.divider ?? ZineTheme.border)
@@ -490,7 +550,8 @@ struct BookmarkDetailView: View {
                 Text(BookmarkDescription.attributedText(
                     summary,
                     youtubeURL: content.provider == .youtube ? content.canonicalUrl : nil,
-                    duration: content.duration
+                    duration: content.duration,
+                    linkColor: detailPrimaryText
                 ))
                 .font(.body)
                 .foregroundStyle(detailSecondaryText)
@@ -525,9 +586,16 @@ struct BookmarkDetailView: View {
         let action = content.provider.openAction(for: content.canonicalUrl)
 
         return Button {
+            guard !isOpeningExternal else { return }
+            isOpeningExternal = true
             ActionRowHaptics.play(style: .heavy)
-            onExternalOpen(bookmark)
-            openURL(content.canonicalUrl)
+            Task { @MainActor in
+                // Let the creator link's system impact finish before switching apps.
+                try? await Task.sleep(for: .milliseconds(150))
+                onExternalOpen(bookmark)
+                openURL(content.canonicalUrl)
+                isOpeningExternal = false
+            }
         } label: {
             HStack(spacing: 9) {
                 ProviderLogoView(logo: action.logo)
@@ -553,11 +621,13 @@ struct BookmarkDetailView: View {
                     .onGeometryChange(for: CGFloat.self) { geometry in
                         geometry.frame(in: .global).maxY
                     } action: { titleBottom = $0 }
+
                 creatorRow
                 metadata
             }
 
             actionRow
+                .background(BookmarkDetailScrollTarget())
 
             if content.contentType == .podcast, content.provider == .web,
                subscriptionSettings == nil {
@@ -614,9 +684,8 @@ struct BookmarkDetailView: View {
                 ShareLink(item: content.canonicalUrl) {
                     actionIcon(systemName: "square.and.arrow.up")
                 }
-                .buttonStyle(.plain)
                 .accessibilityLabel("Share")
-                .actionRowHaptic(style: .heavy)
+                .buttonStyle(ActionRowHapticButtonStyle())
 
                 moreMenu
             }
@@ -782,7 +851,7 @@ struct BookmarkDetailView: View {
             actionIcon(systemName: "ellipsis")
         }
         .accessibilityLabel("More actions")
-        .actionRowHaptic(style: .heavy)
+        .buttonStyle(ActionRowHapticButtonStyle())
     }
 
     private func actionIcon(
@@ -912,7 +981,7 @@ struct BookmarkDetailView: View {
                     .padding(.top, 116 + stretch * 0.25)
             }
             .frame(width: geometry.size.width, height: height + stretch)
-            .offset(y: offset > 0 ? -offset : -offset * 0.35)
+            .offset(y: BookmarkArtworkLayout.parallaxOffset(for: offset))
         }
         .frame(height: height)
     }
@@ -957,7 +1026,7 @@ struct BookmarkDetailView: View {
     private func mediaHeroHeight(in viewport: CGSize) -> CGFloat {
         let imageWidth = max(0, viewport.width - 72)
         let imageHeight = content.provider == .spotify ? imageWidth : imageWidth * 9 / 16
-        return alignedToDisplayPixel(116 + imageHeight + 16)
+        return alignedToDisplayPixel(116 + imageHeight + BookmarkArtworkLayout.bottomSpacing)
     }
 
     private func heroHeight(in viewport: CGSize) -> CGFloat {
@@ -1161,6 +1230,54 @@ private struct BookmarkDetailTopEdgeEffect: ViewModifier {
 // The hidden navigation bar can disable UIKit's pop gestures after a push
 // through the creator screen. Keep the system gesture on the navigation
 // controller, and let the detail scroll view yield to it.
+private struct BookmarkDetailScrollTargetPreference: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+struct BookmarkDetailScrollTarget: View {
+    var body: some View {
+        GeometryReader { geometry in
+            Color.clear.preference(key: BookmarkDetailScrollTargetPreference.self,
+                                   value: geometry.frame(in: .named("bookmarkCollapseContent")).minY)
+        }
+    }
+}
+
+/// Size the scroll content itself, so SwiftUI owns the full scroll range even
+/// after dragging/deceleration or a navigation-title update.
+struct BookmarkDetailCollapsingScrollView<Content: View>: View {
+    // Give metadata immediately above the action a small clearance behind chrome.
+    static var collapseClearance: CGFloat { 8 }
+    let headerBottom: CGFloat
+    @ViewBuilder var content: () -> Content
+    @State private var actionTop: CGFloat = 0
+    @State private var viewportHeight: CGFloat = 0
+    @State private var topInset: CGFloat = 0
+    @State private var screenOrigin: CGFloat = 0
+
+    var body: some View {
+        ScrollView {
+            content()
+                .coordinateSpace(name: "bookmarkCollapseContent")
+                .frame(minHeight: viewportHeight + max(actionTop + screenOrigin + topInset - headerBottom + Self.collapseClearance, 0),
+                       alignment: .top)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .onPreferenceChange(BookmarkDetailScrollTargetPreference.self) { actionTop = $0 }
+        .onScrollGeometryChange(for: CGSize.self) { geometry in
+            CGSize(width: geometry.contentInsets.top,
+                   height: geometry.containerSize.height - geometry.contentInsets.top - geometry.contentInsets.bottom)
+        } action: { _, metrics in
+            topInset = metrics.width
+            viewportHeight = metrics.height
+        }
+        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { screenOrigin = $0 }
+        .coordinateSpace(name: "bookmarkDetailScroll")
+        .ignoresSafeArea(edges: .top)
+    }
+}
+
 struct BookmarkDetailPopGestureBridge: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 

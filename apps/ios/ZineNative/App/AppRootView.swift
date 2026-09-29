@@ -55,8 +55,11 @@ private struct AuthenticatedAppView: View {
     private enum AppTab: Hashable {
         case home
         case library
-        case settings
         case search
+    }
+
+    private enum SettingsEntryRoute: Hashable {
+        case root
     }
 
     @Environment(\.scenePhase) private var scenePhase
@@ -141,17 +144,6 @@ private struct AuthenticatedAppView: View {
                     .tint(ZineTheme.brandAccent)
                 }
 
-                Tab("Settings", systemImage: "gearshape", value: AppTab.settings) {
-                    AppSettingsView(
-                        client: client,
-                        onSignedOut: {
-                            await client.removeOfflineArticleData()
-                            await libraryCache.removeAll()
-                        }
-                    )
-                    .tint(ZineTheme.brandAccent)
-                }
-
                 Tab(value: AppTab.search, role: .search) {
                     LibraryView(
                         client: client,
@@ -173,7 +165,34 @@ private struct AuthenticatedAppView: View {
                 compactTitle: selectedCompactRootTitle?.title,
                 collapseProgress: selectedCompactRootTitle?.progress ?? 0
             )
+            .toolbar {
+                if selectedTab == .home && navigationPath.isEmpty {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            navigationPath.append(SettingsEntryRoute.root)
+                        } label: {
+                            Image(systemName: "gearshape")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(ZineTheme.primaryText)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .accessibilityLabel("Settings")
+                        .accessibilityIdentifier("home-settings-button")
+                    }
+                }
+            }
             .environment(\.zineTabNavigationActions, tabNavigationActions)
+            .navigationDestination(for: SettingsEntryRoute.self) { _ in
+                AppSettingsView(
+                    client: client,
+                    onSignedOut: {
+                        await client.removeOfflineArticleData()
+                        await libraryCache.removeAll()
+                    }
+                )
+                .zinePushedDestinationChrome()
+            }
             .navigationDestination(for: HomeNavigationRoute.self) { route in
                 homeDestination(for: route)
                     .navigationTransition(
@@ -276,8 +295,6 @@ private struct AuthenticatedAppView: View {
         switch selectedTab {
         case .home, .library:
             ""
-        case .settings:
-            "Settings"
         case .search:
             "Search"
         }
@@ -289,7 +306,7 @@ private struct AuthenticatedAppView: View {
             ("Home", homeTitleCollapseProgress)
         case .library:
             ("Library", libraryTitleCollapseProgress)
-        case .settings, .search:
+        case .search:
             nil
         }
     }
@@ -309,7 +326,7 @@ private struct AuthenticatedAppView: View {
             homeTabReselection += 1
         case .library:
             libraryTabReselection += 1
-        case .settings, .search:
+        case .search:
             break
         }
     }
@@ -348,25 +365,20 @@ private struct AuthenticatedAppView: View {
                 onBookmarkCommit: { _, _ in markBookmarkContentChanged() },
                 onExternalOpen: handleExternalOpen
             )
-        case .articleReader(let item):
-            ArticleReaderView(
-                metadata: ArticleReaderMetadata(
-                    bookmarkID: item.id,
-                    title: item.title,
-                    creator: item.creator,
-                    creatorImageURL: item.creatorImageUrl,
-                    canonicalURL: item.canonicalUrl,
-                    readingTimeMinutes: item.readingTimeMinutes,
-                    initialProgress: item.progress,
-                    isFinished: false,
-                    tags: []
-                ),
+        case .resumeArticle(let item):
+            BookmarkDetailView(
+                item: item,
                 client: client,
-                onRead: { handleHomeItemExternalOpen(item) },
-                onProgressSaved: { _ in markBookmarkContentChanged() },
-                onFinishedChanged: { _, _ in markBookmarkContentChanged() },
-                onFinishedCommit: { _ in markBookmarkContentChanged() },
-                onTagsChanged: { _ in markBookmarkContentChanged() }
+                resumesArticleReading: true,
+                onUpdate: { _ in markBookmarkContentChanged() },
+                onBookmarkCommit: { _, _ in markBookmarkContentChanged() },
+                onExternalOpen: { bookmark, item in
+                    if let bookmark {
+                        handleExternalOpen(bookmark)
+                    } else {
+                        handleHomeItemExternalOpen(item)
+                    }
+                }
             )
         }
     }

@@ -35,12 +35,15 @@ struct ArticleBookmarkReaderHeader {
     let content: AnyView
     let palette: ZineTheme.ArtworkPalette
     let jumpRequest: Int
+    var resumesReading = false
+    var minimumScrollTravel: CGFloat = 0
     let onScroll: (CGFloat, CGFloat) -> Void
 }
 
 private final class ArticleReaderWebView: WKWebView {
     var headerController: UIHostingController<AnyView>?
     var onHeaderLayout: ((CGFloat) -> Void)?
+    var minimumHeaderScrollTravel: CGFloat = 0
     private var headerHeight: CGFloat = 0
 
     override func layoutSubviews() {
@@ -55,6 +58,14 @@ private final class ArticleReaderWebView: WKWebView {
             scrollView.contentInset.top = height
             if wasAtHeader { scrollView.contentOffset.y = -height }
             onHeaderLayout?(height)
+        }
+        // Only fill the missing document extent; long articles retain their natural scroll range.
+        let bottom = BookmarkDetailScrollExtent.bottomInset(
+            viewportHeight: scrollView.bounds.height, contentHeight: scrollView.contentSize.height,
+            requiredOffset: minimumHeaderScrollTravel - height
+        )
+        if abs(scrollView.contentInset.bottom - bottom) > 0.5 {
+            scrollView.contentInset.bottom = bottom
         }
     }
 
@@ -77,6 +88,7 @@ private final class ArticleReaderWebView: WKWebView {
         headerController?.view.removeFromSuperview()
         headerController?.removeFromParent()
         headerController = nil
+        scrollView.contentInset.bottom = 0
         onHeaderLayout = nil
     }
 
@@ -153,7 +165,7 @@ enum ArticleHTMLDocumentBuilder {
         let contextualStyle = bookmarkPalette.map { palette in
             """
             html, body { background: \(palette.readerBackgroundCSS); color: rgba(255,255,255,0.82); }
-            body { padding-top: 24px; }
+            body { padding-top: 32px; }
             h1, h2, h3, h4, h5, h6, a { color: white; }
             blockquote, figcaption { color: rgba(255,255,255,0.82); }
             pre { background: rgba(255,255,255,0.10); }
@@ -453,6 +465,7 @@ struct ArticleHTMLView: UIViewRepresentable {
 
         func configureHeader(in view: WKWebView) {
             guard let view = view as? ArticleReaderWebView, let header = parent.bookmarkHeader else { return }
+            view.minimumHeaderScrollTravel = header.minimumScrollTravel
             view.installHeader(header.content)
             view.backgroundColor = header.palette.backgroundUIColor
             view.scrollView.backgroundColor = header.palette.backgroundUIColor
@@ -490,7 +503,6 @@ struct ArticleHTMLView: UIViewRepresentable {
                 }
                 if header.jumpRequest != lastJumpRequest {
                     lastJumpRequest = header.jumpRequest
-                    webView.scrollView.setContentOffset(CGPoint(x: 0, y: 0), animated: false)
                     let position = latestPosition ?? parent.initialPosition
                     if let position, let data = try? JSONEncoder().encode(position),
                        let json = String(data: data, encoding: .utf8), position.contentHash == loadedHash {
@@ -528,9 +540,9 @@ struct ArticleHTMLView: UIViewRepresentable {
             } else {
                 json = "{nodeIndex:-1, fraction:\(fallback)}"
             }
-            if parent.bookmarkHeader == nil {
+            if parent.bookmarkHeader == nil || parent.bookmarkHeader?.resumesReading == true {
                 run("window.zineReader.restore(\(json));", in: webView)
-                applyAppearance(in: webView)
+                if parent.bookmarkHeader == nil { applyAppearance(in: webView) }
             } else {
                 webView.scrollView.setContentOffset(CGPoint(x: 0, y: -headerHeight), animated: false)
             }

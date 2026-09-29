@@ -18,10 +18,15 @@ struct CreatorView: View {
     @State private var store: CreatorStore
     @State private var selectedSection: ContentSection = .bookmarked
     @State private var renderedSection: ContentSection = .bookmarked
-    @State private var artworkPalette = ZineTheme.ArtworkPalette.fallback
+    @State private var extractedArtworkPalette = ZineTheme.ArtworkPalette.fallback
     @State private var headerBottom: CGFloat = 0
     @State private var titleBottom: CGFloat = .greatestFiniteMagnitude
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var artworkPalette: ZineTheme.ArtworkPalette {
+        extractedArtworkPalette.resolved(for: colorScheme)
+    }
 
     private var avatarURL: URL? { store.profile?.imageUrl ?? fallbackImageUrl }
     private var creatorName: String { store.profile?.name ?? fallbackName }
@@ -65,7 +70,7 @@ struct CreatorView: View {
         .background(artworkPalette.background.ignoresSafeArea())
         .foregroundStyle(artworkPalette.primaryText)
         .tint(artworkPalette.primaryText)
-        .preferredColorScheme(.dark)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarVisibility(.visible, for: .navigationBar)
@@ -84,7 +89,7 @@ struct CreatorView: View {
         .onGeometryChange(for: CGFloat.self) { geometry in
             geometry.frame(in: .global).minY
         } action: { headerBottom = $0 }
-        .onChange(of: avatarURL) { _, _ in artworkPalette = .fallback }
+        .onChange(of: avatarURL) { _, _ in extractedArtworkPalette = .fallback }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: artworkPalette)
         .task { await store.reload() }
         .refreshable { await store.reload() }
@@ -98,7 +103,7 @@ struct CreatorView: View {
                 contentType: .article,
                 size: 160,
                 onImageLoaded: { image in
-                    artworkPalette = ZineTheme.ArtworkPalette.make(from: image)
+                    extractedArtworkPalette = ZineTheme.ArtworkPalette.make(from: image)
                 }
             )
 

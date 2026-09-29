@@ -324,11 +324,11 @@ final class HomeTests: XCTestCase {
         )
     }
 
-    func testFeaturedArticleRouteOpensArticleReaderDirectly() {
+    func testFeaturedArticleRouteResumesArticleContent() {
         let article = makeHomeItem(id: "featured", minutes: 8, summary: "Useful context.")
-        let route = HomeNavigationRoute.articleReader(article, sectionID: "featured-article")
+        let route = HomeNavigationRoute.resumeArticle(article, sectionID: "featured-article")
 
-        XCTAssertEqual(route.destination, .articleReader(article))
+        XCTAssertEqual(route.destination, .resumeArticle(article))
         XCTAssertEqual(route.sourceID, "featured-article-featured")
     }
 

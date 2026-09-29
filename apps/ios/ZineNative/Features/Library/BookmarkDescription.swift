@@ -8,7 +8,8 @@ enum BookmarkDescription {
     static func attributedText(
         _ text: String,
         youtubeURL: URL? = nil,
-        duration: Int? = nil
+        duration: Int? = nil,
+        linkColor: Color = ZineTheme.bookmarkDescriptionLink
     ) -> AttributedString {
         var result = AttributedString(text)
         let matches = detector?.matches(
@@ -25,7 +26,7 @@ enum BookmarkDescription {
             else { continue }
 
             result[range].link = url
-            result[range].foregroundColor = ZineTheme.bookmarkDescriptionLink
+            result[range].foregroundColor = linkColor
             result[range].font = .body.weight(.medium)
         }
         if let youtubeURL {
@@ -35,7 +36,7 @@ enum BookmarkDescription {
                       let range = Range(stringRange, in: result)
                 else { continue }
                 result[range].link = chapter.url
-                result[range].foregroundColor = ZineTheme.bookmarkDescriptionLink
+                result[range].foregroundColor = linkColor
                 result[range].font = .body.weight(.medium)
             }
         }
