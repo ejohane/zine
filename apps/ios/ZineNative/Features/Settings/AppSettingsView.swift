@@ -1,3 +1,4 @@
+import AuthenticationServices
 import ClerkKit
 import ClerkKitUI
 import Observation
@@ -14,6 +15,28 @@ final class SettingsStore {
     var isSignOutConfirmationPresented = false
     private(set) var isSigningOut = false
     private(set) var signOutError: String?
+    private(set) var isConnectingApple = false
+    private(set) var appleConnectionError: String?
+
+    func connectApple(using action: () async throws -> Void) async {
+        isConnectingApple = true
+        appleConnectionError = nil
+        defer { isConnectingApple = false }
+
+        do {
+            try await action()
+        } catch is CancellationError {
+            return
+        } catch let error as ASAuthorizationError where error.code == .canceled {
+            return
+        } catch {
+            appleConnectionError = error.localizedDescription
+        }
+    }
+
+    func dismissAppleConnectionError() {
+        appleConnectionError = nil
+    }
 
     func requestSignOut() {
         isSignOutConfirmationPresented = true
@@ -50,6 +73,7 @@ struct AppSettingsView: View {
     @Environment(Clerk.self) private var clerk
     @Environment(\.zineTabNavigationActions) private var navigation
     @State private var store = SettingsStore()
+    @State private var appleConnectedUserID: String?
     @AppStorage(PodcastPlayer.preferenceKey) private var podcastPlayer = PodcastPlayer.overcast.rawValue
 
     init(
@@ -93,6 +117,11 @@ struct AppSettingsView: View {
         } message: {
             Text(store.signOutError ?? "Please try again.")
         }
+        .alert("Couldn’t connect Apple", isPresented: appleConnectionErrorBinding) {
+            Button("OK", role: .cancel) { store.dismissAppleConnectionError() }
+        } message: {
+            Text(store.appleConnectionError ?? "Please try again.")
+        }
     }
 
     private var settingsContent: some View {
@@ -122,6 +151,7 @@ struct AppSettingsView: View {
 
                 VStack(alignment: .leading, spacing: 12) {
                     settingsSectionTitle("Account")
+                    appleSignInCard
                     signOutButton
                 }
             }
@@ -287,6 +317,59 @@ struct AppSettingsView: View {
         }
     }
 
+    private var appleSignInCard: some View {
+        Button {
+            guard let user = clerk.user, !hasAppleConnection else { return }
+            Task {
+                await store.connectApple {
+                    try await user.connectAppleAccount()
+                    appleConnectedUserID = user.id
+                    _ = try? await user.reload()
+                }
+            }
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "apple.logo")
+                    .font(.title3)
+                    .frame(width: 34)
+                    .foregroundStyle(ZineTheme.primaryText)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(hasAppleConnection ? "Apple connected" : "Connect Sign in with Apple")
+                        .font(.system(.headline, design: .rounded, weight: .bold))
+                        .foregroundStyle(ZineTheme.primaryText)
+                    Text(hasAppleConnection
+                         ? "You can sign in to this Zine account with Apple."
+                         : "Keep this library when you sign in with Apple.")
+                        .font(.system(.subheadline, design: .rounded))
+                        .foregroundStyle(ZineTheme.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 4)
+                if store.isConnectingApple {
+                    ProgressView()
+                } else if hasAppleConnection {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(ZineTheme.brandAccent)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ZineTheme.tertiaryText)
+                }
+            }
+            .padding(16)
+            .background(ZineTheme.surface, in: .rect(cornerRadius: 18))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(ZineTheme.border.opacity(0.65), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(hasAppleConnection || store.isConnectingApple)
+        .accessibilityIdentifier("settings-connect-apple")
+    }
+
     private var signOutButton: some View {
         Button(role: .destructive) {
             store.requestSignOut()
@@ -338,6 +421,15 @@ struct AppSettingsView: View {
         clerk.user?.primaryEmailAddress?.emailAddress ?? "Signed in to Zine"
     }
 
+    private var hasAppleConnection: Bool {
+        if appleConnectedUserID == clerk.user?.id, appleConnectedUserID != nil {
+            return true
+        }
+        return clerk.user?.externalAccounts.contains { account in
+            OAuthProvider(strategy: account.provider) == .apple
+        } ?? false
+    }
+
     private var accountInitials: String {
         let initials = accountName.split(separator: " ").prefix(2).compactMap(\.first)
         return initials.isEmpty ? "Z" : String(initials)
@@ -347,6 +439,13 @@ struct AppSettingsView: View {
         Binding(
             get: { store.signOutError != nil },
             set: { if !$0 { store.dismissSignOutError() } }
+        )
+    }
+
+    private var appleConnectionErrorBinding: Binding<Bool> {
+        Binding(
+            get: { store.appleConnectionError != nil },
+            set: { if !$0 { store.dismissAppleConnectionError() } }
         )
     }
 }

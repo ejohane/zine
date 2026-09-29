@@ -47,6 +47,32 @@ struct SettingsTests {
         store.dismissSignOutError()
         #expect(store.signOutError == nil)
     }
+
+    @MainActor
+    @Test func appleConnectionCancellationDoesNotShowAnError() async {
+        let store = SettingsStore()
+
+        await store.connectApple {
+            throw CancellationError()
+        }
+
+        #expect(!store.isConnectingApple)
+        #expect(store.appleConnectionError == nil)
+    }
+
+    @MainActor
+    @Test func failedAppleConnectionCanBeRetried() async {
+        let store = SettingsStore()
+
+        await store.connectApple {
+            throw SettingsTestError.rejected
+        }
+        #expect(!store.isConnectingApple)
+        #expect(store.appleConnectionError == SettingsTestError.rejected.localizedDescription)
+
+        await store.connectApple {}
+        #expect(store.appleConnectionError == nil)
+    }
 }
 
 private enum SettingsTestError: Error, LocalizedError {

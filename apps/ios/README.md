@@ -6,9 +6,22 @@ production data as the rest of the product.
 
 ## Configure
 
-The production Clerk publishable key, native application registration, callback
-scheme, associated domain, Apple Team ID, and Sign in with Apple entitlement are
-configured for `app.zine.native`.
+The production Clerk publishable key, callback scheme, associated domain, Apple
+Team ID, and Sign in with Apple entitlement are configured in this project for
+`app.zine.native`. The production Clerk instance registers that bundle ID and
+`app.zine.native://callback`, and enables Apple for sign-up and sign-in. Apple
+Developer enables Sign in with Apple on the native App ID. The web Services ID
+`app.myzine.web` registers `clerk.myzine.app` and
+`https://clerk.myzine.app/v1/oauth_callback`; Clerk has the matching Services ID,
+Team ID, Key ID, and private key. Apple's private email relay registers Clerk's
+sender address.
+
+`AuthView` shows the native Apple option. Before signing out, an existing reader
+can use Settings → Account → Connect Sign in with Apple to attach Apple to the
+current Clerk account. This also covers Apple's Hide My Email choice, which may
+not match the account's existing email. Check that the Clerk user ID and Library
+stay the same after signing back in. The web client uses the same production
+Clerk instance and shows Apple on its sign-in screen.
 
 For the normal Simulator development flow, run `ZINE_DEV_HOST=localhost bun run
 dev:worktree` from the repository root. It supplies the selected local API URL
