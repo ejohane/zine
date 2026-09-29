@@ -1,7 +1,15 @@
 #!/usr/bin/env bun
 import { execFile, execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
@@ -36,6 +44,13 @@ const LOCAL_USER_ID = resolveLocalUserId();
 const LOCAL_EMAIL = 'dev@example.com';
 const ARTICLE_BODY_TRANSFER_CONCURRENCY = 6;
 const LOCAL_R2_RESTORE_CONCURRENCY = 1;
+// This migration's checked-in SQL differs from the bytes recorded when production applied it.
+// Keep the exception exact and verify its tables and indexes in the imported schema.
+const HISTORICAL_PRODUCTION_MIGRATION = {
+  name: '0023_add_editorial_experiments.sql',
+  fileHash: '4555e60939a418ff8856298853b425840543f59afacd8bb553859a90f3ebb51e',
+  appliedHash: '99b6e50ea8534644202a2bb531d300614c09098c06363fbb3f7c25869911cac0',
+};
 
 const SUPPORTED_ARGS = new Set([
   '--yes',
@@ -211,10 +226,10 @@ function exportProductionD1() {
   }
 
   rmSync(RAW_SQL, { force: true });
-  run(
+  runCaptured(
     'bun',
     ['wrangler', 'd1', 'export', PROD_DATABASE, '--env', PROD_ENV, '--remote', '--output', RAW_SQL],
-    { cwd: WORKER_DIR }
+    { cwd: WORKER_DIR, successMessage: 'Production D1 export downloaded.' }
   );
 }
 
@@ -762,6 +777,7 @@ function buildStagedLocalD1() {
       successMessage: 'Staged local D1 snapshot imported.',
     }
   );
+  reconcileStagedMigrationLedger();
   runCaptured(
     'bun',
     ['wrangler', 'd1', 'migrations', 'apply', 'DB', '--local', '--persist-to', STAGED_STATE_DIR],
@@ -770,6 +786,75 @@ function buildStagedLocalD1() {
       successMessage: 'Staged local D1 migrations applied.',
     }
   );
+}
+
+function reconcileStagedMigrationLedger() {
+  const sqliteFiles = readdirSync(STAGED_STATE_DIR, { recursive: true }).filter((path) =>
+    path.endsWith('.sqlite')
+  );
+  if (sqliteFiles.length !== 1) {
+    throw new Error(`Expected one staged D1 database, found ${sqliteFiles.length}.`);
+  }
+
+  const journal = JSON.parse(
+    readFileSync(join(WORKER_DIR, 'src/db/migrations/meta/_journal.json'), 'utf8')
+  );
+  const db = new Database(join(STAGED_STATE_DIR, sqliteFiles[0]));
+  try {
+    const applied = new Map(
+      db
+        .query('SELECT created_at, hash FROM __drizzle_migrations')
+        .all()
+        .map((row) => [row.created_at, row.hash])
+    );
+    let missingMigrationFound = false;
+    const verifiedNames = [];
+
+    for (const entry of journal.entries) {
+      const fileName = `${entry.tag}.sql`;
+      const migrationSQL = readFileSync(join(WORKER_DIR, 'src/db/migrations', fileName), 'utf8');
+      const hash = createHash('sha256').update(migrationSQL).digest('hex');
+      const appliedHash = applied.get(entry.when);
+
+      if (!appliedHash) {
+        missingMigrationFound = true;
+        continue;
+      }
+      if (
+        missingMigrationFound ||
+        (appliedHash !== hash &&
+          !matchesHistoricalProductionMigration(db, fileName, hash, appliedHash, migrationSQL))
+      ) {
+        throw new Error(`Production migration history does not match ${fileName}.`);
+      }
+      verifiedNames.push(fileName);
+    }
+
+    const insert = db.query('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)');
+    const markVerified = db.transaction(() => {
+      for (const fileName of verifiedNames) insert.run(fileName);
+    });
+    markVerified();
+    console.log(`Reconciled ${verifiedNames.length} verified production migrations in staged D1.`);
+  } finally {
+    db.close();
+  }
+}
+
+function matchesHistoricalProductionMigration(db, fileName, fileHash, appliedHash, sql) {
+  const expected = HISTORICAL_PRODUCTION_MIGRATION;
+  if (
+    fileName !== expected.name ||
+    fileHash !== expected.fileHash ||
+    appliedHash !== expected.appliedHash
+  ) {
+    return false;
+  }
+
+  const createdObjects = [...sql.matchAll(/CREATE (?:UNIQUE )?(TABLE|INDEX) `([^`]+)`/g)];
+  if (createdObjects.length === 0) return false;
+  const lookup = db.query('SELECT 1 FROM sqlite_master WHERE type = ? AND name = ?');
+  return createdObjects.every(([, type, name]) => lookup.get(type.toLowerCase(), name) !== null);
 }
 
 function cleanupRawArtifacts() {
