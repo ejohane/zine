@@ -1,6 +1,10 @@
 #if DEBUG
 import SwiftUI
 
+private enum ScreenshotSettingsRoute: Hashable {
+    case root
+}
+
 struct ScreenshotHomeTabShell: View {
     private let client = APIClient(
         baseURL: URL(string: "https://example.invalid")!,
@@ -24,7 +28,7 @@ struct ScreenshotHomeTabShell: View {
             )
         } else if ProcessInfo.processInfo.arguments.contains("-screenshot-home-pushed-fixture") {
             initialPath.append(
-                HomeNavigationRoute.articleReader(
+                HomeNavigationRoute.resumeArticle(
                     ScreenshotHomeFixtures.featuredArticle,
                     sectionID: "featured"
                 )
@@ -54,13 +58,7 @@ struct ScreenshotHomeTabShell: View {
                     )
                 }
 
-                Tab("Settings", systemImage: "gearshape", value: 2) {
-                    Text("Settings")
-                        .navigationTitle("Settings")
-                        .zineScreenChrome()
-                }
-
-                Tab("Search", systemImage: "magnifyingglass", value: 3) {
+                Tab("Search", systemImage: "magnifyingglass", value: 2) {
                     Text("Search")
                         .navigationTitle("Search")
                         .zineScreenChrome()
@@ -73,7 +71,28 @@ struct ScreenshotHomeTabShell: View {
                 compactTitle: selectedCompactRootTitle?.title,
                 collapseProgress: selectedCompactRootTitle?.progress ?? 0
             )
+            .toolbar {
+                if selectedTab == 0 && navigationPath.isEmpty {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            navigationPath.append(ScreenshotSettingsRoute.root)
+                        } label: {
+                            Image(systemName: "gearshape")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(ZineTheme.primaryText)
+                                .frame(width: 44, height: 44)
+                        }
+                        .accessibilityLabel("Settings")
+                        .accessibilityIdentifier("home-settings-button")
+                    }
+                }
+            }
             .environment(\.zineTabNavigationActions, navigationActions)
+            .navigationDestination(for: ScreenshotSettingsRoute.self) { _ in
+                Text("Settings")
+                    .navigationTitle("Settings")
+                    .zinePushedDestinationChrome()
+            }
             .navigationDestination(for: HomeNavigationRoute.self) { route in
                 fixtureDestination(for: route)
                     .navigationTransition(
@@ -92,8 +111,6 @@ struct ScreenshotHomeTabShell: View {
         switch selectedTab {
         case 0, 1:
             ""
-        case 2:
-            "Settings"
         default:
             "Search"
         }
@@ -124,58 +141,12 @@ struct ScreenshotHomeTabShell: View {
             BookmarkDetailView(item: item, client: client) { _ in }
         case .bookmark(let bookmark):
             BookmarkDetailView(bookmark: bookmark, client: client) { _ in }
-        case .articleReader(let item):
-            fixtureArticleReader(for: item)
+        case .resumeArticle(let item):
+            BookmarkDetailView(item: item, client: client, resumesArticleReading: true) { _ in }
         }
     }
 
-    private func fixtureArticleReader(for item: HomeItem) -> some View {
-        let metadata = ArticleReaderMetadata(
-            bookmarkID: item.id,
-            title: item.title,
-            creator: item.creator,
-            creatorImageURL: item.creatorImageUrl,
-            canonicalURL: item.canonicalUrl,
-            readingTimeMinutes: item.readingTimeMinutes,
-            initialProgress: item.progress,
-            isFinished: false,
-            tags: []
-        )
-        let response = ArticleContentResponse(
-            content: """
-            <p>The next generation of tools will be shaped less by universal workflows and more by software that learns the context, taste, and intent of one person.</p>
-            <h2>Software that adapts to one person</h2>
-            <p>Personal agents change how interfaces should expose context, decisions, and useful next steps. The best tools will make that relationship understandable without making the machinery feel heavy.</p>
-            """,
-            articleBody: ArticleBodyStatus(
-                availability: .available,
-                pipelineStatus: .available,
-                schemaVersion: 1,
-                extractorVersion: 1,
-                sourceKind: "PUBLIC_WEB",
-                contentHash: "home-featured-article-fixture",
-                wordCount: 820,
-                readingTimeMinutes: item.readingTimeMinutes,
-                qualityScore: 0.98,
-                qualityWarnings: [],
-                lastErrorCode: nil,
-                updatedAt: "2026-08-14T12:00:00Z"
-            ),
-            request: nil,
-            requestId: "home-fixture-request",
-            traceId: "home-fixture-trace"
-        )
 
-        return ArticleReaderView(
-            metadata: metadata,
-            client: APIClient(
-                baseURL: URL(string: "https://api.myzine.app")!,
-                tokenProvider: { "fixture-token" }
-            ),
-            initialPhase: .ready(ArticleReaderDocument(metadata: metadata, response: response)),
-            loadsOnAppear: false
-        )
-    }
 }
 
 struct ScreenshotHomeView: View {

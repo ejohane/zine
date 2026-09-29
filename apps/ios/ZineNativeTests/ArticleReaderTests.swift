@@ -1,4 +1,7 @@
 import Foundation
+import UIKit
+import SwiftUI
+import WebKit
 import XCTest
 @testable import ZineNative
 
@@ -29,6 +32,188 @@ final class ArticleReaderTests: XCTestCase {
         XCTAssertTrue(html.contains("script-src 'none'"))
         XCTAssertTrue(html.contains("frame-src 'none'"))
         XCTAssertTrue(html.contains("<article><p>Readable body</p></article>"))
+    }
+
+    func testBookmarkEndpointUsesActualActionPositionForDifferentArtworkAndTitles() {
+        for actionTop: CGFloat in [300, 650, 910] {
+            let travel = BookmarkDetailScrollExtent.collapseTravel(
+                actionTop: actionTop, headerBottom: 100, scrollOrigin: 0
+            )
+            XCTAssertEqual(actionTop - travel, 100, accuracy: 0.001)
+            // At the end of scrolling, the button begins at the bottom of navigation, with metadata above it.
+            let viewport: CGFloat = 800
+            let safeAreaBottom: CGFloat = 34
+            let requiredContentHeight = viewport - safeAreaBottom + travel
+            XCTAssertEqual(requiredContentHeight - viewport + safeAreaBottom, travel, accuracy: 0.001)
+        }
+        XCTAssertEqual(BookmarkDetailScrollExtent.collapseTravel(
+            actionTop: 300, headerBottom: 100, scrollOrigin: 20
+        ), 220)
+    }
+
+    func testBookmarkEndpointAccountsForTheMeasuredContentScreenOrigin() {
+        for localButtonTop: CGFloat in [300, 650, 910] {
+            for contentOrigin: CGFloat in [0, 59, 108] {
+                let headerBottom: CGFloat = 150
+                let travel = BookmarkDetailScrollExtent.collapseTravel(
+                    actionTop: localButtonTop, headerBottom: headerBottom, scrollOrigin: contentOrigin
+                )
+                XCTAssertEqual(localButtonTop + contentOrigin - travel, headerBottom, accuracy: 0.001)
+                XCTAssertLessThan(localButtonTop + contentOrigin - 24 - travel, headerBottom)
+            }
+        }
+    }
+
+    @MainActor
+    func testShortBookmarkScrollReachesButtonBelowNativeNavigation() async throws {
+        for heroHeight: CGFloat in [160, 460] {
+            let probe = BookmarkEndpointProbe()
+            let host = UIHostingController(rootView: BookmarkEndpointTestView(heroHeight: heroHeight, probe: probe))
+            let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+            window.rootViewController = host
+            window.makeKeyAndVisible()
+            defer { window.isHidden = true; window.rootViewController = nil }
+            func findScroll(in view: UIView) -> UIScrollView? {
+                if let scroll = view as? UIScrollView { return scroll }
+                return view.subviews.lazy.compactMap { findScroll(in: $0) }.first
+            }
+            var scroll: UIScrollView?
+            for _ in 0..<50 {
+                host.view.layoutIfNeeded()
+                scroll = findScroll(in: host.view)
+                if probe.actionTop > 0, scroll != nil { break }
+                try await Task.sleep(for: .milliseconds(20))
+            }
+            let actualScroll = try XCTUnwrap(scroll)
+            try await Task.sleep(for: .milliseconds(150))
+            // Scroll once, then let UIKit's animation settle without forcing the
+            // offset again. Repeated setContentOffset calls can mask snap-back.
+            let end = actualScroll.contentSize.height - actualScroll.bounds.height + actualScroll.adjustedContentInset.bottom
+            actualScroll.setContentOffset(CGPoint(x: 0, y: end), animated: true)
+            try await Task.sleep(for: .milliseconds(750))
+            host.view.layoutIfNeeded()
+            XCTAssertEqual(actualScroll.contentOffset.y, end, accuracy: 1)
+            try await Task.sleep(for: .milliseconds(250))
+            XCTAssertEqual(actualScroll.contentOffset.y, end, accuracy: 1)
+            XCTAssertEqual(probe.actionTop, probe.headerBottom - 8, accuracy: 1, "Hero \(heroHeight), content \(actualScroll.contentSize), bounds \(actualScroll.bounds), inset \(actualScroll.adjustedContentInset), offset \(actualScroll.contentOffset)")
+        }
+    }
+
+    func testArtworkBottomRemainsInsideHeroWhileScrolling() {
+        for imageHeight: CGFloat in [180, 368] {
+            let heroHeight = 116 + imageHeight + BookmarkArtworkLayout.bottomSpacing
+            for scrollPosition: CGFloat in [0, -10, -108, -300, -700] {
+                let imageBottom = 116 + imageHeight + BookmarkArtworkLayout.parallaxOffset(for: scrollPosition)
+                XCTAssertLessThanOrEqual(imageBottom, heroHeight)
+            }
+        }
+        XCTAssertGreaterThan(BookmarkArtworkLayout.parallaxOffset(for: -10), 0)
+        XCTAssertEqual(BookmarkArtworkLayout.parallaxOffset(for: 20), -20)
+    }
+
+    func testBookmarkEndpointOnlyAddsMissingSpace() {
+        XCTAssertEqual(BookmarkDetailScrollExtent.collapseTravel(
+            actionTop: 90, headerBottom: 100, scrollOrigin: 0
+        ), 0)
+        XCTAssertEqual(BookmarkDetailScrollExtent.bottomInset(
+            viewportHeight: 800, contentHeight: 300, requiredOffset: 136
+        ), 636)
+        XCTAssertEqual(BookmarkDetailScrollExtent.bottomInset(
+            viewportHeight: 800, contentHeight: 1600, requiredOffset: 136
+        ), 0)
+        // UIKit's merged-header content begins at a negative header-height offset.
+        XCTAssertEqual(BookmarkDetailScrollExtent.bottomInset(
+            viewportHeight: 800, contentHeight: 200, requiredOffset: 136 - 500
+        ), 236)
+    }
+
+    @MainActor
+    func testMergedReaderHostsHeaderInTheArticleScrollView() async throws {
+        try await verifyMergedReaderEntry(resumesReading: false)
+    }
+
+    @MainActor
+    func testMergedReaderResumesSavedProgressBelowItsHeader() async throws {
+        try await verifyMergedReaderEntry(resumesReading: true)
+    }
+
+    @MainActor
+    private func verifyMergedReaderEntry(resumesReading: Bool) async throws {
+        let response = try JSONDecoder().decode(
+            ArticleContentResponse.self, from: Data(Self.availableJSON.replacingOccurrences(of: "Readable body", with: String(repeating: "Readable body with enough article text to scroll. ", count: 400)).utf8)
+        )
+        let document = ArticleReaderDocument(metadata: Self.metadata(), response: response)
+        let reader = ArticleHTMLView(
+            document: document, initialProgress: 0.4, initialPosition: nil,
+            fontScale: 1, fontFamily: .system,
+            onProgressChanged: { _ in }, onScrollSettled: { _ in },
+            onChromeVisibilityChanged: { _ in }, onPositionChanged: { _ in }, onOpenURL: { _ in },
+            bookmarkHeader: ArticleBookmarkReaderHeader(
+                content: AnyView(Text("Bookmark header").frame(height: 180)),
+                palette: .fallback, jumpRequest: 0, resumesReading: resumesReading, minimumScrollTravel: 180, onScroll: { _, _ in }
+            )
+        )
+        let host = UIHostingController(rootView: reader)
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil }
+        func webView(in view: UIView) -> WKWebView? {
+            if let web = view as? WKWebView { return web }
+            for child in view.subviews { if let web = webView(in: child) { return web } }
+            return nil
+        }
+        // Wait for WebKit layout and document navigation, not a fixed launch delay.
+        var web: WKWebView?
+        for _ in 0..<100 {
+            host.view.layoutIfNeeded()
+            web = webView(in: host.view)
+            if let web, !web.isLoading, web.scrollView.contentInset.top > 0,
+               (!resumesReading || web.scrollView.contentOffset.y > 0) { break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        let webView = try XCTUnwrap(web)
+        XCTAssertEqual(webView.scrollView.contentInset.top, 180, accuracy: 1)
+        if resumesReading {
+            XCTAssertGreaterThan(webView.scrollView.contentOffset.y, 0)
+            // The reader stores progress in DOM coordinates; UIKit's hosted
+            // header inset changes WebKit's viewport relative to its bounds.
+            let fraction = try await webView.evaluateJavaScript(
+                "window.scrollY / Math.max(1, document.documentElement.scrollHeight - window.innerHeight)"
+            )
+            // WebKit rounds the hosted viewport as its native header inset settles.
+            XCTAssertEqual(try XCTUnwrap(fraction as? Double), 0.4, accuracy: 0.01)
+        } else {
+            XCTAssertEqual(webView.scrollView.contentOffset.y, -180, accuracy: 1)
+        }
+        XCTAssertGreaterThanOrEqual(
+            webView.scrollView.contentSize.height + webView.scrollView.contentInset.bottom - webView.scrollView.bounds.height,
+            -0.5,
+            "Even a short article must allow its complete 180pt bookmark header to scroll away"
+        )
+        let nativeHeader = webView.scrollView.subviews.first { $0.frame.minY < 0 }
+        XCTAssertNotNil(nativeHeader, "Bookmark header must be inside the reader's existing scroll surface")
+        XCTAssertEqual(host.children.count, 1, "The hosted header must have view-controller containment")
+    }
+
+    func testMergedReaderKeepsPaletteAndOmitsDuplicateBookmarkHeader() throws {
+        let response = try JSONDecoder().decode(
+            ArticleContentResponse.self, from: Data(Self.availableJSON.utf8)
+        )
+        let palette = ZineTheme.ArtworkPalette(hue: 0.6, saturation: 0.6, brightness: 0.22)
+        let html = ArticleHTMLDocumentBuilder.makeHTML(
+            for: ArticleReaderDocument(metadata: Self.metadata(), response: response),
+            bookmarkPalette: palette
+        )
+        XCTAssertFalse(html.contains("<header>"))
+        XCTAssertFalse(html.contains("<h1>A dependable reader</h1>"))
+        XCTAssertTrue(html.contains("<main><article><p>Readable body</p></article></main>"))
+        XCTAssertTrue(html.contains("html, body { background: \(palette.readerBackgroundCSS)"))
+        XCTAssertTrue(html.contains("body { padding-top: 32px; }"))
+        XCTAssertTrue(html.contains("script-src 'none'"))
+        // Contextual overrides follow dark-mode rules, so system appearance cannot replace the creator color.
+        XCTAssertGreaterThan(html.range(of: "html, body { background:")!.lowerBound,
+                             html.range(of: "@media (prefers-color-scheme: dark)")!.lowerBound)
     }
 
     func testHTMLDocumentAppliesReaderFontScaleToTypographyOnly() throws {
@@ -712,5 +897,41 @@ private actor ArticleRequestGate {
         let pending = continuations
         continuations.removeAll()
         pending.forEach { $0.resume() }
+    }
+}
+
+@MainActor
+private final class BookmarkEndpointProbe {
+    var actionTop: CGFloat = 0
+    var headerBottom: CGFloat = 0
+}
+
+private struct BookmarkEndpointTestView: View {
+    let heroHeight: CGFloat
+    let probe: BookmarkEndpointProbe
+    var body: some View {
+        NavigationStack {
+            GeometryReader { viewport in
+                BookmarkDetailCollapsingScrollView(headerBottom: viewport.frame(in: .global).minY) {
+                    VStack(spacing: 0) {
+                        Color.clear.frame(height: heroHeight)
+                        VStack(spacing: 8) {
+                            Text("Episode title")
+                            Text("Creator")
+                            Text("Spotify · 11 min")
+                            Button("Open in Spotify") {}
+                                .frame(height: 50)
+                                .background(BookmarkDetailScrollTarget())
+                                .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { probe.actionTop = $0 }
+                                .padding(.top, 24)
+                            Text("Brief description")
+                        }
+                    }
+                }
+                .onGeometryChange(for: CGFloat.self) { _ in viewport.frame(in: .global).minY } action: { probe.headerBottom = $0 }
+            }
+            .navigationTitle("Episode title")
+            .navigationBarTitleDisplayMode(.inline)
+        }
     }
 }

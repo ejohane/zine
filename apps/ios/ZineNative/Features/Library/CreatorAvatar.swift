@@ -1,15 +1,23 @@
 import SwiftUI
+import UIKit
 
 struct CreatorAvatar: View {
     let imageUrl: URL?
     let creator: String
     let contentType: ContentType
     let size: CGFloat
+    var onImageLoaded: (@MainActor @Sendable (UIImage) -> Void)? = nil
 
     var body: some View {
         CachedRemoteImage(
             url: imageUrl,
-            targetSize: CGSize(width: size, height: size)
+            // Palette-bearing avatars use the same image processing request
+            // on creator and episode pages, regardless of their display size.
+            targetSize: CGSize(
+                width: onImageLoaded == nil ? size : 160,
+                height: onImageLoaded == nil ? size : 160
+            ),
+            onImageLoaded: onImageLoaded
         ) {
             fallback
         }
