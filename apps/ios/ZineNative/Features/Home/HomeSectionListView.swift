@@ -6,6 +6,10 @@ struct HomeSectionListView: View {
     let onContentChanged: () -> Void
     let onExternalOpen: (Bookmark) -> Void
     let tabReselection: Int
+    let title: String
+    let background: Color
+    let refreshRevision: Int
+    let onTitleCollapseProgressChanged: ((CGFloat) -> Void)?
 
     @State private var store: HomeSectionListStore
     @State private var contentType: ContentType?
@@ -20,13 +24,21 @@ struct HomeSectionListView: View {
         initialItems: [Bookmark] = [],
         onContentChanged: @escaping () -> Void = {},
         onExternalOpen: @escaping (Bookmark) -> Void = { _ in },
-        tabReselection: Int = 0
+        tabReselection: Int = 0,
+        title: String? = nil,
+        background: Color = ZineTheme.surface,
+        refreshRevision: Int = 0,
+        onTitleCollapseProgressChanged: ((CGFloat) -> Void)? = nil
     ) {
         self.route = route
         self.client = client
         self.onContentChanged = onContentChanged
         self.onExternalOpen = onExternalOpen
         self.tabReselection = tabReselection
+        self.title = title ?? route.title
+        self.background = background
+        self.refreshRevision = refreshRevision
+        self.onTitleCollapseProgressChanged = onTitleCollapseProgressChanged
         _store = State(initialValue: HomeSectionListStore(
             route: route,
             client: client,
@@ -41,14 +53,16 @@ struct HomeSectionListView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .principal) {
-                    CollapsedListTitle(
-                        title: route.title,
-                        progress: titleCollapseProgress
-                    )
+                if onTitleCollapseProgressChanged == nil {
+                    ToolbarItem(placement: .principal) {
+                        CollapsedListTitle(
+                            title: title,
+                            progress: titleCollapseProgress
+                        )
+                    }
                 }
             }
-            .contentTypeFilterChrome(background: ZineTheme.surface)
+            .contentTypeFilterChrome(background: background)
             .navigationDestination(for: Bookmark.self) { bookmark in
                 BookmarkDetailView(
                     bookmark: bookmark,
@@ -74,7 +88,7 @@ struct HomeSectionListView: View {
                 )
                 .zinePushedDestinationChrome()
             }
-            .task(id: contentType) {
+            .task(id: ReloadKey(contentType: contentType, revision: refreshRevision)) {
                 await store.reload(contentType: contentType)
             }
             .alert("Couldn’t update inbox", isPresented: actionErrorBinding) {
@@ -90,9 +104,9 @@ struct HomeSectionListView: View {
         ScrollViewReader { proxy in
             List {
                 CollapsingListTitle(
-                    title: route.title,
+                    title: title,
                     progress: titleCollapseProgress,
-                    background: ZineTheme.surface
+                    background: background
                 )
                 .id(ScrollAnchor.top)
 
@@ -101,7 +115,7 @@ struct HomeSectionListView: View {
                 } header: {
                     ContentTypeFilterBar(
                         selection: filterSelection,
-                        background: ZineTheme.surface
+                        background: background
                     )
                         .textCase(nil)
                         .listRowInsets(EdgeInsets())
@@ -109,12 +123,13 @@ struct HomeSectionListView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
-            .background(ZineTheme.surface)
+            .background(background)
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
                 let offset = geometry.contentOffset.y + geometry.contentInsets.top
                 return FilteredListScrollState.collapseProgress(scrollOffset: offset)
             } action: { _, progress in
                 titleCollapseProgress = progress
+                onTitleCollapseProgressChanged?(progress)
             }
             .onChange(of: tabReselection) {
                 handleTabReselection(using: proxy)
@@ -132,6 +147,11 @@ struct HomeSectionListView: View {
             }
             .foregroundStyle(ZineTheme.primaryText)
         }
+    }
+
+    private struct ReloadKey: Equatable {
+        let contentType: ContentType?
+        let revision: Int
     }
 
     private enum ScrollAnchor {
@@ -164,12 +184,12 @@ struct HomeSectionListView: View {
         if route == .inbox, store.isResolvingInboxFilter, store.items.isEmpty {
             ProgressView("Checking inbox…")
                 .frame(maxWidth: .infinity, minHeight: 80)
-                .listRowBackground(ZineTheme.surface)
+                .listRowBackground(background)
                 .listRowSeparator(.hidden)
         } else if store.isLoading && store.items.isEmpty && route != .inbox {
             FilteredListLoadingRow(
-                label: "Loading \(route.title.lowercased())…",
-                background: ZineTheme.surface
+                label: "Loading \(title.lowercased())…",
+                background: background
             )
         } else if let error = store.errorMessage, store.items.isEmpty {
             ContentUnavailableView {
@@ -182,7 +202,7 @@ struct HomeSectionListView: View {
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 320)
-            .listRowBackground(ZineTheme.surface)
+            .listRowBackground(background)
             .listRowSeparator(.hidden)
         } else if store.items.isEmpty {
             ContentUnavailableView(
@@ -195,7 +215,7 @@ struct HomeSectionListView: View {
                 )
             )
             .frame(maxWidth: .infinity, minHeight: 320)
-            .listRowBackground(ZineTheme.surface)
+            .listRowBackground(background)
             .listRowSeparator(.hidden)
         } else {
             ForEach(store.items) { bookmark in
@@ -203,7 +223,7 @@ struct HomeSectionListView: View {
                     BookmarkRow(bookmark: bookmark)
                 }
                 .listRowInsets(EdgeInsets(top: 6, leading: 18, bottom: 6, trailing: 14))
-                .listRowBackground(ZineTheme.surface)
+                .listRowBackground(background)
                 .listRowSeparator(.hidden)
                 .matchedTransitionSource(id: bookmark.id, in: bookmarkTransition)
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {

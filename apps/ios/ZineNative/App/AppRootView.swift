@@ -55,6 +55,7 @@ private struct AuthenticatedAppView: View {
     private enum AppTab: Hashable {
         case home
         case library
+        case inbox
         case search
     }
 
@@ -75,6 +76,8 @@ private struct AuthenticatedAppView: View {
     @State private var selectedTab = AppTab.home
     @State private var navigationPath = NavigationPath()
     @State private var homeTabReselection = 0
+    @State private var inboxTabReselection = 0
+    @State private var inboxTitleCollapseProgress: CGFloat = 0
     @State private var libraryTabReselection = 0
     @State private var homeTitleCollapseProgress: CGFloat = 0
     @State private var libraryTitleCollapseProgress: CGFloat = 0
@@ -126,6 +129,23 @@ private struct AuthenticatedAppView: View {
                         onTitleCollapseProgressChanged: { homeTitleCollapseProgress = $0 },
                         transitionNamespace: navigationTransition,
                         registersNavigationDestinations: false
+                    )
+                    .tint(ZineTheme.brandAccent)
+                }
+
+                Tab("Inbox", systemImage: "tray", value: AppTab.inbox) {
+                    HomeSectionListView(
+                        route: .inbox,
+                        client: client,
+                        inboxCache: inboxCache,
+                        initialItems: homeStore.inboxPreviewItems,
+                        onContentChanged: markBookmarkContentChanged,
+                        onExternalOpen: handleExternalOpen,
+                        tabReselection: inboxTabReselection,
+                        title: "Inbox",
+                        background: ZineTheme.canvas,
+                        refreshRevision: libraryRevision,
+                        onTitleCollapseProgressChanged: { inboxTitleCollapseProgress = $0 }
                     )
                     .tint(ZineTheme.brandAccent)
                 }
@@ -293,7 +313,7 @@ private struct AuthenticatedAppView: View {
 
     private var selectedRootTitle: String {
         switch selectedTab {
-        case .home, .library:
+        case .home, .library, .inbox:
             ""
         case .search:
             "Search"
@@ -304,6 +324,8 @@ private struct AuthenticatedAppView: View {
         switch selectedTab {
         case .home:
             ("Home", homeTitleCollapseProgress)
+        case .inbox:
+            ("Inbox", inboxTitleCollapseProgress)
         case .library:
             ("Library", libraryTitleCollapseProgress)
         case .search:
@@ -314,7 +336,13 @@ private struct AuthenticatedAppView: View {
     private var tabNavigationActions: ZineTabNavigationActions {
         ZineTabNavigationActions(
             home: { navigationPath.append($0) },
-            homeSection: { navigationPath.append($0) },
+            homeSection: { route in
+                if route == .inbox {
+                    selectedTab = .inbox
+                } else {
+                    navigationPath.append(route)
+                }
+            },
             bookmark: { navigationPath.append($0) },
             settings: { navigationPath.append($0) }
         )
@@ -324,6 +352,8 @@ private struct AuthenticatedAppView: View {
         switch tab {
         case .home:
             homeTabReselection += 1
+        case .inbox:
+            inboxTabReselection += 1
         case .library:
             libraryTabReselection += 1
         case .search:
