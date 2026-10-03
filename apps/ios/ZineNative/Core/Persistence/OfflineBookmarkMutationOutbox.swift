@@ -248,7 +248,11 @@ actor OfflineBookmarkMutationOutbox {
                 at: fileURL.deletingLastPathComponent(),
                 withIntermediateDirectories: true
             )
+            #if os(iOS)
             try data.write(to: fileURL, options: [.atomic, .completeFileProtection])
+            #else
+            try data.write(to: fileURL, options: .atomic)
+            #endif
             var resourceValues = URLResourceValues()
             resourceValues.isExcludedFromBackup = true
             var storedFileURL = fileURL

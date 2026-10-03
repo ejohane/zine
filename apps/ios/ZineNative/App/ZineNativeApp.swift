@@ -70,7 +70,27 @@ struct ZineNativeApp: App {
     @ViewBuilder
     private var rootView: some View {
 #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-screenshot-bookmark-detail-fixture") {
+        if ProcessInfo.processInfo.arguments.contains("-screenshot-gmail-connected-fixture") {
+            ScreenshotOnboardingNewsletterView(connected: true)
+        } else if ProcessInfo.processInfo.arguments.contains("-screenshot-gmail-disconnected-fixture") {
+            ScreenshotOnboardingNewsletterView(connected: false)
+        } else if ProcessInfo.processInfo.arguments.contains("-screenshot-x-connected-fixture") {
+            ScreenshotOnboardingXView(connected: true)
+        } else if ProcessInfo.processInfo.arguments.contains("-screenshot-x-disconnected-fixture") {
+            ScreenshotOnboardingXView(connected: false)
+        } else if ProcessInfo.processInfo.arguments.contains("-screenshot-rss-feeds-fixture") {
+            ScreenshotOnboardingRssView(showsFeeds: true)
+        } else if ProcessInfo.processInfo.arguments.contains("-screenshot-rss-empty-fixture") {
+            ScreenshotOnboardingRssView(showsFeeds: false)
+        } else if ProcessInfo.processInfo.arguments.contains("-screenshot-youtube-subscriptions-connected-fixture") {
+            ScreenshotOnboardingProviderSubscriptionsView(showsConnectedSubscriptions: true)
+        } else if ProcessInfo.processInfo.arguments.contains("-screenshot-youtube-subscriptions-fixture") {
+            ScreenshotOnboardingProviderSubscriptionsView(showsConnectedSubscriptions: false)
+        } else if ProcessInfo.processInfo.arguments.contains("-screenshot-choose-sources-connected-fixture") {
+            ScreenshotChooseSourcesView(showsCompletedSource: true)
+        } else if ProcessInfo.processInfo.arguments.contains("-screenshot-choose-sources-fixture") {
+            ScreenshotChooseSourcesView(showsCompletedSource: false)
+        } else if ProcessInfo.processInfo.arguments.contains("-screenshot-bookmark-detail-fixture") {
             ScreenshotBookmarkDetailView()
         } else if ProcessInfo.processInfo.arguments.contains("-screenshot-article-reader-fixture") {
             ScreenshotArticleReaderView(unavailable: false)

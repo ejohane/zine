@@ -42,16 +42,24 @@ struct AppRootView: View {
             if let user = clerk.user {
                 AuthenticatedAppView(
                     configuration: configuration,
-                    userID: user.id
+                    userID: user.id,
+                    userCreatedAt: user.createdAt,
+                    userEmail: user.primaryEmailAddress?.emailAddress
                 )
+                .id("\(user.id)-\(user.primaryEmailAddress?.emailAddress ?? "")")
             } else {
-                AuthView(isDismissible: false)
+                ZineAuthEntryView()
             }
         }
     }
 }
 
 private struct AuthenticatedAppView: View {
+    private enum SourcesPresentation {
+        case firstUse
+        case replay
+    }
+
     private enum AppTab: Hashable {
         case home
         case library
@@ -64,6 +72,8 @@ private struct AuthenticatedAppView: View {
 
     @Environment(\.scenePhase) private var scenePhase
 
+    private let configuration: AppConfiguration
+    private let userID: String
     private let client: APIClient
     private let inboxCache: InboxCache
     private let libraryCache: LibraryCache
@@ -71,6 +81,7 @@ private struct AuthenticatedAppView: View {
 
     @State private var commandSession: NativeCommandSession
     @State private var homeStore: HomeStore
+    @State private var sourcesPresentation: SourcesPresentation?
     @State private var search = ""
     @State private var selectedTab = AppTab.home
     @State private var navigationPath = NavigationPath()
@@ -85,7 +96,19 @@ private struct AuthenticatedAppView: View {
     @State private var externalOpenError: String?
     @Namespace private var navigationTransition
 
-    init(configuration: AppConfiguration, userID: String) {
+    init(configuration: AppConfiguration, userID: String, userCreatedAt: Date, userEmail: String?) {
+        self.configuration = configuration
+        self.userID = userID
+        let replayRequested = SourcesOnboardingReplayAccess.consumePreviewRequest(
+            verifiedEmail: userEmail
+        )
+        let shouldPresentFirstUse = SourcesOnboardingProgress.shouldPresent(
+            userID: userID,
+            createdAt: userCreatedAt
+        )
+        _sourcesPresentation = State(initialValue: replayRequested
+            ? .replay
+            : (shouldPresentFirstUse ? .firstUse : nil))
         let bookmarkMutationOutbox = OfflineBookmarkMutationOutbox(userID: userID)
         let client = APIClient(
             baseURL: configuration.apiBaseURL,
@@ -112,6 +135,19 @@ private struct AuthenticatedAppView: View {
     }
 
     var body: some View {
+        if let sourcesPresentation {
+            ChooseSourcesView(client: client, configuration: configuration) {
+                if sourcesPresentation == .firstUse {
+                    SourcesOnboardingProgress.markCompleted(userID: userID)
+                }
+                self.sourcesPresentation = nil
+            }
+        } else {
+            appShell
+        }
+    }
+
+    private var appShell: some View {
         NavigationStack(path: $navigationPath) {
             TabView(selection: tabSelection) {
                 Tab("Home", systemImage: "house", value: AppTab.home) {

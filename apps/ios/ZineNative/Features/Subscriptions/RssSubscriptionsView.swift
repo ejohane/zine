@@ -1,9 +1,27 @@
 import Observation
 import SwiftUI
 
+struct RssSubscriptionsClient {
+    var load: () async throws -> RssSubscriptionsResponse
+    var add: (String) async throws -> Void
+    var update: (String, String) async throws -> Void
+    var remove: (String) async throws -> Void
+    var sync: (String) async throws -> SubscriptionSyncResponse
+
+    static func live(_ apiClient: APIClient) -> Self {
+        Self(
+            load: { try await apiClient.listRssFeeds() },
+            add: { try await apiClient.addRssFeed(url: $0) },
+            update: { try await apiClient.updateRssFeed(id: $0, action: $1) },
+            remove: { try await apiClient.removeRssFeed(id: $0) },
+            sync: { try await apiClient.syncRssFeed(id: $0) }
+        )
+    }
+}
+
 @MainActor
 @Observable
-private final class RssSubscriptionsStore {
+final class RssSubscriptionsStore {
     private(set) var response: RssSubscriptionsResponse?
     private(set) var isLoading = false
     private(set) var isAdding = false
@@ -11,9 +29,13 @@ private final class RssSubscriptionsStore {
     private(set) var errorMessage: String?
     private(set) var actionMessage: String?
 
-    private let client: APIClient
+    private let client: RssSubscriptionsClient
 
     init(client: APIClient) {
+        self.client = .live(client)
+    }
+
+    init(client: RssSubscriptionsClient) {
         self.client = client
     }
 
@@ -22,7 +44,7 @@ private final class RssSubscriptionsStore {
         errorMessage = nil
         defer { isLoading = false }
         do {
-            response = try await client.listRssFeeds()
+            response = try await client.load()
         } catch is CancellationError {
             return
         } catch {
@@ -34,7 +56,8 @@ private final class RssSubscriptionsStore {
         let value = url.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let candidate = URL(string: value),
               let scheme = candidate.scheme?.lowercased(),
-              scheme == "http" || scheme == "https" else {
+              (scheme == "http" || scheme == "https"),
+              candidate.host != nil else {
             actionMessage = "Enter a complete http or https feed URL."
             return false
         }
@@ -42,7 +65,7 @@ private final class RssSubscriptionsStore {
         isAdding = true
         defer { isAdding = false }
         do {
-            try await client.addRssFeed(url: value)
+            try await client.add(value)
             await reloadAfterMutation()
             return true
         } catch {
@@ -53,20 +76,17 @@ private final class RssSubscriptionsStore {
 
     func setPaused(_ feed: RssFeed, isPaused: Bool) async {
         await perform(feed) {
-            try await client.updateRssFeed(id: feed.id, action: isPaused ? "pause" : "resume")
+            try await client.update(feed.id, isPaused ? "pause" : "resume")
         }
     }
 
     func remove(_ feed: RssFeed) async {
-        await perform(feed) { try await client.removeRssFeed(id: feed.id) }
+        await perform(feed) { try await client.remove(feed.id) }
     }
 
     func setAutoBookmark(_ feed: RssFeed, enabled: Bool) async {
         await perform(feed) {
-            try await client.updateRssFeed(
-                id: feed.id,
-                action: enabled ? "auto_bookmark_on" : "auto_bookmark_off"
-            )
+            try await client.update(feed.id, enabled ? "auto_bookmark_on" : "auto_bookmark_off")
         }
     }
 
@@ -74,7 +94,7 @@ private final class RssSubscriptionsStore {
         pendingFeedIDs.insert(feed.id)
         defer { pendingFeedIDs.remove(feed.id) }
         do {
-            let result = try await client.syncRssFeed(id: feed.id)
+            let result = try await client.sync(feed.id)
             actionMessage = result.itemsFound == 1
                 ? "Fetched 1 new item from \(feed.title)."
                 : "Fetched \(result.itemsFound) new items from \(feed.title)."
@@ -99,7 +119,7 @@ private final class RssSubscriptionsStore {
 
     private func reloadAfterMutation() async {
         do {
-            response = try await client.listRssFeeds()
+            response = try await client.load()
             errorMessage = nil
         } catch {
             actionMessage = "The change was saved, but the feed list couldn’t be refreshed."

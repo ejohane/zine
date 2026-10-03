@@ -1,9 +1,29 @@
 import Observation
 import SwiftUI
 
+struct XSubscriptionsClient {
+    var load: () async throws -> XSubscriptionsResponse
+    var connect: () async throws -> Void
+    var disconnect: () async throws -> Void
+    var sync: () async throws -> Void
+    var updateDailySync: (Bool) async throws -> Void
+
+    @MainActor
+    static func live(_ apiClient: APIClient, configuration: AppConfiguration) -> Self {
+        let oauth = ProviderOAuthSession(apiClient: apiClient, configuration: configuration)
+        return Self(
+            load: { try await apiClient.getXSubscriptions() },
+            connect: { try await oauth.connect(.x) },
+            disconnect: { try await apiClient.disconnectProvider(.x) },
+            sync: { try await apiClient.syncXBookmarks() },
+            updateDailySync: { try await apiClient.updateXBookmarkSettings(dailySyncEnabled: $0) }
+        )
+    }
+}
+
 @MainActor
 @Observable
-private final class XSubscriptionsStore {
+final class XSubscriptionsStore {
     private(set) var response: XSubscriptionsResponse?
     private(set) var isLoading = false
     private(set) var isUpdatingConnection = false
@@ -12,12 +32,14 @@ private final class XSubscriptionsStore {
     private(set) var errorMessage: String?
     private(set) var actionMessage: String?
 
-    private let client: APIClient
-    private let oauth: ProviderOAuthSession
+    private let client: XSubscriptionsClient
 
     init(client: APIClient, configuration: AppConfiguration) {
+        self.client = .live(client, configuration: configuration)
+    }
+
+    init(client: XSubscriptionsClient) {
         self.client = client
-        oauth = ProviderOAuthSession(apiClient: client, configuration: configuration)
     }
 
     func reload() async {
@@ -25,7 +47,7 @@ private final class XSubscriptionsStore {
         errorMessage = nil
         defer { isLoading = false }
         do {
-            response = try await client.getXSubscriptions()
+            response = try await client.load()
         } catch is CancellationError {
             return
         } catch {
@@ -37,7 +59,7 @@ private final class XSubscriptionsStore {
         isUpdatingConnection = true
         defer { isUpdatingConnection = false }
         do {
-            try await oauth.connect(.x)
+            try await client.connect()
             await reloadAfterMutation()
         } catch is CancellationError {
             return
@@ -50,7 +72,7 @@ private final class XSubscriptionsStore {
         isUpdatingConnection = true
         defer { isUpdatingConnection = false }
         do {
-            try await client.disconnectProvider(.x)
+            try await client.disconnect()
             await reloadAfterMutation()
         } catch {
             actionMessage = "X couldn’t be disconnected. \(error.localizedDescription)"
@@ -61,7 +83,7 @@ private final class XSubscriptionsStore {
         isSyncing = true
         defer { isSyncing = false }
         do {
-            try await client.syncXBookmarks()
+            try await client.sync()
             await reloadAfterMutation()
         } catch {
             actionMessage = "X bookmarks couldn’t be synced. \(error.localizedDescription)"
@@ -91,7 +113,7 @@ private final class XSubscriptionsStore {
         defer { isUpdatingSettings = false }
 
         do {
-            try await client.updateXBookmarkSettings(dailySyncEnabled: enabled)
+            try await client.updateDailySync(enabled)
             await reloadAfterMutation()
         } catch {
             response = current
@@ -103,7 +125,7 @@ private final class XSubscriptionsStore {
 
     private func reloadAfterMutation() async {
         do {
-            response = try await client.getXSubscriptions()
+            response = try await client.load()
             errorMessage = nil
         } catch {
             actionMessage = "The change was saved, but X status couldn’t be refreshed."
