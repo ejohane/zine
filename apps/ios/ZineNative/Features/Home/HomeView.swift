@@ -109,6 +109,9 @@ struct HomeView: View {
                             HomeSectionListView(
                                 route: route,
                                 client: client,
+                                onItemVisibilityChanged: { id, isVisible in
+                                    store.setItemVisibility(id: id, isVisible: isVisible)
+                                },
                                 onContentChanged: onContentChanged,
                                 onExternalOpen: onExternalOpen,
                                 tabReselection: tabReselection

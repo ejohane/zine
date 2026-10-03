@@ -435,6 +435,9 @@ private struct AuthenticatedAppView: View {
                 client: client,
                 inboxCache: route == .inbox ? inboxCache : nil,
                 initialItems: route == .inbox ? homeStore.inboxPreviewItems : [],
+                onItemVisibilityChanged: { id, isVisible in
+                    homeStore.setItemVisibility(id: id, isVisible: isVisible)
+                },
                 onContentChanged: markBookmarkContentChanged,
                 onExternalOpen: handleExternalOpen,
                 tabReselection: homeTabReselection
