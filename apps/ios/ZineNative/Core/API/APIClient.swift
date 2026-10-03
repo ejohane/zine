@@ -991,7 +991,8 @@ struct APIClient {
         let _: EmptyResponse = try await send(request)
     }
 
-    private static func filterHome(_ response: HomeResponse, hiding ids: Set<String>) -> HomeResponse {
+    static func filterHome(_ response: HomeResponse, hiding ids: Set<String>) -> HomeResponse {
+        guard !ids.isEmpty else { return response }
         func visible(_ items: [HomeItem]) -> [HomeItem] {
             items.filter { !ids.contains($0.id) }
         }

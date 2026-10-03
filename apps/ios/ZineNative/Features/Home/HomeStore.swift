@@ -38,6 +38,7 @@ final class HomeStore {
     private let cache: HomeCache
     private var home: HomeResponse?
     private var inboxItems: [Bookmark] = []
+    private var hiddenItemIDs: Set<String> = []
     private var optimisticOpenedItems: [String: HomeItem] = [:]
 
     var inboxPreviewItems: [Bookmark] { inboxItems }
@@ -90,6 +91,17 @@ final class HomeStore {
             networkErrors.append(error)
         }
 
+        if networkErrors.isEmpty, let home {
+            // Once the server confirms removal, later re-bookmarking or marking
+            // unfinished elsewhere can return the item through a normal refresh.
+            let serverIDs = Set((home.recentBookmarks + home.jumpBackIn
+                + home.byContentType.videos + home.byContentType.podcasts
+                + home.byContentType.articles + home.customCollections.flatMap(\.items)).map(\.id))
+                .union(inboxItems.map(\.id))
+            hiddenItemIDs.formIntersection(serverIDs)
+            rebuildSections()
+        }
+
         if didUpdate {
             await cache.save(home: home, inboxItems: inboxItems)
         } else if sections.isEmpty {
@@ -101,8 +113,20 @@ final class HomeStore {
         sections = Self.makeSections(
             home: home,
             inboxItems: inboxItems,
-            optimisticOpenedItems: Array(optimisticOpenedItems.values)
+            optimisticOpenedItems: Array(optimisticOpenedItems.values),
+            hiddenItemIDs: hiddenItemIDs
         )
+    }
+
+    // Apply destination mutations before an interactive pop exposes Home. Keep this
+    // overlay across cache/network refreshes so stale responses cannot restore rows.
+    func setItemVisibility(id: String, isVisible: Bool) {
+        if isVisible {
+            hiddenItemIDs.remove(id)
+        } else {
+            hiddenItemIDs.insert(id)
+        }
+        rebuildSections()
     }
 
     func promoteOpened(_ bookmark: Bookmark, at openedAt: Date) {
@@ -142,11 +166,15 @@ final class HomeStore {
     static func makeSections(
         home: HomeResponse?,
         inboxItems: [Bookmark],
-        optimisticOpenedItems: [HomeItem] = []
+        optimisticOpenedItems: [HomeItem] = [],
+        hiddenItemIDs: Set<String> = []
     ) -> [HomeDashboardSection] {
-        guard let home else {
+        let inboxItems = inboxItems.filter { !hiddenItemIDs.contains($0.id) }
+        let optimisticOpenedItems = optimisticOpenedItems.filter { !hiddenItemIDs.contains($0.id) }
+        guard let sourceHome = home else {
             return inboxItems.isEmpty ? [] : [.inbox(inboxItems)]
         }
+        let home = APIClient.filterHome(sourceHome, hiding: hiddenItemIDs)
 
         let jumpBackInCandidates: [HomeItem]
         if optimisticOpenedItems.isEmpty {

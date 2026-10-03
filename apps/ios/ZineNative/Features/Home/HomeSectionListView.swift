@@ -3,6 +3,7 @@ import SwiftUI
 struct HomeSectionListView: View {
     let route: HomeSectionRoute
     let client: APIClient
+    let onItemVisibilityChanged: (String, Bool) -> Void
     let onContentChanged: () -> Void
     let onExternalOpen: (Bookmark) -> Void
     let tabReselection: Int
@@ -18,12 +19,14 @@ struct HomeSectionListView: View {
         client: APIClient,
         inboxCache: InboxCache? = nil,
         initialItems: [Bookmark] = [],
+        onItemVisibilityChanged: @escaping (String, Bool) -> Void = { _, _ in },
         onContentChanged: @escaping () -> Void = {},
         onExternalOpen: @escaping (Bookmark) -> Void = { _ in },
         tabReselection: Int = 0
     ) {
         self.route = route
         self.client = client
+        self.onItemVisibilityChanged = onItemVisibilityChanged
         self.onContentChanged = onContentChanged
         self.onExternalOpen = onExternalOpen
         self.tabReselection = tabReselection
@@ -55,13 +58,22 @@ struct HomeSectionListView: View {
                     client: client,
                     onUpdate: { updated in
                         store.update(updated)
+                        if route != .inbox {
+                            onItemVisibilityChanged(updated.id, updated.state == "BOOKMARKED" && !updated.isFinished)
+                        }
                         onContentChanged()
                     },
                     onBookmarkChange: { changed, isBookmarked, _ in
                         store.setBookmarked(changed, isBookmarked: isBookmarked)
+                        if route != .inbox {
+                            onItemVisibilityChanged(changed.id, isBookmarked && !changed.isFinished)
+                        }
                         onContentChanged()
                     },
                     onBookmarkCommit: { changed, isBookmarked in
+                        if route != .inbox {
+                            onItemVisibilityChanged(changed.id, isBookmarked && !changed.isFinished)
+                        }
                         if isBookmarked {
                             Task { await store.removeCachedInboxItem(id: changed.id) }
                         }

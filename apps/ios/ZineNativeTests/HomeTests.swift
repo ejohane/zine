@@ -485,6 +485,40 @@ final class HomeTests: XCTestCase {
         XCTAssertEqual(article.id, "featured")
     }
 
+    @MainActor
+    func testDestinationRemovalSurvivesCachedRefreshAndSupportsRollback() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let item = makeHomeItem(id: "removed", minutes: 5)
+        let home = HomeResponse(
+            recentBookmarks: [item], jumpBackIn: [item],
+            byContentType: HomeContentTypeSections(videos: [], podcasts: [], articles: [item]),
+            customCollections: [], sectionOrder: [], requestId: nil, traceId: nil
+        )
+        let cache = HomeCache(userID: "test-user", baseDirectory: directory)
+        await cache.save(home: home, inboxItems: [])
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [UnavailableInboxURLProtocol.self]
+        let client = APIClient(
+            baseURL: URL(string: "https://example.com")!, tokenProvider: { "test-token" },
+            session: URLSession(configuration: configuration)
+        )
+        let store = HomeStore(client: client, cache: cache)
+        await store.reload()
+        XCTAssertFalse(store.sections.isEmpty)
+        // Archive and completion both make a saved item ineligible for Home.
+        store.setItemVisibility(id: item.id, isVisible: false)
+        XCTAssertTrue(store.sections.isEmpty)
+        await store.reload()
+        XCTAssertTrue(store.sections.isEmpty)
+        // An archive failure must restore the original preview immediately.
+        store.setItemVisibility(id: item.id, isVisible: true)
+        XCTAssertTrue(store.sections.contains { $0.id == "recently-saved" })
+        XCTAssertTrue(store.sections.contains { $0.id == "jump-back-in" })
+        XCTAssertTrue(store.sections.contains { $0.id == "articles" })
+    }
+
     func testHomeCacheKeepsOnlyFourInboxItems() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
