@@ -50,6 +50,7 @@ struct AppSettingsView: View {
     @Environment(Clerk.self) private var clerk
     @Environment(\.zineTabNavigationActions) private var navigation
     @State private var store = SettingsStore()
+    @State private var isShowingSourcesReplay = false
     @AppStorage(PodcastPlayer.preferenceKey) private var podcastPlayer = PodcastPlayer.overcast.rawValue
 
     init(
@@ -93,6 +94,11 @@ struct AppSettingsView: View {
         } message: {
             Text(store.signOutError ?? "Please try again.")
         }
+        .fullScreenCover(isPresented: $isShowingSourcesReplay) {
+            ChooseSourcesView(client: client) {
+                isShowingSourcesReplay = false
+            }
+        }
     }
 
     private var settingsContent: some View {
@@ -123,6 +129,13 @@ struct AppSettingsView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     settingsSectionTitle("Account")
                     signOutButton
+                }
+
+                if SourcesOnboardingReplayAccess.isAvailable(email: clerk.user?.primaryEmailAddress?.emailAddress) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        settingsSectionTitle("Testing")
+                        replaySourcesButton
+                    }
                 }
             }
             .padding(.horizontal, 18)
@@ -309,6 +322,30 @@ struct AppSettingsView: View {
         .foregroundStyle(Color.red)
         .disabled(store.isSigningOut)
         .accessibilityIdentifier("settings-sign-out")
+    }
+
+    private var replaySourcesButton: some View {
+        Button {
+            isShowingSourcesReplay = true
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.system(.headline, design: .rounded, weight: .semibold))
+                    .foregroundStyle(ZineTheme.brandAccent)
+                Text("Replay source setup")
+                    .font(.system(.headline, design: .rounded, weight: .semibold))
+                    .foregroundStyle(ZineTheme.primaryText)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ZineTheme.tertiaryText)
+            }
+            .padding(17)
+            .frame(maxWidth: .infinity)
+            .background(ZineTheme.surface, in: .rect(cornerRadius: 18))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("settings-replay-sources")
     }
 
     private func settingsSectionTitle(_ title: String) -> some View {

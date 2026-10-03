@@ -1,9 +1,31 @@
 import Observation
 import SwiftUI
 
+struct NewsletterSubscriptionsClient {
+    var load: () async throws -> NewsletterSubscriptionsResponse
+    var connect: () async throws -> Void
+    var disconnect: () async throws -> Void
+    var sync: () async throws -> Void
+    var update: (String, String) async throws -> Void
+    var unsubscribe: (String) async throws -> Void
+
+    @MainActor
+    static func live(_ apiClient: APIClient, configuration: AppConfiguration) -> Self {
+        let oauth = ProviderOAuthSession(apiClient: apiClient, configuration: configuration)
+        return Self(
+            load: { try await apiClient.listNewsletters() },
+            connect: { try await oauth.connect(.gmail) },
+            disconnect: { try await apiClient.disconnectProvider(.gmail) },
+            sync: { try await apiClient.syncNewsletters() },
+            update: { try await apiClient.updateNewsletter(id: $0, action: $1) },
+            unsubscribe: { try await apiClient.unsubscribeNewsletter(id: $0) }
+        )
+    }
+}
+
 @MainActor
 @Observable
-private final class NewsletterSubscriptionsStore {
+final class NewsletterSubscriptionsStore {
     private(set) var response: NewsletterSubscriptionsResponse?
     private(set) var isLoading = false
     private(set) var isUpdatingConnection = false
@@ -12,12 +34,14 @@ private final class NewsletterSubscriptionsStore {
     private(set) var errorMessage: String?
     private(set) var actionMessage: String?
 
-    private let client: APIClient
-    private let oauth: ProviderOAuthSession
+    private let client: NewsletterSubscriptionsClient
 
     init(client: APIClient, configuration: AppConfiguration) {
+        self.client = .live(client, configuration: configuration)
+    }
+
+    init(client: NewsletterSubscriptionsClient) {
         self.client = client
-        oauth = ProviderOAuthSession(apiClient: client, configuration: configuration)
     }
 
     func reload() async {
@@ -25,7 +49,7 @@ private final class NewsletterSubscriptionsStore {
         errorMessage = nil
         defer { isLoading = false }
         do {
-            response = try await client.listNewsletters()
+            response = try await client.load()
         } catch is CancellationError {
             return
         } catch {
@@ -37,7 +61,7 @@ private final class NewsletterSubscriptionsStore {
         isUpdatingConnection = true
         defer { isUpdatingConnection = false }
         do {
-            try await oauth.connect(.gmail)
+            try await client.connect()
             await reloadAfterMutation()
         } catch is CancellationError {
             return
@@ -50,7 +74,7 @@ private final class NewsletterSubscriptionsStore {
         isUpdatingConnection = true
         defer { isUpdatingConnection = false }
         do {
-            try await client.disconnectProvider(.gmail)
+            try await client.disconnect()
             await reloadAfterMutation()
         } catch {
             actionMessage = "Gmail couldn’t be disconnected. \(error.localizedDescription)"
@@ -61,7 +85,7 @@ private final class NewsletterSubscriptionsStore {
         isSyncing = true
         defer { isSyncing = false }
         do {
-            try await client.syncNewsletters()
+            try await client.sync()
             await reloadAfterMutation()
         } catch {
             actionMessage = "Newsletters couldn’t be synced. \(error.localizedDescription)"
@@ -70,20 +94,17 @@ private final class NewsletterSubscriptionsStore {
 
     func setActive(_ feed: NewsletterFeed, isActive: Bool) async {
         await perform(feed) {
-            try await client.updateNewsletter(id: feed.id, action: isActive ? "activate" : "hide")
+            try await client.update(feed.id, isActive ? "activate" : "hide")
         }
     }
 
     func unsubscribe(_ feed: NewsletterFeed) async {
-        await perform(feed) { try await client.unsubscribeNewsletter(id: feed.id) }
+        await perform(feed) { try await client.unsubscribe(feed.id) }
     }
 
     func setAutoBookmark(_ feed: NewsletterFeed, enabled: Bool) async {
         await perform(feed) {
-            try await client.updateNewsletter(
-                id: feed.id,
-                action: enabled ? "auto_bookmark_on" : "auto_bookmark_off"
-            )
+            try await client.update(feed.id, enabled ? "auto_bookmark_on" : "auto_bookmark_off")
         }
     }
 
@@ -102,7 +123,7 @@ private final class NewsletterSubscriptionsStore {
 
     private func reloadAfterMutation() async {
         do {
-            response = try await client.listNewsletters()
+            response = try await client.load()
             errorMessage = nil
         } catch {
             actionMessage = "The change was saved, but the list couldn’t be refreshed."

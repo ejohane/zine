@@ -239,7 +239,11 @@ actor ArticleBodyCache {
                 at: directoryURL,
                 withIntermediateDirectories: true
             )
+            #if os(iOS)
             try data.write(to: url, options: [.atomic, .completeFileProtection])
+            #else
+            try data.write(to: url, options: .atomic)
+            #endif
             var resourceValues = URLResourceValues()
             resourceValues.isExcludedFromBackup = true
             var storedFileURL = url
