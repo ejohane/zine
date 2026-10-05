@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { setTimeout } from 'node:timers/promises';
 
 // The pinned workerd runner can exhaust macOS loopback connections when all
 // files start together. Sequential shards retain per-file runtime and storage
@@ -20,4 +21,6 @@ for (let shard = 1; shard <= shardCount; shard += 1) {
     process.exit(1);
   }
   if (result.status !== 0) process.exit(result.status ?? 1);
+  // Allow macOS TIME_WAIT sockets to drain before opening the next batch.
+  if (shard < shardCount) await setTimeout(20_000);
 }
