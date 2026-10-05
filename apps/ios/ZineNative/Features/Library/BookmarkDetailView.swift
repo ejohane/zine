@@ -1355,10 +1355,10 @@ struct BookmarkDetailPopGestureBridge: UIViewRepresentable {
         private var configurations: [Configuration] = []
 
         func enable(in navigation: UINavigationController, alongside scrollGesture: UIPanGestureRecognizer?) {
-            var gestures = [navigation.interactivePopGestureRecognizer]
-            if #available(iOS 26.0, *) {
-                gestures.append(navigation.interactiveContentPopGestureRecognizer)
-            }
+            let gestures = [navigation.interactivePopGestureRecognizer]
+            // The content-pop recognizer owns UIKit’s zoom-transition delegate.
+            // Replacing it breaks interactive returns from matched bookmark routes.
+            // Only the edge recognizer needs the hidden-navigation-bar workaround.
 
             for gesture in gestures.compactMap({ $0 }) {
                 if !configurations.contains(where: { $0.gesture === gesture }) {

@@ -29,8 +29,29 @@
             let client = APIClient(
                 baseURL: URL(string: "https://fixture.invalid")!, tokenProvider: { "fixture" },
                 session: transport)
+            let allQuery = LibraryQuery(includesFinished: true)
+            let allFirst = try await client.listBookmarks(query: allQuery)
+            guard allFirst.items.contains(where: { $0.isFinished }),
+                  let allCursor = allFirst.nextCursor else {
+                throw CommandError("all_statuses_first_page_failed")
+            }
+            let allNext = try await client.listBookmarks(query: allQuery, cursor: allCursor)
+            let allIDs = (allFirst.items + allNext.items).map(\.id)
+            guard Set(allIDs) == Set((server.catalog ?? []).map(\.id)),
+                  allIDs.count == 5, allNext.nextCursor == nil else {
+                throw CommandError("all_statuses_pagination_failed")
+            }
             let library = LibraryStore(
                 client: client, cache: LibraryCache(userID: "fixture", baseDirectory: directory))
+            await library.reload(query: allQuery)
+            guard let unfinished = library.items.first(where: { !$0.isFinished }) else {
+                throw CommandError("all_statuses_missing_unfinished")
+            }
+            await library.complete(unfinished)
+            guard library.items.contains(where: { $0.id == unfinished.id && $0.isFinished }) else {
+                throw CommandError("completed_search_result_disappeared")
+            }
+            _ = try await library.setFinished(unfinished, value: false)
             let session = NativeCommandSession(client: client)
             session.library = library
             session.route = "library"

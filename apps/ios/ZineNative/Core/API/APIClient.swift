@@ -7,16 +7,32 @@ extension Notification.Name {
 struct LibraryQuery: Hashable, Codable {
     var search = ""
     var isFinished = false
+    var includesFinished = false
     var provider: Provider?
     var contentType: ContentType?
 
     var cacheKey: String {
         [
             search.trimmingCharacters(in: .whitespacesAndNewlines),
-            String(isFinished),
+            includesFinished ? "all-statuses" : String(isFinished),
             provider?.rawValue ?? "all",
             contentType?.rawValue ?? "all",
         ].joined(separator: "|")
+    }
+}
+
+extension LibraryQuery {
+    private enum CodingKeys: String, CodingKey {
+        case search, isFinished, includesFinished, provider, contentType
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        search = try values.decodeIfPresent(String.self, forKey: .search) ?? ""
+        isFinished = try values.decodeIfPresent(Bool.self, forKey: .isFinished) ?? false
+        includesFinished = try values.decodeIfPresent(Bool.self, forKey: .includesFinished) ?? false
+        provider = try values.decodeIfPresent(Provider.self, forKey: .provider)
+        contentType = try values.decodeIfPresent(ContentType.self, forKey: .contentType)
     }
 }
 
@@ -201,6 +217,32 @@ struct APIClient {
         cursor: String? = nil,
         limit: Int = 30
     ) async throws -> PaginatedBookmarksResponse {
+        if query.includesFinished {
+            let page = cursor.flatMap { Data(base64Encoded: $0) }
+                .flatMap { try? JSONDecoder().decode(AllBookmarksCursor.self, from: $0) }
+            var unfinishedQuery = query
+            unfinishedQuery.includesFinished = false
+            unfinishedQuery.isFinished = false
+            var finishedQuery = unfinishedQuery
+            finishedQuery.isFinished = true
+            async let unfinished = page?.unfinishedDone == true
+                ? PaginatedBookmarksResponse(items: [], nextCursor: nil)
+                : listBookmarks(query: unfinishedQuery, cursor: page?.unfinished, limit: limit)
+            async let finished = page?.finishedDone == true
+                ? PaginatedBookmarksResponse(items: [], nextCursor: nil)
+                : listBookmarks(query: finishedQuery, cursor: page?.finished, limit: limit)
+            let (first, second) = try await (unfinished, finished)
+            let next = AllBookmarksCursor(
+                unfinished: first.nextCursor, finished: second.nextCursor,
+                unfinishedDone: first.nextCursor == nil, finishedDone: second.nextCursor == nil
+            )
+            let nextCursor = next.unfinishedDone && next.finishedDone
+                ? nil : try JSONEncoder().encode(next).base64EncodedString()
+            var seen = Set<String>()
+            let merged = (first.items + second.items).filter { seen.insert($0.id).inserted }
+                .sorted { ($0.bookmarkedAt ?? $0.ingestedAt) > ($1.bookmarkedAt ?? $1.ingestedAt) }
+            return PaginatedBookmarksResponse(items: merged, nextCursor: nextCursor)
+        }
         var components = URLComponents(
             url: baseURL.appending(path: "/api/v1/bookmarks"),
             resolvingAgainstBaseURL: false
@@ -1113,3 +1155,10 @@ private struct SaveEditorialBookmarkRequest: Encodable {
 }
 
 private struct EmptyResponse: Decodable {}
+
+private struct AllBookmarksCursor: Codable {
+    let unfinished: String?
+    let finished: String?
+    let unfinishedDone: Bool
+    let finishedDone: Bool
+}
