@@ -12,6 +12,10 @@ export default defineWorkersConfig(async () => ({
     setupFiles: ['./src/test/vitest.setup.ts'],
     poolOptions: {
       workers: {
+        // Older workerd versions can exhaust macOS loopback connections when
+        // starting one runtime per file. Keep isolated storage, but run files
+        // sequentially in one runtime on macOS.
+        singleWorker: process.platform === 'darwin',
         miniflare: {
           bindings: { TEST_MIGRATIONS: await readD1Migrations('./src/db/migrations') },
         },
