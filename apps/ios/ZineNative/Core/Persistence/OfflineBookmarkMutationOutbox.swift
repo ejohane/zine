@@ -275,7 +275,7 @@ actor OfflineBookmarkMutationOutbox {
     }
 
     private static func matches(_ bookmark: Bookmark, query: LibraryQuery) -> Bool {
-        guard bookmark.isFinished == query.isFinished else { return false }
+        guard query.includesFinished || bookmark.isFinished == query.isFinished else { return false }
         if let provider = query.provider, bookmark.provider != provider { return false }
         if let contentType = query.contentType, bookmark.contentType != contentType { return false }
         let search = query.search.trimmingCharacters(in: .whitespacesAndNewlines)

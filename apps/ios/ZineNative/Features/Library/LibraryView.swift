@@ -3,6 +3,7 @@ import SwiftUI
 struct LibraryView: View {
     let client: APIClient
     let searchText: Binding<String>?
+    let searchHistoryKey: String
     let refreshRevision: Int
     let onContentChanged: () -> Void
     let onExternalOpen: (Bookmark) -> Void
@@ -11,11 +12,21 @@ struct LibraryView: View {
     let transitionNamespace: Namespace.ID
 
     @Environment(\.nativeCommandSession) private var commandSession
+    @AppStorage private var searchHistoryData: Data
+    @State private var hasFocusedSearch = false
+    @State private var recentlyOpened: [HomeItem] = []
+    @FocusState private var searchInputFocused: Bool
     @State private var store: LibraryStore
-    @State private var showsFinished = false
+    @State private var statusFilter: Bool?
+    @State private var creatorMatches: [Bookmark] = []
     @State private var provider: Provider?
     @State private var contentType: ContentType?
-    @State private var titleCollapseProgress: CGFloat = 0
+    @State private var localTitleCollapseState = ListTitleCollapseState()
+    private let suppliedTitleCollapseState: ListTitleCollapseState?
+
+    private var titleCollapseState: ListTitleCollapseState {
+        suppliedTitleCollapseState ?? localTitleCollapseState
+    }
     @State private var isVisible = false
     @State private var isShowingAddBookmark = false
     @Environment(\.zineTabNavigationActions) private var navigation
@@ -24,15 +35,20 @@ struct LibraryView: View {
         client: APIClient,
         cache: LibraryCache,
         searchText: Binding<String>? = nil,
+        searchHistoryKey: String = "zine.search.history",
         refreshRevision: Int = 0,
         onContentChanged: @escaping () -> Void = {},
         onExternalOpen: @escaping (Bookmark) -> Void = { _ in },
         tabReselection: Int = 0,
         onTitleCollapseProgressChanged: @escaping (CGFloat) -> Void = { _ in },
-        transitionNamespace: Namespace.ID
+        transitionNamespace: Namespace.ID,
+        titleCollapseState: ListTitleCollapseState? = nil
     ) {
+        _searchHistoryData = AppStorage(wrappedValue: Data(), searchHistoryKey)
+        suppliedTitleCollapseState = titleCollapseState
         self.client = client
         self.searchText = searchText
+        self.searchHistoryKey = searchHistoryKey
         self.refreshRevision = refreshRevision
         self.onContentChanged = onContentChanged
         self.onExternalOpen = onExternalOpen
@@ -58,7 +74,8 @@ struct LibraryView: View {
     private var query: LibraryQuery {
         LibraryQuery(
             search: search,
-            isFinished: showsFinished,
+            isFinished: statusFilter ?? false,
+            includesFinished: isSearchMode && statusFilter == nil,
             provider: provider,
             contentType: contentType
         )
@@ -66,15 +83,11 @@ struct LibraryView: View {
 
     var body: some View {
         content
-            .navigationTitle(isSearchMode ? "Search" : "")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .contentTypeFilterChrome()
             .toolbar {
-                if isSearchMode {
-                    ToolbarItem(placement: .topBarLeading) {
-                        filterMenu
-                    }
-                } else {
+                if !isSearchMode {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
                             isShowingAddBookmark = true
@@ -89,7 +102,12 @@ struct LibraryView: View {
             .zineScreenChrome()
             .task(id: LibraryReloadKey(query: query, revision: refreshRevision)) {
                 if isSearchMode && search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    creatorMatches = []
                     store.reset()
+                    if let home = try? await client.getHome(), !Task.isCancelled {
+                        recentlyOpened = Array(home.jumpBackIn.filter { $0.lastOpenedAt != nil }
+                            .sorted { ($0.lastOpenedAt ?? "") > ($1.lastOpenedAt ?? "") }.prefix(3))
+                    }
                     return
                 }
                 if !search.isEmpty {
@@ -97,6 +115,7 @@ struct LibraryView: View {
                 }
                 guard !Task.isCancelled else { return }
                 await store.reload(query: query)
+                if isSearchMode { await loadMatchingCreators() }
             }
             .alert("Couldn’t update bookmark", isPresented: actionErrorBinding) {
                 Button("OK", role: .cancel) {
@@ -129,12 +148,35 @@ struct LibraryView: View {
         ScrollViewReader { proxy in
             List {
                 if isSearchMode {
-                    resultRows
+                    HStack {
+                        ObservedListTitle(title: "Search", state: titleCollapseState)
+                        filterMenu
+                            .labelStyle(.iconOnly)
+                            .foregroundStyle(hasFilters ? ZineTheme.brandAccent : ZineTheme.primaryText)
+                            .frame(minWidth: 44, minHeight: 44)
+                    }
+                    .id(ScrollAnchor.top)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 18, bottom: 0, trailing: 18))
+                    .listRowBackground(ZineTheme.canvas)
+                    .listRowSeparator(.hidden)
+
+                    searchField
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(ZineTheme.canvas)
+                        .listRowSeparator(.hidden)
+                }
+                if isSearchMode && search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    searchLandingRows
+                } else if isSearchMode {
+                    if !creatorMatches.isEmpty { creatorResults }
+                    if !store.items.isEmpty {
+                        Section("Bookmarks") { resultRows }
+                            .textCase(nil)
+                    } else {
+                        resultRows
+                    }
                 } else {
-                    CollapsingListTitle(
-                        title: "Library",
-                        progress: titleCollapseProgress
-                    )
+                    ObservedListTitle(title: "Library", state: titleCollapseState)
                     .id(ScrollAnchor.top)
 
                     Section {
@@ -146,6 +188,7 @@ struct LibraryView: View {
                     }
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .background(ZineTheme.canvas)
@@ -153,10 +196,11 @@ struct LibraryView: View {
                 let offset = geometry.contentOffset.y + geometry.contentInsets.top
                 return FilteredListScrollState.collapseProgress(scrollOffset: offset)
             } action: { _, progress in
-                titleCollapseProgress = progress
+                titleCollapseState.progress = progress
                 onTitleCollapseProgressChanged(progress)
             }
             .onChange(of: tabReselection) {
+                if isSearchMode { searchInputFocused = true }
                 handleTabReselection(using: proxy)
             }
             .onChange(of: store.items) { _, _ in commandSession?.recordUIChange("library.items") }
@@ -165,14 +209,17 @@ struct LibraryView: View {
                 commandSession?.library = store
                 commandSession?.applyLibraryQuery = { requested in
                     searchText?.wrappedValue = requested.search
-                    showsFinished = requested.isFinished
+                    statusFilter = requested.includesFinished ? nil : requested.isFinished
                     provider = requested.provider
                     contentType = requested.contentType
                     await store.reload(query: requested)
                 }
                 commandSession?.route = isSearchMode ? "search" : "library"
             }
-            .onDisappear { isVisible = false }
+            .onDisappear {
+                isVisible = false
+                searchInputFocused = false
+            }
             .refreshable {
                 await store.reload(query: query)
             }
@@ -192,7 +239,7 @@ struct LibraryView: View {
     private func handleTabReselection(using proxy: ScrollViewProxy) {
         FilteredListTabAction.perform(
             isVisible: isVisible && !isSearchMode,
-            collapseProgress: titleCollapseProgress,
+            collapseProgress: titleCollapseState.progress,
             hasActiveFilter: contentType != nil,
             proxy: proxy,
             topID: ScrollAnchor.top,
@@ -258,6 +305,10 @@ struct LibraryView: View {
         Group {
             if let navigate = navigation.bookmark {
                 Button {
+                    if isSearchMode {
+                        rememberSearch()
+                        searchInputFocused = false
+                    }
                     navigate(bookmark)
                 } label: {
                     BookmarkRow(bookmark: bookmark)
@@ -298,6 +349,197 @@ struct LibraryView: View {
         }
     }
 
+    private func loadMatchingCreators() async {
+        let requested = query
+        let term = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !term.isEmpty, !Task.isCancelled, store.activeQuery == requested else { return }
+        var matches: [Bookmark] = []
+        var seen = Set<String>()
+        func append(_ items: [Bookmark]) {
+            for item in items {
+                if let id = item.creatorId, !id.isEmpty,
+                   item.creator.localizedCaseInsensitiveContains(term), seen.insert(id).inserted {
+                    matches.append(item)
+                }
+            }
+        }
+        append(store.items)
+        creatorMatches = matches
+        var cursor = store.nextCursor
+        while let next = cursor, !Task.isCancelled {
+            guard let page = try? await client.listBookmarks(query: requested, cursor: next, limit: 100),
+                  !Task.isCancelled, requested == query else { return }
+            append(page.items)
+            creatorMatches = matches
+            cursor = page.nextCursor
+        }
+    }
+
+    private var creatorResults: some View {
+        Section("Creators") {
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(alignment: .top, spacing: 18) {
+                    ForEach(creatorMatches, id: \.creatorId) { item in
+                        Button {
+                            rememberSearch()
+                            searchInputFocused = false
+                            navigation.creator?(SearchCreatorRoute(bookmark: item))
+                        } label: {
+                            VStack(spacing: 8) {
+                                CreatorAvatar(imageUrl: item.creatorImageUrl, creator: item.creator,
+                                              contentType: item.contentType, size: 64)
+                                Text(item.creator)
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(ZineTheme.primaryText)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(width: 90)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 6)
+            }
+            .listRowBackground(ZineTheme.canvas)
+            .listRowSeparator(.hidden)
+        }
+        .textCase(nil)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(ZineTheme.secondaryText)
+            TextField("Search your library", text: searchText ?? .constant(""))
+                .foregroundStyle(ZineTheme.primaryText)
+                .focused($searchInputFocused)
+                .submitLabel(.search)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .accessibilityIdentifier("library-search-input")
+                .onSubmit {
+                    rememberSearch()
+                    searchInputFocused = false
+                }
+            if !search.isEmpty {
+                Button {
+                    searchText?.wrappedValue = ""
+                    searchInputFocused = true
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(ZineTheme.secondaryText)
+                }
+                .accessibilityLabel("Clear search")
+            }
+            if searchInputFocused {
+                Button("Done") { searchInputFocused = false }
+                    .accessibilityLabel("Dismiss search keyboard")
+            }
+        }
+        .padding(12)
+        .background(ZineTheme.raised, in: RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+        .background(ZineTheme.canvas)
+        .onAppear {
+            if !hasFocusedSearch {
+                hasFocusedSearch = true
+                searchInputFocused = true
+            }
+        }
+    }
+
+    private var recentSearches: [String] {
+        (try? JSONDecoder().decode([String].self, from: searchHistoryData)) ?? []
+    }
+
+    private static func recordSearch(_ search: String, key: String) {
+        let term = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !term.isEmpty else { return }
+        let data = UserDefaults.standard.data(forKey: key) ?? Data()
+        let recent = (try? JSONDecoder().decode([String].self, from: data)) ?? []
+        let history = [term] + recent.filter { $0.caseInsensitiveCompare(term) != .orderedSame }
+        if let encoded = try? JSONEncoder().encode(Array(history.prefix(5))) {
+            UserDefaults.standard.set(encoded, forKey: key)
+        }
+    }
+
+    private func rememberSearch() {
+        Self.recordSearch(search, key: searchHistoryKey)
+    }
+
+    @ViewBuilder
+    private var searchLandingRows: some View {
+        if !recentSearches.isEmpty {
+            Section {
+                ForEach(recentSearches, id: \.self) { term in
+                    Button {
+                        searchText?.wrappedValue = term
+                        rememberSearch()
+                        searchInputFocused = false
+                    } label: {
+                        Label(term, systemImage: "clock")
+                            .foregroundStyle(ZineTheme.primaryText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .listRowBackground(ZineTheme.canvas)
+                }
+            } header: {
+                HStack {
+                    Text("Recent searches")
+                    Spacer()
+                    Button("Clear") { searchHistoryData = Data() }
+                        .accessibilityLabel("Clear recent searches")
+                }
+                .textCase(nil)
+            }
+        }
+        if !recentlyOpened.isEmpty {
+            Section("Recently opened") {
+                ForEach(recentlyOpened) { item in
+                    let route = HomeNavigationRoute.item(item, sectionID: "search-recent")
+                    Button {
+                        searchInputFocused = false
+                        navigation.home?(route)
+                    } label: {
+                        HStack(spacing: 10) {
+                            CachedRemoteImage(url: item.thumbnailUrl, targetSize: CGSize(width: 64, height: 48)) {
+                                ZineTheme.raised
+                            }
+                            .frame(width: 64, height: 48)
+                            .clipShape(.rect(cornerRadius: 7))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(item.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ZineTheme.primaryText)
+                                    .lineLimit(1)
+                                Text(item.creator)
+                                    .font(.caption)
+                                    .foregroundStyle(ZineTheme.secondaryText)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 2)
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(ZineTheme.canvas)
+                    .listRowSeparator(.hidden)
+                    .matchedTransitionSource(id: route.sourceID, in: transitionNamespace)
+                }
+            }
+            .textCase(nil)
+        }
+        if recentSearches.isEmpty && recentlyOpened.isEmpty {
+            Text("Search by title or creator")
+                .font(.subheadline)
+                .foregroundStyle(ZineTheme.secondaryText)
+                .listRowBackground(ZineTheme.canvas)
+                .listRowSeparator(.hidden)
+        }
+    }
+
     private var actionErrorBinding: Binding<Bool> {
         Binding(
             get: { store.actionErrorMessage != nil },
@@ -307,9 +549,10 @@ struct LibraryView: View {
 
     private var filterMenu: some View {
         Menu {
-            Picker("Status", selection: $showsFinished) {
-                Text("Unfinished").tag(false)
-                Text("Finished").tag(true)
+            Picker("Status", selection: $statusFilter) {
+                Text("All bookmarks").tag(Bool?.none)
+                Text("Unfinished").tag(Bool?.some(false))
+                Text("Finished").tag(Bool?.some(true))
             }
 
             Picker("Provider", selection: $provider) {
@@ -332,7 +575,7 @@ struct LibraryView: View {
     }
 
     private var hasFilters: Bool {
-        showsFinished || provider != nil || contentType != nil
+        statusFilter != nil || provider != nil || contentType != nil
     }
 
 }

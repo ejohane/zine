@@ -1,6 +1,7 @@
 import ClerkKit
 import ClerkKitUI
 import SwiftUI
+import UIKit
 
 struct ExternalBookmarkOpenEvent: Equatable {
     enum Change: Equatable {
@@ -14,11 +15,16 @@ struct ExternalBookmarkOpenEvent: Equatable {
     let change: Change
 }
 
+struct SearchCreatorRoute: Hashable {
+    let bookmark: Bookmark
+}
+
 struct ZineTabNavigationActions {
     var home: ((HomeNavigationRoute) -> Void)?
     var homeSection: ((HomeSectionRoute) -> Void)?
     var bookmark: ((Bookmark) -> Void)?
     var settings: ((SettingsRoute) -> Void)?
+    var creator: ((SearchCreatorRoute) -> Void)?
 }
 
 private struct ZineTabNavigationActionsKey: EnvironmentKey {
@@ -84,14 +90,16 @@ private struct AuthenticatedAppView: View {
     @State private var homeStore: HomeStore
     @State private var sourcesPresentation: SourcesPresentation?
     @State private var search = ""
+    @State private var searchTabReselection = 0
     @State private var selectedTab = AppTab.home
     @State private var navigationPath = NavigationPath()
     @State private var homeTabReselection = 0
     @State private var inboxTabReselection = 0
-    @State private var inboxTitleCollapseProgress: CGFloat = 0
+    @State private var inboxTitleCollapseState = ListTitleCollapseState()
     @State private var libraryTabReselection = 0
-    @State private var homeTitleCollapseProgress: CGFloat = 0
-    @State private var libraryTitleCollapseProgress: CGFloat = 0
+    @State private var homeTitleCollapseState = ListTitleCollapseState()
+    @State private var libraryTitleCollapseState = ListTitleCollapseState()
+    @State private var searchTitleCollapseState = ListTitleCollapseState()
     @State private var homeRevision = 0
     @State private var libraryRevision = 0
     @State private var offlineSyncRevision = 0
@@ -162,9 +170,9 @@ private struct AuthenticatedAppView: View {
                         onExternalOpen: handleExternalOpen,
                         onHomeItemExternalOpen: handleHomeItemExternalOpen,
                         tabReselection: homeTabReselection,
-                        onTitleCollapseProgressChanged: { homeTitleCollapseProgress = $0 },
                         transitionNamespace: navigationTransition,
-                        registersNavigationDestinations: false
+                        registersNavigationDestinations: false,
+                        titleCollapseState: homeTitleCollapseState
                     )
                     .tint(ZineTheme.brandAccent)
                 }
@@ -181,7 +189,7 @@ private struct AuthenticatedAppView: View {
                         title: "Inbox",
                         background: ZineTheme.canvas,
                         refreshRevision: libraryRevision,
-                        onTitleCollapseProgressChanged: { inboxTitleCollapseProgress = $0 }
+                        titleCollapseState: inboxTitleCollapseState
                     )
                     .tint(ZineTheme.brandAccent)
                 }
@@ -194,24 +202,36 @@ private struct AuthenticatedAppView: View {
                         onContentChanged: markHomeChanged,
                         onExternalOpen: handleExternalOpen,
                         tabReselection: libraryTabReselection,
-                        onTitleCollapseProgressChanged: { libraryTitleCollapseProgress = $0 },
-                        transitionNamespace: navigationTransition
+                        transitionNamespace: navigationTransition,
+                        titleCollapseState: libraryTitleCollapseState
                     )
                     .tint(ZineTheme.brandAccent)
                 }
 
-                Tab(value: AppTab.search, role: .search) {
+                Tab(value: AppTab.search) {
                     LibraryView(
                         client: client,
                         cache: libraryCache,
                         searchText: $search,
+                        searchHistoryKey: "zine.search.history.\(userID)",
                         refreshRevision: libraryRevision,
                         onContentChanged: markHomeChanged,
                         onExternalOpen: handleExternalOpen,
-                        transitionNamespace: navigationTransition
+                        tabReselection: searchTabReselection,
+                        transitionNamespace: navigationTransition,
+                        titleCollapseState: searchTitleCollapseState
                     )
-                    .searchable(text: $search, prompt: "Search your library")
                     .tint(ZineTheme.brandAccent)
+                } label: {
+                    Label {
+                        Text("Search")
+                    } icon: {
+                        Image(uiImage: UIImage(
+                            systemName: "magnifyingglass",
+                            withConfiguration: UIImage.SymbolConfiguration(weight: .medium)
+                        )!)
+                        .renderingMode(.template)
+                    }
                 }
             }
             .zineTabShellChrome()
@@ -219,7 +239,8 @@ private struct AuthenticatedAppView: View {
             .navigationBarTitleDisplayMode(.inline)
             .zineRootNavigationChrome(
                 compactTitle: selectedCompactRootTitle?.title,
-                collapseProgress: selectedCompactRootTitle?.progress ?? 0
+                collapseProgress: selectedCompactRootTitle?.progress ?? 0,
+                collapseState: selectedTitleCollapseState
             )
             .toolbar {
                 if selectedTab == .home && navigationPath.isEmpty {
@@ -266,6 +287,19 @@ private struct AuthenticatedAppView: View {
                         .zoom(sourceID: bookmark.id, in: navigationTransition)
                     )
                     .zinePushedDestinationChrome()
+            }
+            .navigationDestination(for: SearchCreatorRoute.self) { route in
+                CreatorView(
+                    creatorId: route.bookmark.creatorId ?? "",
+                    fallbackName: route.bookmark.creator,
+                    fallbackImageUrl: route.bookmark.creatorImageUrl,
+                    fallbackProvider: route.bookmark.provider,
+                    client: client,
+                    onBookmarkUpdate: { _ in markHomeChanged() },
+                    onBookmarkChange: { _, _, _ in markHomeChanged() },
+                    onExternalOpen: handleExternalOpen
+                )
+                .zinePushedDestinationChrome()
             }
             .navigationDestination(for: SettingsRoute.self) { route in
                 settingsDestination(for: route)
@@ -342,6 +376,7 @@ private struct AuthenticatedAppView: View {
                     handleTabReselection(newTab)
                 } else {
                     selectedTab = newTab
+                    if newTab == .search { searchTabReselection += 1 }
                 }
             }
         )
@@ -352,20 +387,29 @@ private struct AuthenticatedAppView: View {
         case .home, .library, .inbox:
             ""
         case .search:
-            "Search"
+            ""
+        }
+    }
+
+    private var selectedTitleCollapseState: ListTitleCollapseState? {
+        switch selectedTab {
+        case .home: homeTitleCollapseState
+        case .inbox: inboxTitleCollapseState
+        case .library: libraryTitleCollapseState
+        case .search: searchTitleCollapseState
         }
     }
 
     private var selectedCompactRootTitle: (title: String, progress: CGFloat)? {
         switch selectedTab {
         case .home:
-            ("Home", homeTitleCollapseProgress)
+            ("Home", 0)
         case .inbox:
-            ("Inbox", inboxTitleCollapseProgress)
+            ("Inbox", 0)
         case .library:
-            ("Library", libraryTitleCollapseProgress)
+            ("Library", 0)
         case .search:
-            nil
+            ("Search", 0)
         }
     }
 
@@ -380,7 +424,8 @@ private struct AuthenticatedAppView: View {
                 }
             },
             bookmark: { navigationPath.append($0) },
-            settings: { navigationPath.append($0) }
+            settings: { navigationPath.append($0) },
+            creator: { navigationPath.append($0) }
         )
     }
 
@@ -393,7 +438,7 @@ private struct AuthenticatedAppView: View {
         case .library:
             libraryTabReselection += 1
         case .search:
-            break
+            searchTabReselection += 1
         }
     }
 

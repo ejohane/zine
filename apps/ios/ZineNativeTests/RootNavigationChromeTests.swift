@@ -104,6 +104,7 @@ private final class NavigationState: ObservableObject {
 
 private struct NavigationHarness: View {
     @ObservedObject var state: NavigationState
+    @State private var titleState = ListTitleCollapseState(progress: 1)
 
     var body: some View {
         NavigationStack(path: $state.path) {
@@ -115,7 +116,7 @@ private struct NavigationHarness: View {
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            .zineRootNavigationChrome(compactTitle: "Library", collapseProgress: 1)
+            .zineRootNavigationChrome(compactTitle: "Library", collapseProgress: 0, collapseState: titleState)
             .navigationDestination(for: Int.self) { _ in
                 Text("Detail")
                     .toolbarVisibility(.hidden, for: .navigationBar)

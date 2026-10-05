@@ -1,4 +1,29 @@
 import SwiftUI
+import Observation
+
+@Observable
+final class ListTitleCollapseState {
+    var progress: CGFloat
+
+    init(progress: CGFloat = 0) {
+        self.progress = progress
+    }
+}
+
+struct ObservedListTitle: View {
+    let title: String
+    let state: ListTitleCollapseState
+    var compact = false
+    var background = ZineTheme.canvas
+
+    var body: some View {
+        if compact {
+            CollapsedListTitle(title: title, progress: state.progress)
+        } else {
+            CollapsingListTitle(title: title, progress: state.progress, background: background)
+        }
+    }
+}
 
 struct CollapsingListTitle: View {
     let title: String
@@ -144,7 +169,7 @@ private struct ContentTypeFilterChip: View {
 }
 
 extension View {
-    func zineRootNavigationChrome(compactTitle: String?, collapseProgress: CGFloat) -> some View {
+    func zineRootNavigationChrome(compactTitle: String?, collapseProgress: CGFloat, collapseState: ListTitleCollapseState? = nil) -> some View {
         // This belongs to the root navigation entry, not the stack's current
         // depth. Removing its toolbar on push can lose the principal title
         // when SwiftUI restores the TabView after a pop (including swipe-back).
@@ -153,7 +178,11 @@ extension View {
             .toolbar {
                 if let compactTitle {
                     ToolbarItem(placement: .principal) {
-                        CollapsedListTitle(title: compactTitle, progress: collapseProgress)
+                        if let collapseState {
+                            ObservedListTitle(title: compactTitle, state: collapseState, compact: true)
+                        } else {
+                            CollapsedListTitle(title: compactTitle, progress: collapseProgress)
+                        }
                     }
                 }
             }

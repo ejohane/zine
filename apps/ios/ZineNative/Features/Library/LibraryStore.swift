@@ -135,7 +135,7 @@ final class LibraryStore {
 
     func update(_ bookmark: Bookmark) {
         if let index = items.firstIndex(where: { $0.id == bookmark.id }) {
-            if bookmark.isFinished == activeQuery.isFinished {
+            if activeQuery.includesFinished || bookmark.isFinished == activeQuery.isFinished {
                 items[index] = bookmark
             } else {
                 items.remove(at: index)
@@ -148,7 +148,7 @@ final class LibraryStore {
     func setBookmarked(_ bookmark: Bookmark, isBookmarked: Bool) {
         if isBookmarked {
             guard !items.contains(where: { $0.id == bookmark.id }),
-                  bookmark.isFinished == activeQuery.isFinished
+                  (activeQuery.includesFinished || bookmark.isFinished == activeQuery.isFinished)
             else { return }
 
             let index = min(unbookmarkedIndices.removeValue(forKey: bookmark.id) ?? 0, items.endIndex)
@@ -174,6 +174,19 @@ final class LibraryStore {
     }
 
     func complete(_ bookmark: Bookmark) async {
+        if activeQuery.includesFinished {
+            guard !bookmark.isFinished else { return }
+            var completed = bookmark
+            completed.isFinished = true
+            update(completed)
+            do {
+                _ = try await setFinished(bookmark, value: true)
+            } catch {
+                update(bookmark)
+                actionErrorMessage = "The bookmark couldn’t be completed. Please try again."
+            }
+            return
+        }
         guard !bookmark.isFinished,
               let removal = removeOptimistically(bookmark)
         else { return }

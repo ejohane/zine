@@ -14,7 +14,12 @@ struct HomeSectionListView: View {
 
     @State private var store: HomeSectionListStore
     @State private var contentType: ContentType?
-    @State private var titleCollapseProgress: CGFloat = 0
+    @State private var localTitleCollapseState = ListTitleCollapseState()
+    private let suppliedTitleCollapseState: ListTitleCollapseState?
+
+    private var titleCollapseState: ListTitleCollapseState {
+        suppliedTitleCollapseState ?? localTitleCollapseState
+    }
     @State private var isVisible = false
     @Namespace private var bookmarkTransition
 
@@ -30,9 +35,11 @@ struct HomeSectionListView: View {
         title: String? = nil,
         background: Color = ZineTheme.surface,
         refreshRevision: Int = 0,
-        onTitleCollapseProgressChanged: ((CGFloat) -> Void)? = nil
+        onTitleCollapseProgressChanged: ((CGFloat) -> Void)? = nil,
+        titleCollapseState: ListTitleCollapseState? = nil
     ) {
         self.route = route
+        suppliedTitleCollapseState = titleCollapseState
         self.client = client
         self.onItemVisibilityChanged = onItemVisibilityChanged
         self.onContentChanged = onContentChanged
@@ -56,12 +63,9 @@ struct HomeSectionListView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if onTitleCollapseProgressChanged == nil {
+                if onTitleCollapseProgressChanged == nil && suppliedTitleCollapseState == nil {
                     ToolbarItem(placement: .principal) {
-                        CollapsedListTitle(
-                            title: title,
-                            progress: titleCollapseProgress
-                        )
+                        ObservedListTitle(title: title, state: titleCollapseState, compact: true)
                     }
                 }
             }
@@ -115,11 +119,7 @@ struct HomeSectionListView: View {
     private var content: some View {
         ScrollViewReader { proxy in
             List {
-                CollapsingListTitle(
-                    title: title,
-                    progress: titleCollapseProgress,
-                    background: background
-                )
+                ObservedListTitle(title: title, state: titleCollapseState, background: background)
                 .id(ScrollAnchor.top)
 
                 Section {
@@ -140,7 +140,7 @@ struct HomeSectionListView: View {
                 let offset = geometry.contentOffset.y + geometry.contentInsets.top
                 return FilteredListScrollState.collapseProgress(scrollOffset: offset)
             } action: { _, progress in
-                titleCollapseProgress = progress
+                titleCollapseState.progress = progress
                 onTitleCollapseProgressChanged?(progress)
             }
             .onChange(of: tabReselection) {
@@ -183,7 +183,7 @@ struct HomeSectionListView: View {
     private func handleTabReselection(using proxy: ScrollViewProxy) {
         FilteredListTabAction.perform(
             isVisible: isVisible,
-            collapseProgress: titleCollapseProgress,
+            collapseProgress: titleCollapseState.progress,
             hasActiveFilter: contentType != nil,
             proxy: proxy,
             topID: ScrollAnchor.top,
