@@ -22,6 +22,21 @@ export function qualityGate(cases: ReviewedPrediction[]) {
       unwanted = total('unwanted'),
       unknown = total('unknown');
     return {
+      confirmedAbstentionCases: items.filter(
+        (r) =>
+          r.reviewed &&
+          r.labels.exhaustive &&
+          r.labels.expectedGroups.length === 0 &&
+          r.labels.acceptable.length === 0
+      ).length,
+      correctAbstentions: items.filter(
+        (r) =>
+          r.reviewed &&
+          r.labels.exhaustive &&
+          r.labels.expectedGroups.length === 0 &&
+          r.labels.acceptable.length === 0 &&
+          r.suggestions.length === 0
+      ).length,
       cases: items.length,
       reviewedCases: items.filter((r) => r.reviewed).length,
       useful,

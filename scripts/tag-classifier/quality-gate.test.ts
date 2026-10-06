@@ -31,3 +31,14 @@ test('reports micro scores and coverage failures without null-as-zero', () => {
   expect(qualityGate([]).overall.precision).toBeNull();
   expect(() => qualityGate([cases()[0], cases()[0]])).toThrow('Duplicate');
 });
+
+test('abstention measures explicitly reviewed no-tag cases', () => {
+  const inputs = cases();
+  inputs[0].labels = { expectedGroups: [], acceptable: [], unwanted: [], exhaustive: true };
+  inputs[0].suggestions = [];
+  const result = qualityGate(inputs);
+  expect(result.overall.confirmedAbstentionCases).toBe(1);
+  expect(result.overall.correctAbstentions).toBe(1);
+  inputs[0].suggestions = ['ai'];
+  expect(qualityGate(inputs).overall.correctAbstentions).toBe(0);
+});
