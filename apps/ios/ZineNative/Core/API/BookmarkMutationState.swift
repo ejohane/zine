@@ -19,6 +19,7 @@ final class BookmarkMutationState {
   private struct Entry {
     var patch: Patch
     var version: Int
+    var intentVersion: Int
     var pending: Bool
   }
   @ObservationIgnored private var knownStates: [String: Patch] = [:]
@@ -49,7 +50,7 @@ final class BookmarkMutationState {
     }
     if let state { patch.state = state }
     revision += 1
-    entries[id] = Entry(patch: patch, version: revision, pending: true)
+    entries[id] = Entry(patch: patch, version: revision, intentVersion: revision, pending: true)
     return Transaction(id: id, version: revision, previous: previous)
   }
 
@@ -57,6 +58,7 @@ final class BookmarkMutationState {
     guard var entry = entries[transaction.id], entry.version == transaction.version else { return }
     revision += 1
     entry.version = revision
+    entry.intentVersion = revision
     entry.pending = false
     if let isFinished {
       entry.patch.isFinished = isFinished
@@ -68,7 +70,7 @@ final class BookmarkMutationState {
   func rollback(_ transaction: Transaction) {
     guard entries[transaction.id]?.version == transaction.version else { return }
     revision += 1
-    entries[transaction.id] = Entry(patch: transaction.previous, version: revision, pending: false)
+    entries[transaction.id] = Entry(patch: transaction.previous, version: revision, intentVersion: revision, pending: false)
   }
 
   /// A read started after the last commit can reconcile external changes. Older
@@ -89,7 +91,7 @@ final class BookmarkMutationState {
           || patch.state != entry.patch.state
       else { continue }
       revision += 1
-      entries[bookmark.id] = Entry(patch: patch, version: revision, pending: false)
+      entries[bookmark.id] = Entry(patch: patch, version: revision, intentVersion: entry.intentVersion, pending: false)
     }
   }
 
@@ -113,6 +115,11 @@ final class BookmarkMutationState {
       && (membership?.includes(id: id, isFinished: patch.isFinished) ?? true)
   }
 
+  func shouldRetain(id: String, after readRevision: Int) -> Bool {
+    guard let entry = entries[id] else { return false }
+    return entry.pending || entry.intentVersion > readRevision
+  }
+
   var changedIDs: Set<String> { Set(entries.keys) }
 
   var hiddenUnfinishedIDs: Set<String> {
@@ -120,5 +127,29 @@ final class BookmarkMutationState {
       entries.compactMap { id, entry in
         entry.patch.isFinished || entry.patch.state != "BOOKMARKED" ? id : nil
       })
+  }
+}
+
+/// Query-local membership fences. Keep restoration snapshots without treating a
+/// field patch as permanent proof that a row belongs in a refreshed page.
+struct BookmarkMembershipSnapshot {
+  private var omissions: [String: Int] = [:]
+  private var queuedIDs: Set<String> = []
+
+  mutating func accept(previousIDs: [String], receivedIDs: [String], startedAt: Int,
+                       queuedIDs: Set<String>) {
+    self.queuedIDs = queuedIDs
+    let received = Set(receivedIDs)
+    for id in previousIDs where !received.contains(id) { omissions[id] = startedAt }
+    for id in received { omissions.removeValue(forKey: id) }
+  }
+
+  mutating func includeReturned(_ ids: [String]) {
+    for id in ids { omissions.removeValue(forKey: id) }
+  }
+
+  @MainActor func includes(_ id: String, state: BookmarkMutationState) -> Bool {
+    guard let revision = omissions[id] else { return true }
+    return queuedIDs.contains(id) || state.shouldRetain(id: id, after: revision)
   }
 }

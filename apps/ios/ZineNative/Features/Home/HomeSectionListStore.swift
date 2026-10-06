@@ -10,8 +10,9 @@ final class HomeSectionListStore {
     }
 
     private var storedItems: [Bookmark] = []
+    private var membership = BookmarkMembershipSnapshot()
     private(set) var items: [Bookmark] {
-        get { client.bookmarkState.overlay(storedItems).filter { shouldKeep($0) } }
+        get { client.bookmarkState.overlay(storedItems).filter { membership.includes($0.id, state: client.bookmarkState) && shouldKeep($0) } }
         set {
             let receivedIDs = Set(newValue.map(\.id))
             storedItems = newValue + storedItems.filter {
@@ -96,6 +97,7 @@ final class HomeSectionListStore {
         } else if filterChanged {
             activeContentType = contentType
             storedItems = []
+            membership = BookmarkMembershipSnapshot()
             nextCursor = nil
             isLoadingMore = false
         }
@@ -108,9 +110,13 @@ final class HomeSectionListStore {
         }
 
         do {
+            let readRevision = client.bookmarkState.revision
             let response = try await request(contentType: contentType)
             guard !Task.isCancelled, activeContentType == contentType else { return }
             completionMembership = response.completionMembership
+            let queuedIDs = await client.pendingBookmarkMutationIDs()
+            guard !Task.isCancelled, activeContentType == contentType else { return }
+            membership.accept(previousIDs: storedItems.map(\.id), receivedIDs: response.items.map(\.id), startedAt: readRevision, queuedIDs: queuedIDs)
             items = route == .inbox ? visibleInboxItems(response.items) : response.items
             nextCursor = response.nextCursor
             if route == .inbox {
@@ -184,6 +190,7 @@ final class HomeSectionListStore {
             if let membership = response.completionMembership {
                 completionMembership = CollectionCompletionMembership(isFinished: membership.isFinished, pinnedIds: (completionMembership?.pinnedIds ?? []) + membership.pinnedIds)
             }
+            membership.includeReturned(response.items.map(\.id))
             let existingIDs = Set(items.map(\.id))
             items.append(contentsOf: response.items.filter {
                 !existingIDs.contains($0.id)

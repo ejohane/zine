@@ -5,8 +5,9 @@ import Observation
 @Observable
 final class JumpBackInListStore {
     private var storedItems: [Bookmark] = []
+    private var membership = BookmarkMembershipSnapshot()
     private(set) var items: [Bookmark] {
-        get { client.bookmarkState.overlay(storedItems).filter { $0.state == "BOOKMARKED" && !$0.isFinished } }
+        get { client.bookmarkState.overlay(storedItems).filter { membership.includes($0.id, state: client.bookmarkState) && $0.state == "BOOKMARKED" && !$0.isFinished } }
         set {
             let receivedIDs = Set(newValue.map(\.id))
             storedItems = newValue + storedItems.filter {
@@ -34,6 +35,7 @@ final class JumpBackInListStore {
 
         if filterChanged {
             storedItems = []
+            membership = BookmarkMembershipSnapshot()
             nextCursor = nil
             isLoadingMore = false
         }
@@ -46,8 +48,12 @@ final class JumpBackInListStore {
         }
 
         do {
+            let readRevision = client.bookmarkState.revision
             let response = try await client.listOpenedBookmarks(contentType: contentType)
             guard !Task.isCancelled, activeContentType == contentType else { return }
+            let queuedIDs = await client.pendingBookmarkMutationIDs()
+            guard !Task.isCancelled, activeContentType == contentType else { return }
+            membership.accept(previousIDs: storedItems.map(\.id), receivedIDs: response.items.map(\.id), startedAt: readRevision, queuedIDs: queuedIDs)
             items = response.items
             nextCursor = response.nextCursor
             prefetchImages(in: response.items)
@@ -79,6 +85,7 @@ final class JumpBackInListStore {
                 cursor: nextCursor
             )
             guard !Task.isCancelled, activeContentType == requestedContentType else { return }
+            membership.includeReturned(response.items.map(\.id))
             let existingIDs = Set(items.map(\.id))
             items.append(contentsOf: response.items.filter { !existingIDs.contains($0.id) })
             self.nextCursor = response.nextCursor

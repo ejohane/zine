@@ -119,9 +119,10 @@ actor OfflineBookmarkMutationOutbox {
         return overlayLoaded(bookmark)
     }
 
-    func overlay(_ bookmarks: [Bookmark], matching query: LibraryQuery) -> [Bookmark] {
+    func overlay(_ bookmarks: [Bookmark], matching query: LibraryQuery, insertMissing: Bool = true) -> [Bookmark] {
         loadIfNeeded()
         var result = bookmarks.compactMap(overlayLoaded).filter { Self.matches($0, query: query) }
+        guard insertMissing else { return result }
         var existingIDs = Set(result.map(\.id))
 
         for mutation in (envelope?.mutations ?? []).sorted(by: { $0.sequence < $1.sequence }) {

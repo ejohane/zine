@@ -342,7 +342,7 @@ struct APIClient {
         let response: PaginatedBookmarksResponse = try await request(url: components.url!)
         guard let bookmarkMutationOutbox else { return response }
         return PaginatedBookmarksResponse(
-            items: await bookmarkMutationOutbox.overlay(response.items, matching: LibraryQuery(includesFinished: true, contentType: contentType)),
+            items: await bookmarkMutationOutbox.overlay(response.items, matching: LibraryQuery(includesFinished: true, contentType: contentType), insertMissing: false),
             nextCursor: response.nextCursor,
             completionMembership: response.completionMembership)
     }
@@ -814,6 +814,11 @@ struct APIClient {
     func overlayLibraryBookmarks(_ bookmarks: [Bookmark], query: LibraryQuery) async -> [Bookmark] {
         guard let bookmarkMutationOutbox else { return bookmarks }
         return await bookmarkMutationOutbox.overlay(bookmarks, matching: query)
+    }
+
+    func pendingBookmarkMutationIDs() async -> Set<String> {
+        guard let bookmarkMutationOutbox else { return [] }
+        return Set(await bookmarkMutationOutbox.pendingMutations().map(\.bookmarkID))
     }
 
     func pendingBookmarkMutationCount() async -> Int {

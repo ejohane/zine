@@ -5,6 +5,8 @@ import Observation
 @Observable
 final class CreatorStore {
     private(set) var profile: CreatorProfile?
+    private var bookmarkMembership = BookmarkMembershipSnapshot()
+    private var completedMembership = BookmarkMembershipSnapshot()
     private var storedBookmarks: [Bookmark] = []
     private(set) var bookmarks: [Bookmark] {
         get { visibleBookmarks(finished: false) }
@@ -23,10 +25,15 @@ final class CreatorStore {
 
     private func visibleBookmarks(finished: Bool) -> [Bookmark] {
         var seen = Set<String>()
-        return client.bookmarkState.overlay(storedBookmarks + storedCompletedBookmarks).filter {
+        let snapshot = finished ? completedMembership : bookmarkMembership
+        let candidates = (storedBookmarks + storedCompletedBookmarks).filter {
+            snapshot.includes($0.id, state: client.bookmarkState)
+        }
+        return client.bookmarkState.overlay(candidates).filter {
             seen.insert($0.id).inserted && $0.state == "BOOKMARKED" && $0.isFinished == finished
         }
     }
+
     private(set) var latestContent: [CreatorContentItem] = []
     private(set) var latestProvider: Provider?
     private(set) var latestReason: String?
@@ -84,6 +91,7 @@ final class CreatorStore {
                 isFinished: false
             )
             guard !Task.isCancelled else { return }
+            bookmarkMembership.includeReturned(response.items.map(\.id))
             let existingIDs = Set(bookmarks.map(\.id))
             bookmarks.append(contentsOf: response.items.filter { !existingIDs.contains($0.id) })
             self.nextCursor = response.nextCursor
@@ -111,6 +119,7 @@ final class CreatorStore {
                 isFinished: true
             )
             guard !Task.isCancelled else { return }
+            completedMembership.includeReturned(response.items.map(\.id))
             let existingIDs = Set(completedBookmarks.map(\.id))
             completedBookmarks.append(
                 contentsOf: response.items.filter { !existingIDs.contains($0.id) }
@@ -137,12 +146,15 @@ final class CreatorStore {
         isLoadingBookmarks = reset && bookmarks.isEmpty
         defer { isLoadingBookmarks = false }
 
+        let readRevision = client.bookmarkState.revision
         do {
             let response = try await client.listCreatorBookmarks(
                 creatorId: creatorId,
                 isFinished: false
             )
+            let queuedIDs = await client.pendingBookmarkMutationIDs()
             guard !Task.isCancelled else { return }
+            bookmarkMembership.accept(previousIDs: (storedBookmarks + storedCompletedBookmarks).map(\.id), receivedIDs: response.items.map(\.id), startedAt: readRevision, queuedIDs: queuedIDs)
             bookmarks = response.items
             nextCursor = response.nextCursor
         } catch is CancellationError {
@@ -156,12 +168,15 @@ final class CreatorStore {
         isLoadingCompletedBookmarks = reset && completedBookmarks.isEmpty
         defer { isLoadingCompletedBookmarks = false }
 
+        let readRevision = client.bookmarkState.revision
         do {
             let response = try await client.listCreatorBookmarks(
                 creatorId: creatorId,
                 isFinished: true
             )
+            let queuedIDs = await client.pendingBookmarkMutationIDs()
             guard !Task.isCancelled else { return }
+            completedMembership.accept(previousIDs: (storedBookmarks + storedCompletedBookmarks).map(\.id), receivedIDs: response.items.map(\.id), startedAt: readRevision, queuedIDs: queuedIDs)
             completedBookmarks = response.items
             completedNextCursor = response.nextCursor
         } catch is CancellationError {
