@@ -16,10 +16,11 @@ Library filtering is outside this scope.
       retain timestamps, coverage, hashes, and durable failures.
 - [x] Compare description and transcript evidence on the four acquired episodes
       with the same frozen catalog/model/policy/threshold.
-- [ ] Build a reproducible baseline comparison and regression report recording
+- [x] Build a reproducible baseline comparison and regression report recording
       versions, input hashes, coverage, cost, latency, misses, and extras.
-- [ ] Prepare at least forty unseen varied bookmarks for human labels before
-      revealing model output. Independent labels are a required quality gate.
+- [x] Prepare at least forty unseen varied bookmarks for human labels before
+      revealing model output.
+- [ ] Obtain independent human labels; this remains a required quality gate.
 - [ ] Freeze and evaluate a candidate: >=90% reviewed-suggestion precision and >=80% expected-tag recovery, with per-coverage results, unwanted tags per
       bookmark, abstention, cost, and latency. Never promote on development scores.
 - [ ] After the quality gate, implement enrichment-triggered background jobs,

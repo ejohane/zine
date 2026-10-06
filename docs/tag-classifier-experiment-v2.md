@@ -44,7 +44,7 @@ patterns article, and AI/Vibecode on the icon post. Decision making on the desig
 system article and Critical thinking on the postmortem remain above threshold.
 Additional suggestions need review, especially inference from sparse evidence.
 
-Final revised twenty-call estimated cost: $0.02512; median API latency: 352 ms.
+Final revised twenty-call estimated cost: $0.02512; median API latency: 348.5 ms.
 An earlier longer-policy exploratory run also made twenty calls, before the
 request-size check prompted shortening; its runs are retained separately under
 `v2-runs`. Only `v2-final-runs` supplies the numbers above.
