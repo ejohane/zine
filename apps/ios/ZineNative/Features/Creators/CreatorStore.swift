@@ -5,8 +5,28 @@ import Observation
 @Observable
 final class CreatorStore {
     private(set) var profile: CreatorProfile?
-    private(set) var bookmarks: [Bookmark] = []
-    private(set) var completedBookmarks: [Bookmark] = []
+    private var storedBookmarks: [Bookmark] = []
+    private(set) var bookmarks: [Bookmark] {
+        get { visibleBookmarks(finished: false) }
+        set { storedBookmarks = retainingMutatedRows(storedBookmarks, replacingWith: newValue) }
+    }
+    private var storedCompletedBookmarks: [Bookmark] = []
+    private(set) var completedBookmarks: [Bookmark] {
+        get { visibleBookmarks(finished: true) }
+        set { storedCompletedBookmarks = retainingMutatedRows(storedCompletedBookmarks, replacingWith: newValue) }
+    }
+
+    private func retainingMutatedRows(_ old: [Bookmark], replacingWith new: [Bookmark]) -> [Bookmark] {
+        let receivedIDs = Set(new.map(\.id))
+        return new + old.filter { client.bookmarkState.changedIDs.contains($0.id) && !receivedIDs.contains($0.id) }
+    }
+
+    private func visibleBookmarks(finished: Bool) -> [Bookmark] {
+        var seen = Set<String>()
+        return client.bookmarkState.overlay(storedBookmarks + storedCompletedBookmarks).filter {
+            seen.insert($0.id).inserted && $0.state == "BOOKMARKED" && $0.isFinished == finished
+        }
+    }
     private(set) var latestContent: [CreatorContentItem] = []
     private(set) var latestProvider: Provider?
     private(set) var latestReason: String?

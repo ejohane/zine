@@ -428,6 +428,13 @@ struct BookmarkDetailView: View {
         .task(id: content.id) {
             await hydrateBookmark()
         }
+        .onChange(of: client.bookmarkState.revision) { _, _ in
+            guard let current = bookmark, !finishedState.isUpdating, !isSavingBookmark else { return }
+            let updated = client.bookmarkState.overlay(current)
+            bookmark = updated
+            isBookmarked = updated.state == "BOOKMARKED"
+            finishedState.synchronize(isFinished: updated.isFinished, finishedAt: updated.finishedAt, isUpdating: false)
+        }
         .onChange(of: content.creatorImageUrl) { _, _ in artworkPalette = nil }
         .task(id: content.id) {
             await hydrateSubscriptionSettings()
@@ -1110,6 +1117,7 @@ struct BookmarkDetailView: View {
     }
 
     private func toggleFinished() {
+        let previousBookmark = bookmark
         guard let mutation = finishedState.beginToggle() else { return }
         updateBookmarkFromFinishedState(notify: false)
 
@@ -1118,7 +1126,7 @@ struct BookmarkDetailView: View {
                 let result = try await client.setFinished(
                     id: content.id,
                     isFinished: mutation.requestedIsFinished,
-                    bookmark: bookmark
+                    bookmark: previousBookmark
                 )
                 finishedState.accept(
                     isFinished: result.isFinished,
@@ -1153,7 +1161,7 @@ struct BookmarkDetailView: View {
         do {
             let delivery: NativeMutationDelivery
             if newValue {
-                try await client.bookmarkItem(id: bookmark.id)
+                try await client.bookmarkItem(id: bookmark.id, bookmark: bookmark)
                 delivery = .serverCommitted
             } else {
                 delivery = try await client.archiveBookmarkWithReceipt(id: bookmark.id, bookmark: bookmark)

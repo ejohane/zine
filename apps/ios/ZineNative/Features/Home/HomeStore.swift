@@ -30,13 +30,81 @@ enum HomeDashboardSection: Identifiable {
 @MainActor
 @Observable
 final class HomeStore {
-    private(set) var sections: [HomeDashboardSection] = []
+    var sections: [HomeDashboardSection] {
+        Self.makeSections(
+            home: home,
+            inboxItems: client.bookmarkState.overlay(inboxItems).filter {
+                $0.state == "INBOX" && !$0.isFinished
+            },
+            optimisticOpenedItems: Array(optimisticOpenedItems.values),
+            hiddenItemIDs: hiddenItemIDs.subtracting(client.bookmarkState.changedIDs)
+        ).compactMap { section in
+            switch section {
+            case .collection(var collection):
+                let visible = collection.items.filter {
+                    client.bookmarkState.includesInCollection(
+                        id: $0.id, membership: collection.completionMembership)
+                }
+                collection = HomeCollection(
+                    collectionId: collection.collectionId, title: collection.title, layout: collection.layout,
+                    position: collection.position, count: visible.count, items: visible,
+                    completionMembership: collection.completionMembership)
+                return .collection(collection)
+            case .jumpBackIn(let items): return .jumpBackIn(visibleUnfinished(items))
+            case .quickWins(let items): return .quickWins(visibleUnfinished(items))
+            case .recentlySaved(let items): return .recentlySaved(visibleUnfinished(items))
+            case .podcasts(let items): return .podcasts(visibleUnfinished(items))
+            case .articles(let items): return .articles(visibleUnfinished(items))
+            case .videos(let items): return .videos(visibleUnfinished(items))
+            case .featuredArticle(let item):
+                return client.bookmarkState.hiddenUnfinishedIDs.contains(item.id) ? nil : section
+            default: return section
+            }
+        }
+    }
+
+    private func visibleUnfinished(_ items: [HomeItem]) -> [HomeItem] {
+        items.filter { !client.bookmarkState.hiddenUnfinishedIDs.contains($0.id) }
+    }
     private(set) var isLoading = false
     private(set) var errorMessage: String?
 
     private let client: APIClient
     private let cache: HomeCache
     private var home: HomeResponse?
+
+    private func setHome(_ updated: HomeResponse?) {
+        guard let oldValue = home, let current = updated else {
+            home = updated
+            return
+        }
+        func retain(_ old: [HomeItem], _ new: [HomeItem]) -> [HomeItem] {
+            let received = Set(new.map(\.id))
+            return new
+                + old.filter {
+                    client.bookmarkState.changedIDs.contains($0.id) && !received.contains($0.id)
+                }
+        }
+        let collections = current.customCollections.map { collection in
+            guard let old = oldValue.customCollections.first(where: { $0.id == collection.id }) else {
+                return collection
+            }
+            let items = retain(old.items, collection.items)
+            return HomeCollection(
+                collectionId: collection.collectionId, title: collection.title, layout: collection.layout,
+                position: collection.position, count: items.count, items: items,
+                completionMembership: collection.completionMembership)
+        }
+        home = HomeResponse(
+            recentBookmarks: retain(oldValue.recentBookmarks, current.recentBookmarks),
+            jumpBackIn: retain(oldValue.jumpBackIn, current.jumpBackIn),
+            byContentType: HomeContentTypeSections(
+                videos: retain(oldValue.byContentType.videos, current.byContentType.videos),
+                podcasts: retain(oldValue.byContentType.podcasts, current.byContentType.podcasts),
+                articles: retain(oldValue.byContentType.articles, current.byContentType.articles)),
+            customCollections: collections, sectionOrder: current.sectionOrder,
+            requestId: current.requestId, traceId: current.traceId)
+    }
     private var inboxItems: [Bookmark] = []
     private var hiddenItemIDs: Set<String> = []
     private var optimisticOpenedItems: [String: HomeItem] = [:]
@@ -53,12 +121,11 @@ final class HomeStore {
 
         if let snapshot = await cache.load() {
             if let cachedHome = snapshot.home {
-                home = await client.overlayHome(cachedHome)
+                setHome(await client.overlayHome(cachedHome))
             } else {
                 home = nil
             }
             inboxItems = snapshot.inboxItems
-            rebuildSections()
         }
 
         isLoading = sections.isEmpty
@@ -68,10 +135,9 @@ final class HomeStore {
         var didUpdate = false
 
         do {
-            home = try await client.getHome()
+            setHome(try await client.getHome())
             reconcileOptimisticOpenedItems()
             didUpdate = true
-            rebuildSections()
         } catch is CancellationError {
             return
         } catch {
@@ -84,7 +150,6 @@ final class HomeStore {
             let response = try await client.listInbox(query: InboxQuery(), limit: 4)
             inboxItems = Array(response.items.prefix(4))
             didUpdate = true
-            rebuildSections()
         } catch is CancellationError {
             return
         } catch {
@@ -99,7 +164,6 @@ final class HomeStore {
                 + home.byContentType.articles + home.customCollections.flatMap(\.items)).map(\.id))
                 .union(inboxItems.map(\.id))
             hiddenItemIDs.formIntersection(serverIDs)
-            rebuildSections()
         }
 
         if didUpdate {
@@ -107,15 +171,6 @@ final class HomeStore {
         } else if sections.isEmpty {
             errorMessage = networkErrors.first?.localizedDescription ?? "Please try again."
         }
-    }
-
-    private func rebuildSections() {
-        sections = Self.makeSections(
-            home: home,
-            inboxItems: inboxItems,
-            optimisticOpenedItems: Array(optimisticOpenedItems.values),
-            hiddenItemIDs: hiddenItemIDs
-        )
     }
 
     // Apply destination mutations before an interactive pop exposes Home. Keep this
@@ -126,13 +181,11 @@ final class HomeStore {
         } else {
             hiddenItemIDs.insert(id)
         }
-        rebuildSections()
     }
 
     func promoteOpened(_ bookmark: Bookmark, at openedAt: Date) {
         guard bookmark.state == "BOOKMARKED", !bookmark.isFinished else { return }
         optimisticOpenedItems[bookmark.id] = HomeItem(bookmark: bookmark, openedAt: openedAt)
-        rebuildSections()
     }
 
     func rollbackOpened(id: String, openedAt: Date) {
@@ -140,7 +193,6 @@ final class HomeStore {
               optimistic.lastOpenedAt == openedAt.formatted(.iso8601)
         else { return }
         optimisticOpenedItems[id] = nil
-        rebuildSections()
     }
 
     private func reconcileOptimisticOpenedItems() {

@@ -51,6 +51,8 @@ struct InboxQuery: Hashable {
 struct APIClient {
     typealias TokenProvider = () async throws -> String
 
+    let bookmarkState = BookmarkMutationState()
+
     let baseURL: URL
     let tokenProvider: TokenProvider
     var session: URLSession
@@ -81,8 +83,13 @@ struct APIClient {
     func overlayHome(_ response: HomeResponse) async -> HomeResponse {
         guard let bookmarkMutationOutbox else { return response }
         let hiddenIDs = await bookmarkMutationOutbox.hiddenHomeItemIDs()
-        guard !hiddenIDs.isEmpty else { return response }
-        return Self.filterHome(response, hiding: hiddenIDs)
+        let pending = await bookmarkMutationOutbox.pendingMutations()
+        let archivedIDs = Set(pending.filter { $0.kind == .archive }.map(\.bookmarkID))
+        let finishedStates = Dictionary(pending.compactMap { mutation -> (String, Bool)? in
+            guard mutation.kind == .finished, let finished = mutation.isFinished else { return nil }
+            return (mutation.bookmarkID, finished)
+        }, uniquingKeysWith: { _, latest in latest })
+        return Self.filterHome(response, hiding: hiddenIDs, hidingFromCollections: archivedIDs, collectionFinishedStates: finishedStates)
     }
 
     func getEditorialToday() async throws -> EditorialTodayResponse {
@@ -333,7 +340,11 @@ struct APIClient {
         }
         components.queryItems = items
         let response: PaginatedBookmarksResponse = try await request(url: components.url!)
-        return await overlayUnfinishedBookmarks(response, contentType: contentType)
+        guard let bookmarkMutationOutbox else { return response }
+        return PaginatedBookmarksResponse(
+            items: await bookmarkMutationOutbox.overlay(response.items, matching: LibraryQuery(includesFinished: true, contentType: contentType)),
+            nextCursor: response.nextCursor,
+            completionMembership: response.completionMembership)
     }
 
     func listInbox(
@@ -363,7 +374,7 @@ struct APIClient {
         let response: BookmarkResponse = try await request(
             url: baseURL.appending(path: "/api/v1/bookmarks/\(id)")
         )
-        guard let bookmarkMutationOutbox else { return response.item }
+        guard let bookmarkMutationOutbox else { return await bookmarkState.overlay(response.item) }
         guard let overlaid = await bookmarkMutationOutbox.overlay(response.item) else {
             throw APIError.server(
                 status: 404,
@@ -371,7 +382,7 @@ struct APIClient {
                 code: nil
             )
         }
-        return overlaid
+        return await bookmarkState.overlay(overlaid)
     }
 
     func getBookmarkSubscriptionSettings(id: String) async throws -> BookmarkSubscriptionSettings? {
@@ -448,8 +459,27 @@ struct APIClient {
     func setFinishedWithReceipt(
         id: String,
         isFinished: Bool,
-        bookmark: Bookmark? = nil
+        bookmark: Bookmark? = nil,
+        previousFinished: Bool? = nil,
+        previousFinishedAt: String? = nil
     ) async throws -> NativeMutationReceipt<FinishedStateResponse.FinishedBookmark> {
+        let transaction: BookmarkMutationState.Transaction?
+        if let bookmark {
+            transaction = try await bookmarkState.begin(bookmark, finished: isFinished)
+        } else if let previousFinished {
+            transaction = try await bookmarkState.begin(id: id, previous: .init(isFinished: previousFinished, finishedAt: previousFinishedAt, state: "BOOKMARKED"), finished: isFinished)
+        } else { transaction = nil }
+        do {
+            let receipt = try await performFinished(id: id, isFinished: isFinished, bookmark: bookmark)
+            if let transaction { await bookmarkState.commit(transaction, isFinished: receipt.value.isFinished, finishedAt: receipt.value.finishedAt) }
+            return receipt
+        } catch {
+            if let transaction { await bookmarkState.rollback(transaction) }
+            throw error
+        }
+    }
+
+    private func performFinished(id: String, isFinished: Bool, bookmark: Bookmark?) async throws -> NativeMutationReceipt<FinishedStateResponse.FinishedBookmark> {
         guard let bookmarkMutationOutbox else {
             return NativeMutationReceipt(value: try await sendFinished(id: id, isFinished: isFinished), delivery: .serverCommitted)
         }
@@ -549,6 +579,18 @@ struct APIClient {
     }
 
     func archiveBookmarkWithReceipt(id: String, bookmark: Bookmark? = nil) async throws -> NativeMutationDelivery {
+        let transaction: BookmarkMutationState.Transaction? = if let bookmark { try await bookmarkState.begin(bookmark, state: "ARCHIVED") } else { nil }
+        do {
+            let delivery = try await performArchive(id: id, bookmark: bookmark)
+            if let transaction { await bookmarkState.commit(transaction) }
+            return delivery
+        } catch {
+            if let transaction { await bookmarkState.rollback(transaction) }
+            throw error
+        }
+    }
+
+    private func performArchive(id: String, bookmark: Bookmark?) async throws -> NativeMutationDelivery {
         guard let bookmarkMutationOutbox else {
             try await sendArchiveBookmark(id: id)
             return .serverCommitted
@@ -578,7 +620,18 @@ struct APIClient {
         let _: EmptyResponse = try await send(request)
     }
 
-    func bookmarkItem(id: String) async throws {
+    func bookmarkItem(id: String, bookmark: Bookmark? = nil) async throws {
+        let transaction: BookmarkMutationState.Transaction? = if let bookmark { try await bookmarkState.begin(bookmark, state: "BOOKMARKED") } else { nil }
+        do {
+            try await performBookmarkItem(id: id)
+            if let transaction { await bookmarkState.commit(transaction) }
+        } catch {
+            if let transaction { await bookmarkState.rollback(transaction) }
+            throw error
+        }
+    }
+
+    private func performBookmarkItem(id: String) async throws {
         let archives = await bookmarkMutationOutbox?.pendingMutations().filter { $0.bookmarkID == id && $0.kind == .archive } ?? []
         var request = URLRequest(url: baseURL.appending(path: "/api/v1/inbox/\(id)/bookmark"))
         request.httpMethod = "POST"
@@ -586,7 +639,18 @@ struct APIClient {
         for mutation in archives { await bookmarkMutationOutbox?.remove(mutation) }
     }
 
-    func archiveInboxItem(id: String) async throws {
+    func archiveInboxItem(id: String, bookmark: Bookmark? = nil) async throws {
+        let transaction: BookmarkMutationState.Transaction? = if let bookmark { try await bookmarkState.begin(bookmark, state: "ARCHIVED") } else { nil }
+        do {
+            try await performArchiveInboxItem(id: id)
+            if let transaction { await bookmarkState.commit(transaction) }
+        } catch {
+            if let transaction { await bookmarkState.rollback(transaction) }
+            throw error
+        }
+    }
+
+    private func performArchiveInboxItem(id: String) async throws {
         var request = URLRequest(url: baseURL.appending(path: "/api/v1/inbox/\(id)/archive"))
         request.httpMethod = "POST"
         let _: EmptyResponse = try await send(request)
@@ -1033,21 +1097,30 @@ struct APIClient {
         let _: EmptyResponse = try await send(request)
     }
 
-    static func filterHome(_ response: HomeResponse, hiding ids: Set<String>) -> HomeResponse {
-        guard !ids.isEmpty else { return response }
+    static func filterHome(
+        _ response: HomeResponse, hiding ids: Set<String>,
+        hidingFromCollections collectionHiddenIDs: Set<String>? = nil,
+        collectionFinishedStates: [String: Bool] = [:]
+    ) -> HomeResponse {
+        guard !ids.isEmpty || !collectionFinishedStates.isEmpty || !(collectionHiddenIDs?.isEmpty ?? true) else { return response }
         func visible(_ items: [HomeItem]) -> [HomeItem] {
             items.filter { !ids.contains($0.id) }
         }
 
         let collections = response.customCollections.map { collection in
-            let items = visible(collection.items)
+            let items = collection.items.filter { item in
+                guard !(collectionHiddenIDs ?? ids).contains(item.id) else { return false }
+                guard let finished = collectionFinishedStates[item.id] else { return true }
+                return collection.completionMembership?.includes(id: item.id, isFinished: finished) ?? true
+            }
             return HomeCollection(
                 collectionId: collection.collectionId,
                 title: collection.title,
                 layout: collection.layout,
                 position: collection.position,
                 count: items.count,
-                items: items
+                items: items,
+                completionMembership: collection.completionMembership
             )
         }
         return HomeResponse(
@@ -1080,7 +1153,17 @@ struct APIClient {
     }
 
     private func request<Response: Decodable>(url: URL) async throws -> Response {
-        try await send(URLRequest(url: url))
+        let revision = await bookmarkState.revision
+        let response: Response = try await send(URLRequest(url: url))
+        if let detail = response as? BookmarkResponse {
+            let pending = Set(await bookmarkMutationOutbox?.pendingMutations().map(\.bookmarkID) ?? [])
+            if !pending.contains(detail.item.id) { await bookmarkState.reconcile([detail.item], startedAt: revision) }
+        }
+        if let page = response as? PaginatedBookmarksResponse {
+            let pending = Set(await bookmarkMutationOutbox?.pendingMutations().map(\.bookmarkID) ?? [])
+            await bookmarkState.reconcile(page.items.filter { !pending.contains($0.id) }, startedAt: revision)
+        }
+        return response
     }
 
     private func send<Response: Decodable>(_ input: URLRequest) async throws -> Response {

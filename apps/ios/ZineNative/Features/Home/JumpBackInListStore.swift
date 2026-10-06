@@ -4,7 +4,16 @@ import Observation
 @MainActor
 @Observable
 final class JumpBackInListStore {
-    private(set) var items: [Bookmark] = []
+    private var storedItems: [Bookmark] = []
+    private(set) var items: [Bookmark] {
+        get { client.bookmarkState.overlay(storedItems).filter { $0.state == "BOOKMARKED" && !$0.isFinished } }
+        set {
+            let receivedIDs = Set(newValue.map(\.id))
+            storedItems = newValue + storedItems.filter {
+                client.bookmarkState.changedIDs.contains($0.id) && !receivedIDs.contains($0.id)
+            }
+        }
+    }
     private(set) var isLoading = false
     private(set) var isLoadingMore = false
     private(set) var errorMessage: String?
@@ -24,7 +33,7 @@ final class JumpBackInListStore {
         errorMessage = nil
 
         if filterChanged {
-            items = []
+            storedItems = []
             nextCursor = nil
             isLoadingMore = false
         }
@@ -82,14 +91,8 @@ final class JumpBackInListStore {
     }
 
     func update(_ bookmark: Bookmark) {
-        guard let index = items.firstIndex(where: { $0.id == bookmark.id }) else { return }
-        if bookmark.isFinished
-            || bookmark.state != "BOOKMARKED"
-            || (activeContentType != nil && bookmark.contentType != activeContentType)
-        {
-            items.remove(at: index)
-        } else {
-            items[index] = bookmark
+        if let index = storedItems.firstIndex(where: { $0.id == bookmark.id }) {
+            storedItems[index] = bookmark
         }
     }
 
