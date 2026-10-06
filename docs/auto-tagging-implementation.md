@@ -12,7 +12,7 @@ Library filtering is outside this scope.
 - [x] Commit the existing read-only classifier experiment after repository gates.
 - [x] Implement review labels: expected, acceptable, unwanted, unknown, aliases,
       alternative groups, and explicit completeness. Unknown is never wrong.
-- [ ] Implement provenance-aware transcript import and bounded sequential chunks;
+- [x] Implement provenance-aware transcript import and bounded sequential chunks;
       retain timestamps, coverage, hashes, and durable failures.
 - [x] Compare description and transcript evidence on the four acquired episodes
       with the same frozen catalog/model/policy/threshold.
@@ -55,3 +55,7 @@ individually in isolated runtimes. The default bulk runner exhausted local
 loopback ports; single-runtime/no-isolation was rejected because it leaked mocks.
 Web tests, repository lint/typecheck/build/format and focused classifier tests
 passed. Local verification logs are under `.local-data/tag-classifier/`.
+
+Caption acquisition is now a repository command with persisted failures.
+The latest verification includes 28 focused classifier tests; human holdout
+labels and production integration remain incomplete.

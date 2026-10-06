@@ -50,3 +50,29 @@ must accompany reviewed precision: 100% precision with many unknown suggestions
 is not a release gate. Exhaustive review or zero unknowns is required to assess
 precision for a candidate. Empty expected labels must not be used as negative
 ground truth until a human actually confirms abstention.
+
+## Repeatable caption acquisition
+
+Create a source manifest containing public YouTube video IDs and titles:
+
+```json
+[{ "videoId": "q9xD36NCtZ8", "title": "Why Rust is different, with Alice Ryhl" }]
+```
+
+```sh
+bun scripts/tag-classifier/captions.ts .local-data/tag-classifier/caption-sources.json .local-data/tag-classifier/transcripts
+```
+
+This command requests English uploaded captions or automatic captions using an
+installed `yt-dlp`. It downloads no audio/video and reads no browser cookies.
+Verified existing transcript JSON is reused, including publisher transcripts
+acquired separately. New JSON3 imports preserve timing and Unicode text,
+verify source identity, label ASR provenance, and record when the final caption
+ends before the video's last five percent. That span check does not prove
+verbatim accuracy or continuous caption coverage.
+
+The manifest is saved after each source. Failure states distinguish rate limits,
+missing captions, download errors, and invalid artifacts. Failures do not become
+empty successful transcripts. Re-running retries missing sources while retaining
+verified transcripts. Expiring media URLs from newly downloaded information
+files are discarded after successful normalization; raw caption JSON remains.
