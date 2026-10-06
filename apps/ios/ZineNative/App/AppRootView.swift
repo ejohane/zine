@@ -295,8 +295,8 @@ private struct AuthenticatedAppView: View {
                     fallbackImageUrl: route.bookmark.creatorImageUrl,
                     fallbackProvider: route.bookmark.provider,
                     client: client,
-                    onBookmarkUpdate: { _ in markHomeChanged() },
-                    onBookmarkChange: { _, _, _ in markHomeChanged() },
+                    onBookmarkUpdate: { _ in markBookmarkContentChanged() },
+                    onBookmarkChange: { _, _, _ in markBookmarkContentChanged() },
                     onExternalOpen: handleExternalOpen
                 )
                 .zinePushedDestinationChrome()

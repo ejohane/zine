@@ -4,7 +4,20 @@ import Observation
 @MainActor
 @Observable
 final class LibraryStore {
-    private(set) var items: [Bookmark] = []
+    private var storedItems: [Bookmark] = []
+    private(set) var items: [Bookmark] {
+        get {
+            client.bookmarkState.overlay(storedItems).filter {
+                $0.state == "BOOKMARKED" && (activeQuery.includesFinished || $0.isFinished == activeQuery.isFinished)
+            }
+        }
+        set {
+            let receivedIDs = Set(newValue.map(\.id))
+            storedItems = newValue + storedItems.filter {
+                client.bookmarkState.changedIDs.contains($0.id) && !receivedIDs.contains($0.id)
+            }
+        }
+    }
     private(set) var dataSource: String?
     private(set) var isReloading = false
     private(set) var isLoading = false
@@ -37,7 +50,7 @@ final class LibraryStore {
         generation += 1
         isReloading = false
         dataSource = nil
-        items = []
+        storedItems = []
         nextCursor = nil
         errorMessage = nil
         isLoading = false
@@ -55,7 +68,7 @@ final class LibraryStore {
 
         if queryChanged {
             dataSource = nil
-            items = []
+            storedItems = []
             nextCursor = nil
         }
 
@@ -134,12 +147,8 @@ final class LibraryStore {
     }
 
     func update(_ bookmark: Bookmark) {
-        if let index = items.firstIndex(where: { $0.id == bookmark.id }) {
-            if activeQuery.includesFinished || bookmark.isFinished == activeQuery.isFinished {
-                items[index] = bookmark
-            } else {
-                items.remove(at: index)
-            }
+        if let index = storedItems.firstIndex(where: { $0.id == bookmark.id }) {
+            storedItems[index] = bookmark
             persistCurrentState()
             onContentChanged()
         }
@@ -174,33 +183,9 @@ final class LibraryStore {
     }
 
     func complete(_ bookmark: Bookmark) async {
-        if activeQuery.includesFinished {
-            guard !bookmark.isFinished else { return }
-            var completed = bookmark
-            completed.isFinished = true
-            update(completed)
-            do {
-                _ = try await setFinished(bookmark, value: true)
-            } catch {
-                update(bookmark)
-                actionErrorMessage = "The bookmark couldn’t be completed. Please try again."
-            }
-            return
-        }
-        guard !bookmark.isFinished,
-              let removal = removeOptimistically(bookmark)
-        else { return }
-
-        do {
-            _ = try await client.setFinished(
-                id: bookmark.id,
-                isFinished: true,
-                bookmark: bookmark
-            )
-            onContentChanged()
-        } catch {
-            restore(removal, message: "The bookmark couldn’t be completed. Please try again.")
-        }
+        guard !bookmark.isFinished else { return }
+        do { _ = try await setFinished(bookmark, value: true) }
+        catch { actionErrorMessage = "The bookmark couldn’t be completed. Please try again." }
     }
 
     func archive(_ bookmark: Bookmark) async {

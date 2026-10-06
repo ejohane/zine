@@ -198,8 +198,13 @@ final class OfflineBookmarkMutationOutboxTests: XCTestCase {
                     layout: .stackRail,
                     position: 0,
                     count: 3,
-                    items: [finished, archived, visible]
+                    items: [finished, archived, visible],
+                    completionMembership: CollectionCompletionMembership(isFinished: false, pinnedIds: [])
                 ),
+                HomeCollection(collectionId: "all", title: "All", layout: .stackRail, position: 1, count: 3,
+                    items: [finished, archived, visible], completionMembership: CollectionCompletionMembership(isFinished: nil, pinnedIds: [])),
+                HomeCollection(collectionId: "pinned", title: "Pinned", layout: .stackRail, position: 2, count: 3,
+                    items: [finished, archived, visible], completionMembership: CollectionCompletionMembership(isFinished: false, pinnedIds: ["finished"])),
             ],
             sectionOrder: [],
             requestId: nil,
@@ -213,6 +218,8 @@ final class OfflineBookmarkMutationOutboxTests: XCTestCase {
         XCTAssertEqual(overlaid.byContentType.articles.map(\.id), ["visible"])
         XCTAssertEqual(overlaid.customCollections.first?.items.map(\.id), ["visible"])
         XCTAssertEqual(overlaid.customCollections.first?.count, 1)
+        XCTAssertEqual(overlaid.customCollections[1].items.map(\.id), ["finished", "visible"])
+        XCTAssertEqual(overlaid.customCollections[2].items.map(\.id), ["finished", "visible"])
     }
 
     func testPermanentMutationFailureIsNotRetriedForever() async throws {
