@@ -5,10 +5,11 @@ import Observation
 @Observable
 final class LibraryStore {
     private var storedItems: [Bookmark] = []
+    private var membership = BookmarkMembershipSnapshot()
     private(set) var items: [Bookmark] {
         get {
             client.bookmarkState.overlay(storedItems).filter {
-                $0.state == "BOOKMARKED" && (activeQuery.includesFinished || $0.isFinished == activeQuery.isFinished)
+                membership.includes($0.id, state: client.bookmarkState) && $0.state == "BOOKMARKED" && (activeQuery.includesFinished || $0.isFinished == activeQuery.isFinished)
             }
         }
         set {
@@ -51,6 +52,7 @@ final class LibraryStore {
         isReloading = false
         dataSource = nil
         storedItems = []
+        membership = BookmarkMembershipSnapshot()
         nextCursor = nil
         errorMessage = nil
         isLoading = false
@@ -69,6 +71,7 @@ final class LibraryStore {
         if queryChanged {
             dataSource = nil
             storedItems = []
+            membership = BookmarkMembershipSnapshot()
             nextCursor = nil
         }
 
@@ -88,9 +91,14 @@ final class LibraryStore {
         defer { if generation == loadGeneration { isLoading = false } }
 
         do {
+            let queuedAtStart = await client.pendingBookmarkMutationIDs()
+            let readRevision = client.bookmarkState.revision
             let response = try await client.listBookmarks(query: query)
             guard !Task.isCancelled, activeQuery == query, generation == loadGeneration else { return }
             dataSource = "network"
+            let queuedIDs = queuedAtStart.union(await client.pendingBookmarkMutationIDs())
+            guard !Task.isCancelled, activeQuery == query, generation == loadGeneration else { return }
+            membership.accept(previousIDs: storedItems.map(\.id), receivedIDs: response.items.map(\.id), startedAt: readRevision, queuedIDs: queuedIDs)
             items = response.items
             nextCursor = response.nextCursor
             prefetchImages(in: response.items)
@@ -133,6 +141,7 @@ final class LibraryStore {
                 cursor: nextCursor
             )
             guard !Task.isCancelled, generation == loadGeneration, activeQuery == query else { return }
+            membership.includeReturned(response.items.map(\.id))
             var existingIDs = Set(items.map(\.id))
             items.append(contentsOf: response.items.filter { existingIDs.insert($0.id).inserted })
             self.nextCursor = response.nextCursor

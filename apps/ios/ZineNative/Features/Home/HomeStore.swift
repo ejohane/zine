@@ -32,7 +32,7 @@ enum HomeDashboardSection: Identifiable {
 final class HomeStore {
     var sections: [HomeDashboardSection] {
         Self.makeSections(
-            home: home,
+            home: visibleHome,
             inboxItems: client.bookmarkState.overlay(inboxItems).filter {
                 $0.state == "INBOX" && !$0.isFinished
             },
@@ -63,6 +63,30 @@ final class HomeStore {
         }
     }
 
+    private var visibleHome: HomeResponse? {
+        guard let home else { return nil }
+        func visible(_ items: [HomeItem], key: String) -> [HomeItem] {
+            items.filter { includes($0.id, key: key) }
+        }
+        return HomeResponse(
+            recentBookmarks: visible(home.recentBookmarks, key: "recently-saved"),
+            jumpBackIn: visible(home.jumpBackIn, key: "jump-back-in"),
+            byContentType: HomeContentTypeSections(
+                videos: visible(home.byContentType.videos, key: "videos"),
+                podcasts: visible(home.byContentType.podcasts, key: "podcasts"),
+                articles: visible(home.byContentType.articles, key: "articles")),
+            customCollections: home.customCollections.map { collection in
+                let items = visible(collection.items, key: "collection-" + collection.id)
+                return HomeCollection(collectionId: collection.collectionId, title: collection.title,
+                    layout: collection.layout, position: collection.position, count: collection.count,
+                    items: items, completionMembership: collection.completionMembership)
+            }, sectionOrder: home.sectionOrder, requestId: home.requestId, traceId: home.traceId)
+    }
+
+    private func includes(_ id: String, key: String) -> Bool {
+        membership[key]?.includes(id, state: client.bookmarkState) ?? true
+    }
+
     private func visibleUnfinished(_ items: [HomeItem]) -> [HomeItem] {
         items.filter { !client.bookmarkState.hiddenUnfinishedIDs.contains($0.id) }
     }
@@ -72,13 +96,20 @@ final class HomeStore {
     private let client: APIClient
     private let cache: HomeCache
     private var home: HomeResponse?
+    private var membership: [String: BookmarkMembershipSnapshot] = [:]
 
-    private func setHome(_ updated: HomeResponse?) {
+    private func setHome(_ updated: HomeResponse?, startedAt: Int? = nil, queuedIDs: Set<String> = []) {
         guard let oldValue = home, let current = updated else {
+            membership = [:]
             home = updated
             return
         }
-        func retain(_ old: [HomeItem], _ new: [HomeItem]) -> [HomeItem] {
+        func retain(_ old: [HomeItem], _ new: [HomeItem], key: String) -> [HomeItem] {
+            if let startedAt {
+                var snapshot = membership[key] ?? BookmarkMembershipSnapshot()
+                snapshot.accept(previousIDs: old.map(\.id), receivedIDs: new.map(\.id), startedAt: startedAt, queuedIDs: queuedIDs)
+                membership[key] = snapshot
+            }
             let received = Set(new.map(\.id))
             return new
                 + old.filter {
@@ -89,19 +120,19 @@ final class HomeStore {
             guard let old = oldValue.customCollections.first(where: { $0.id == collection.id }) else {
                 return collection
             }
-            let items = retain(old.items, collection.items)
+            let items = retain(old.items, collection.items, key: "collection-" + collection.id)
             return HomeCollection(
                 collectionId: collection.collectionId, title: collection.title, layout: collection.layout,
                 position: collection.position, count: items.count, items: items,
                 completionMembership: collection.completionMembership)
         }
         home = HomeResponse(
-            recentBookmarks: retain(oldValue.recentBookmarks, current.recentBookmarks),
-            jumpBackIn: retain(oldValue.jumpBackIn, current.jumpBackIn),
+            recentBookmarks: retain(oldValue.recentBookmarks, current.recentBookmarks, key: "recently-saved"),
+            jumpBackIn: retain(oldValue.jumpBackIn, current.jumpBackIn, key: "jump-back-in"),
             byContentType: HomeContentTypeSections(
-                videos: retain(oldValue.byContentType.videos, current.byContentType.videos),
-                podcasts: retain(oldValue.byContentType.podcasts, current.byContentType.podcasts),
-                articles: retain(oldValue.byContentType.articles, current.byContentType.articles)),
+                videos: retain(oldValue.byContentType.videos, current.byContentType.videos, key: "videos"),
+                podcasts: retain(oldValue.byContentType.podcasts, current.byContentType.podcasts, key: "podcasts"),
+                articles: retain(oldValue.byContentType.articles, current.byContentType.articles, key: "articles")),
             customCollections: collections, sectionOrder: current.sectionOrder,
             requestId: current.requestId, traceId: current.traceId)
     }
@@ -135,7 +166,12 @@ final class HomeStore {
         var didUpdate = false
 
         do {
-            setHome(try await client.getHome())
+            let queuedAtStart = await client.pendingBookmarkMutationIDs()
+            let readRevision = client.bookmarkState.revision
+            let response = try await client.getHome()
+            let queuedIDs = queuedAtStart.union(await client.pendingBookmarkMutationIDs())
+            guard !Task.isCancelled else { return }
+            setHome(response, startedAt: readRevision, queuedIDs: queuedIDs)
             reconcileOptimisticOpenedItems()
             didUpdate = true
         } catch is CancellationError {
