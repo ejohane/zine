@@ -146,13 +146,14 @@ final class CreatorStore {
         isLoadingBookmarks = reset && bookmarks.isEmpty
         defer { isLoadingBookmarks = false }
 
+        let queuedAtStart = await client.pendingBookmarkMutationIDs()
         let readRevision = client.bookmarkState.revision
         do {
             let response = try await client.listCreatorBookmarks(
                 creatorId: creatorId,
                 isFinished: false
             )
-            let queuedIDs = await client.pendingBookmarkMutationIDs()
+            let queuedIDs = queuedAtStart.union(await client.pendingBookmarkMutationIDs())
             guard !Task.isCancelled else { return }
             bookmarkMembership.accept(previousIDs: (storedBookmarks + storedCompletedBookmarks).map(\.id), receivedIDs: response.items.map(\.id), startedAt: readRevision, queuedIDs: queuedIDs)
             bookmarks = response.items
@@ -168,13 +169,14 @@ final class CreatorStore {
         isLoadingCompletedBookmarks = reset && completedBookmarks.isEmpty
         defer { isLoadingCompletedBookmarks = false }
 
+        let queuedAtStart = await client.pendingBookmarkMutationIDs()
         let readRevision = client.bookmarkState.revision
         do {
             let response = try await client.listCreatorBookmarks(
                 creatorId: creatorId,
                 isFinished: true
             )
-            let queuedIDs = await client.pendingBookmarkMutationIDs()
+            let queuedIDs = queuedAtStart.union(await client.pendingBookmarkMutationIDs())
             guard !Task.isCancelled else { return }
             completedMembership.accept(previousIDs: (storedBookmarks + storedCompletedBookmarks).map(\.id), receivedIDs: response.items.map(\.id), startedAt: readRevision, queuedIDs: queuedIDs)
             completedBookmarks = response.items

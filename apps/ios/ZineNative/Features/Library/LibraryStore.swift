@@ -91,11 +91,12 @@ final class LibraryStore {
         defer { if generation == loadGeneration { isLoading = false } }
 
         do {
+            let queuedAtStart = await client.pendingBookmarkMutationIDs()
             let readRevision = client.bookmarkState.revision
             let response = try await client.listBookmarks(query: query)
             guard !Task.isCancelled, activeQuery == query, generation == loadGeneration else { return }
             dataSource = "network"
-            let queuedIDs = await client.pendingBookmarkMutationIDs()
+            let queuedIDs = queuedAtStart.union(await client.pendingBookmarkMutationIDs())
             guard !Task.isCancelled, activeQuery == query, generation == loadGeneration else { return }
             membership.accept(previousIDs: storedItems.map(\.id), receivedIDs: response.items.map(\.id), startedAt: readRevision, queuedIDs: queuedIDs)
             items = response.items

@@ -100,6 +100,7 @@ final class HomeStore {
 
     private func setHome(_ updated: HomeResponse?, startedAt: Int? = nil, queuedIDs: Set<String> = []) {
         guard let oldValue = home, let current = updated else {
+            membership = [:]
             home = updated
             return
         }
@@ -165,9 +166,10 @@ final class HomeStore {
         var didUpdate = false
 
         do {
+            let queuedAtStart = await client.pendingBookmarkMutationIDs()
             let readRevision = client.bookmarkState.revision
             let response = try await client.getHome()
-            let queuedIDs = await client.pendingBookmarkMutationIDs()
+            let queuedIDs = queuedAtStart.union(await client.pendingBookmarkMutationIDs())
             guard !Task.isCancelled else { return }
             setHome(response, startedAt: readRevision, queuedIDs: queuedIDs)
             reconcileOptimisticOpenedItems()

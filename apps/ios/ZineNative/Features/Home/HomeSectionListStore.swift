@@ -110,11 +110,12 @@ final class HomeSectionListStore {
         }
 
         do {
+            let queuedAtStart = await client.pendingBookmarkMutationIDs()
             let readRevision = client.bookmarkState.revision
             let response = try await request(contentType: contentType)
             guard !Task.isCancelled, activeContentType == contentType else { return }
             completionMembership = response.completionMembership
-            let queuedIDs = await client.pendingBookmarkMutationIDs()
+            let queuedIDs = queuedAtStart.union(await client.pendingBookmarkMutationIDs())
             guard !Task.isCancelled, activeContentType == contentType else { return }
             membership.accept(previousIDs: storedItems.map(\.id), receivedIDs: response.items.map(\.id), startedAt: readRevision, queuedIDs: queuedIDs)
             items = route == .inbox ? visibleInboxItems(response.items) : response.items
