@@ -8,22 +8,22 @@
  * - Fetches recent videos from channel's uploads playlist
  * - Enriches videos with duration and full description
  * - Filters out YouTube Shorts (videos ≤ 3 minutes)
- * - Identifies new videos based on lastPolledAt
+ * - Reconciles an overlap window using ingestion idempotency
  *
  * @see /features/subscriptions/backend-spec.md Section 3: Polling Architecture
  */
 
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { Provider, YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from '@zine/shared';
 import type { Database } from '../db';
 import type { youtube_v3 } from 'googleapis';
-import { subscriptions, creators } from '../db/schema';
+import { subscriptions, creators, providerItemsSeen } from '../db/schema';
 import { pollLogger } from '../lib/logger';
 import {
   getYouTubeClientForConnection,
   getUploadsPlaylistId,
-  fetchRecentVideos,
-  fetchVideoDetails,
+  fetchVideosForReconciliation,
+  YOUTUBE_POLL_OVERLAP_MS,
   fetchVideoDetailsBatched,
   type YouTubeClient,
   type VideoDetails,
@@ -42,7 +42,6 @@ import type {
   YouTubeSkipMetrics,
 } from './types';
 import {
-  MAX_ITEMS_PER_POLL,
   createEmptyYouTubeSkipMetrics,
   aggregateYouTubeSkipMetrics,
   getTotalSkipCount,
@@ -111,7 +110,7 @@ export const youtubeProviderConfig: ProviderBatchConfig<YouTubeClient> = {
  * 2. Fetch recent videos from playlist
  * 3. Fetch video details (duration + full description) in batch
  * 4. Filter out YouTube Shorts (≤ 3 min)
- * 5. Identify new videos based on lastPolledAt
+ * 5. Reconcile released videos in the overlap window
  * 6. Ingest new videos
  * 7. Update subscription metadata
  *
@@ -129,89 +128,18 @@ export async function pollSingleYouTubeSubscription(
   env: Bindings,
   db: DrizzleDB
 ): Promise<PollingResult> {
-  // Fetch creator data for logging and ingestion
-  const creator = sub.creatorId
-    ? await db.query.creators.findFirst({ where: eq(creators.id, sub.creatorId) })
-    : null;
-  const creatorName = creator?.name ?? sub.providerChannelId;
-  const creatorImageUrl = creator?.imageUrl ?? null;
-
-  ytLogger.info('Polling subscription', { subscriptionId: sub.id, name: creatorName });
-
-  // Get the channel's uploads playlist (deterministic, no API call needed)
-  const uploadsPlaylistId = getUploadsPlaylistId(sub.providerChannelId);
-
-  // Fetch recent videos
-  const videos = await fetchRecentVideos(client, uploadsPlaylistId, MAX_ITEMS_PER_POLL);
-
-  if (videos.length === 0) {
-    ytLogger.info('No videos found', { name: creatorName });
-    await updateSubscriptionPolled(sub.id, db);
-    return { newItems: 0 };
-  }
-
-  // Extract video IDs for details lookup (duration + full description)
-  const videoIds = videos.map((v) => v.contentDetails?.videoId).filter((id): id is string => !!id);
-
-  // Fetch video details (duration + full description) in one batched call (1 quota unit)
-  // Note: playlistItems.list truncates descriptions to ~160 chars, videos.list gives full description
-  const videoDetails = await fetchVideoDetails(client, videoIds);
-
-  // Enrich videos with duration and full description from videos.list API
-  const enrichedVideos = enrichVideosWithDetails(videos, videoDetails);
-
-  // Filter out Shorts before processing (returns skip metrics)
-  const shortsFilterResult = filterOutShorts(enrichedVideos, creatorName);
-
-  // If all videos were Shorts, we're done
-  if (shortsFilterResult.filtered.length === 0) {
-    ytLogger.info('All videos were Shorts, nothing to ingest', {
-      name: creatorName,
-      skipMetrics: shortsFilterResult.skipMetrics,
-    });
-    await updateSubscriptionPolled(sub.id, db);
-    return { newItems: 0 };
-  }
-
-  // Filter to new videos based on lastPolledAt (passing along skip metrics)
-  const newVideosResult = filterNewVideos(
-    shortsFilterResult.filtered,
-    sub.lastPolledAt,
-    creatorName,
-    shortsFilterResult.skipMetrics
+  const videos = await fetchVideosForReconciliation(
+    client,
+    getUploadsPlaylistId(sub.providerChannelId),
+    reconciliationSince(sub)
   );
+  const ids = videos.map((v) => v.contentDetails?.videoId).filter((id): id is string => !!id);
+  const details = await fetchVideoDetailsBatched(client, ids, 3, true);
+  return processSubscriptionVideos(sub, videos, details, userId, db);
+}
 
-  ytLogger.info('Found videos', {
-    total: videos.length,
-    afterShortsFilter: shortsFilterResult.filtered.length,
-    new: newVideosResult.filtered.length,
-    name: creatorName,
-    skipMetrics: newVideosResult.skipMetrics,
-  });
-
-  // Ingest new items
-  const newItemsCount = await ingestNewVideos(
-    newVideosResult.filtered,
-    userId,
-    sub.id,
-    creatorImageUrl,
-    db
-  );
-
-  // Calculate newest published timestamp from all videos
-  const newestPublishedAt = calculateNewestPublishedAt(videos, sub.lastPublishedAt);
-
-  // Update subscription with poll results
-  await db
-    .update(subscriptions)
-    .set({
-      lastPolledAt: Date.now(),
-      lastPublishedAt: newestPublishedAt || undefined,
-      updatedAt: Date.now(),
-    })
-    .where(eq(subscriptions.id, sub.id));
-
-  return { newItems: newItemsCount };
+function reconciliationSince(sub: Subscription): number {
+  return Math.max(sub.createdAt, (sub.lastPolledAt || Date.now()) - YOUTUBE_POLL_OVERLAP_MS);
 }
 
 // Helper Functions
@@ -221,30 +149,6 @@ export async function pollSingleYouTubeSubscription(
  */
 interface EnrichedVideo extends youtube_v3.Schema$PlaylistItem {
   durationSeconds?: number;
-}
-
-/**
- * Enrich videos with duration and full description from videos.list API.
- *
- * The playlistItems.list API truncates descriptions to ~160 chars,
- * so we fetch full details via videos.list API and merge them.
- */
-function enrichVideosWithDetails(
-  videos: youtube_v3.Schema$PlaylistItem[],
-  videoDetails: Map<string, { durationSeconds: number; description: string }>
-): EnrichedVideo[] {
-  return videos.map((v) => {
-    const details = videoDetails.get(v.contentDetails?.videoId || '');
-    return {
-      ...v,
-      durationSeconds: details?.durationSeconds,
-      // Override truncated description with full description from videos.list
-      snippet: {
-        ...v.snippet,
-        description: details?.description ?? v.snippet?.description,
-      },
-    };
-  });
 }
 
 /**
@@ -295,7 +199,7 @@ function filterOutShorts(
 }
 
 /**
- * Filter videos to only those published after lastPolledAt.
+ * Select released videos in the reconciliation window.
  *
  * Edge cases handled:
  * - Missing/invalid dates: Videos without valid publishedAt are logged and skipped
@@ -333,7 +237,7 @@ function filterNewVideos(
       return false;
     }
 
-    return true;
+    return publishedAt <= Date.now();
   });
 
   // Log summary if we filtered out invalid dates
@@ -351,11 +255,11 @@ function filterNewVideos(
     return { filtered: validVideos.slice(0, 1), skipMetrics };
   }
 
-  // Filter to videos published after lastPolledAt
+  // Reconcile inclusive publication boundary; seen IDs prevent duplicate delivery
   const filtered = validVideos.filter((v) => {
     // We know publishedAt is valid here since we filtered above
     const publishedAt = parseYouTubeDate(v.snippet?.publishedAt)!;
-    return publishedAt > lastPolledAt;
+    return publishedAt >= lastPolledAt && publishedAt <= Date.now();
   });
 
   return { filtered, skipMetrics };
@@ -401,6 +305,7 @@ async function ingestNewVideos(
         errorType: serialized.type,
         errorStack: serialized.stack,
       });
+      throw ingestError;
     }
   }
 
@@ -431,7 +336,7 @@ function calculateNewestPublishedAt(
 }
 
 /**
- * Update subscription lastPolledAt (used after errors or when no new items).
+ * Mark a successful empty poll. Failed polls must retain the prior cutoff.
  */
 async function updateSubscriptionPolled(subscriptionId: string, db: DrizzleDB): Promise<void> {
   await db
@@ -479,7 +384,11 @@ async function fetchPlaylistsInParallel(
       wave.map(async (sub): Promise<PlaylistFetchResult> => {
         try {
           const uploadsPlaylistId = getUploadsPlaylistId(sub.providerChannelId);
-          const videos = await fetchRecentVideos(client, uploadsPlaylistId, MAX_ITEMS_PER_POLL);
+          const videos = await fetchVideosForReconciliation(
+            client,
+            uploadsPlaylistId,
+            reconciliationSince(sub)
+          );
           return { subscription: sub, videos };
         } catch (error) {
           const serialized = serializeError(error);
@@ -561,7 +470,7 @@ export async function pollYouTubeSubscriptionsBatched(
   // Step 3: Fetch video details in batched calls (50 per call)
   // This is the key optimization: instead of 1 call per subscription,
   // we batch all videos across subscriptions
-  const videoDetails = await fetchVideoDetailsBatched(client, allVideoIds);
+  const videoDetails = await fetchVideoDetailsBatched(client, [...new Set(allVideoIds)], 3, true);
 
   // Step 4: Process each subscription with the pre-fetched video details
   let totalNewItems = 0;
@@ -638,7 +547,7 @@ interface SubscriptionProcessResult {
  * This helper handles:
  * 1. Enriching videos with duration and full description
  * 2. Filtering out Shorts
- * 3. Filtering to new videos based on lastPolledAt
+ * 3. Select released videos in the overlap window
  * 4. Ingesting new items
  * 5. Updating subscription metadata
  *
@@ -674,6 +583,7 @@ async function processSubscriptionVideos(
 
   // Filter out Shorts (returns skip metrics)
   const shortsFilterResult = filterOutShorts(enrichedVideos, creatorName);
+  shortsFilterResult.skipMetrics.unavailable = videos.length - enrichedVideos.length;
 
   if (shortsFilterResult.filtered.length === 0) {
     ytLogger.info('All videos were Shorts, nothing to ingest', {
@@ -684,10 +594,10 @@ async function processSubscriptionVideos(
     return { newItems: 0, skipMetrics: shortsFilterResult.skipMetrics };
   }
 
-  // Filter to new videos based on lastPolledAt (passing along skip metrics)
+  // Reconcile the overlap; ingestion deduplicates previously delivered videos.
   const newVideosResult = filterNewVideos(
     shortsFilterResult.filtered,
-    sub.lastPolledAt,
+    sub.lastPolledAt ? reconciliationSince(sub) : null,
     creatorName,
     shortsFilterResult.skipMetrics
   );
@@ -700,17 +610,33 @@ async function processSubscriptionVideos(
     skipMetrics: newVideosResult.skipMetrics,
   });
 
-  // Ingest new items
-  const newItemsCount = await ingestNewVideos(
-    newVideosResult.filtered,
-    userId,
-    sub.id,
-    creatorImageUrl,
-    db
-  );
+  // Repeated overlap polls must not spend multiple D1 requests per seen item.
+  // The ingestion pipeline still protects the remaining writes against races.
+  const seenIDs = new Set<string>();
+  const candidates = newVideosResult.filtered;
+  const ids = candidates.map((v) => v.contentDetails?.videoId).filter((id): id is string => !!id);
+  for (let offset = 0; offset < ids.length; offset += 80) {
+    const seen = await db
+      .select({ providerItemId: providerItemsSeen.providerItemId })
+      .from(providerItemsSeen)
+      .where(
+        and(
+          eq(providerItemsSeen.userId, userId),
+          eq(providerItemsSeen.provider, Provider.YOUTUBE),
+          inArray(providerItemsSeen.providerItemId, ids.slice(offset, offset + 80))
+        )
+      );
+    for (const row of seen) seenIDs.add(row.providerItemId);
+  }
+  newVideosResult.skipMetrics.alreadySeen += seenIDs.size;
+  const unseen = candidates.filter((video) => !seenIDs.has(video.contentDetails?.videoId ?? ''));
+  const newItemsCount = await ingestNewVideos(unseen, userId, sub.id, creatorImageUrl, db);
 
   // Calculate newest published timestamp
-  const newestPublishedAt = calculateNewestPublishedAt(videos, sub.lastPublishedAt);
+  const newestPublishedAt = calculateNewestPublishedAt(
+    newVideosResult.filtered,
+    sub.lastPublishedAt
+  );
 
   // Update subscription
   await db
@@ -728,21 +654,32 @@ async function processSubscriptionVideos(
 /**
  * Enrich videos with duration and full description from a pre-fetched details map.
  *
- * Similar to enrichVideosWithDetails but uses the cross-subscription batched map.
+ * Use actual publication dates and exclude videos unavailable in videos.list.
  */
 function enrichVideosWithDetailsMap(
   videos: youtube_v3.Schema$PlaylistItem[],
   videoDetails: Map<string, VideoDetails>
 ): EnrichedVideo[] {
-  return videos.map((v) => {
-    const details = videoDetails.get(v.contentDetails?.videoId || '');
-    return {
-      ...v,
-      durationSeconds: details?.durationSeconds,
-      snippet: {
-        ...v.snippet,
-        description: details?.description ?? v.snippet?.description,
-      },
-    };
-  });
+  return videos
+    .filter(
+      (v) =>
+        videoDetails.has(v.contentDetails?.videoId ?? '') && v.status?.privacyStatus !== 'private'
+    )
+    .map((v) => {
+      const details = videoDetails.get(v.contentDetails?.videoId || '');
+      return {
+        ...v,
+        contentDetails: {
+          ...v.contentDetails,
+          videoPublishedAt: details?.publishedAt ?? v.contentDetails?.videoPublishedAt,
+        },
+        durationSeconds: details?.durationSeconds,
+        snippet: {
+          ...v.snippet,
+          publishedAt:
+            details?.publishedAt ?? v.contentDetails?.videoPublishedAt ?? v.snippet?.publishedAt,
+          description: details?.description ?? v.snippet?.description,
+        },
+      };
+    });
 }
