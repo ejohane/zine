@@ -37,8 +37,12 @@ function setup(entries = [video('late', '2026-10-06T17:00:31Z', '2026-10-01T00:0
     api: { playlistItems: { list: playlist }, videos: { list: details } },
   } as unknown as YouTubeClient;
   const set = vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
-  const db = { update: vi.fn().mockReturnValue({ set }) } as unknown as DrizzleDB;
-  return { playlist, details, client, db, set };
+  const seen = vi.fn().mockResolvedValue([]);
+  const db = {
+    select: vi.fn().mockReturnValue({ from: vi.fn().mockReturnValue({ where: seen }) }),
+    update: vi.fn().mockReturnValue({ set }),
+  } as unknown as DrizzleDB;
+  return { playlist, details, client, db, set, seen };
 }
 beforeEach(() => {
   vi.spyOn(Date, 'now').mockReturnValue(now);
@@ -154,6 +158,22 @@ describe('YouTube reconciliation', () => {
     await expect(
       pollSingleYouTubeSubscription(sub, client, 'user', {} as Bindings, db)
     ).resolves.toMatchObject({ newItems: 0 });
+  });
+  it('skips known IDs in one lookup without touching item membership', async () => {
+    const { client, db, seen } = setup();
+    seen.mockResolvedValue([{ providerItemId: 'late' }]);
+    const result = await pollSingleYouTubeSubscription(sub, client, 'user', {} as Bindings, db);
+    expect(result.newItems).toBe(0);
+    expect(ingestItem).not.toHaveBeenCalled();
+    expect(seen).toHaveBeenCalledTimes(1);
+  });
+  it('keeps D1 parameter counts bounded for a large overlap window', async () => {
+    const { client, db, seen } = setup(
+      Array.from({ length: 181 }, (_, i) => video('video' + i, '2026-10-07T18:00:00Z'))
+    );
+    await pollSingleYouTubeSubscription(sub, client, 'user', {} as Bindings, db);
+    expect(seen).toHaveBeenCalledTimes(3);
+    expect(ingestItem).toHaveBeenCalledTimes(181);
   });
   it('excludes Shorts, future releases, and unavailable videos', async () => {
     const { client, db, details } = setup([

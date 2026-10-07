@@ -13,11 +13,11 @@
  * @see /features/subscriptions/backend-spec.md Section 3: Polling Architecture
  */
 
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { Provider, YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from '@zine/shared';
 import type { Database } from '../db';
 import type { youtube_v3 } from 'googleapis';
-import { subscriptions, creators } from '../db/schema';
+import { subscriptions, creators, providerItemsSeen } from '../db/schema';
 import { pollLogger } from '../lib/logger';
 import {
   getYouTubeClientForConnection,
@@ -610,14 +610,27 @@ async function processSubscriptionVideos(
     skipMetrics: newVideosResult.skipMetrics,
   });
 
-  // Ingest new items
-  const newItemsCount = await ingestNewVideos(
-    newVideosResult.filtered,
-    userId,
-    sub.id,
-    creatorImageUrl,
-    db
-  );
+  // Repeated overlap polls must not spend multiple D1 requests per seen item.
+  // The ingestion pipeline still protects the remaining writes against races.
+  const seenIDs = new Set<string>();
+  const candidates = newVideosResult.filtered;
+  const ids = candidates.map((v) => v.contentDetails?.videoId).filter((id): id is string => !!id);
+  for (let offset = 0; offset < ids.length; offset += 80) {
+    const seen = await db
+      .select({ providerItemId: providerItemsSeen.providerItemId })
+      .from(providerItemsSeen)
+      .where(
+        and(
+          eq(providerItemsSeen.userId, userId),
+          eq(providerItemsSeen.provider, Provider.YOUTUBE),
+          inArray(providerItemsSeen.providerItemId, ids.slice(offset, offset + 80))
+        )
+      );
+    for (const row of seen) seenIDs.add(row.providerItemId);
+  }
+  newVideosResult.skipMetrics.alreadySeen += seenIDs.size;
+  const unseen = candidates.filter((video) => !seenIDs.has(video.contentDetails?.videoId ?? ''));
+  const newItemsCount = await ingestNewVideos(unseen, userId, sub.id, creatorImageUrl, db);
 
   // Calculate newest published timestamp
   const newestPublishedAt = calculateNewestPublishedAt(
