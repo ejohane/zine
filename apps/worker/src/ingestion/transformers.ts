@@ -109,6 +109,7 @@ export class TransformError extends Error {
 interface YouTubePlaylistItem {
   contentDetails?: {
     videoId?: string;
+    videoPublishedAt?: string;
   };
   snippet?: {
     title?: string;
@@ -168,7 +169,11 @@ export function transformYouTubeVideo(
     creatorImageUrl: channelImageUrl,
     imageUrl: snippet.thumbnails?.high?.url || snippet.thumbnails?.default?.url,
     durationSeconds: playlistItem.durationSeconds,
-    publishedAt: snippet.publishedAt ? new Date(snippet.publishedAt).getTime() : now,
+    publishedAt: playlistItem.contentDetails?.videoPublishedAt
+      ? new Date(playlistItem.contentDetails.videoPublishedAt).getTime()
+      : snippet.publishedAt
+        ? new Date(snippet.publishedAt).getTime()
+        : now,
     createdAt: now,
   };
 }

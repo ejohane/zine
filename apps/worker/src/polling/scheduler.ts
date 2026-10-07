@@ -215,8 +215,9 @@ async function processSubscriptionsSequentially<TClient>(
         subscriptionId: sub.id,
         error: subError,
       });
-      // Update lastPolledAt even on error to prevent infinite retry
-      await updateSubscriptionPolled(sub.id, db);
+      // YouTube needs its successful cutoff for catch-up after an outage.
+      // Other providers retain their existing error scheduling.
+      if (config.provider !== 'YOUTUBE') await updateSubscriptionPolled(sub.id, db);
       processed++;
     }
   }

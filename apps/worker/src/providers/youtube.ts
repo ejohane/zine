@@ -192,6 +192,47 @@ export async function fetchRecentVideos(
   return response.data.items || [];
 }
 
+/** Read an overlap window with pagination; never silently accept a truncated scan. */
+export const YOUTUBE_POLL_OVERLAP_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_RECONCILIATION_PAGES = 10;
+
+export async function fetchVideosForReconciliation(
+  client: YouTubeClient,
+  uploadsPlaylistId: string,
+  since: number
+): Promise<youtube_v3.Schema$PlaylistItem[]> {
+  const videos: youtube_v3.Schema$PlaylistItem[] = [];
+  let pageToken: string | undefined;
+  for (let page = 0; page < MAX_RECONCILIATION_PAGES; page++) {
+    const response = await client.api.playlistItems.list({
+      part: ['snippet', 'contentDetails', 'status'],
+      playlistId: uploadsPlaylistId,
+      maxResults: 50,
+      pageToken,
+    });
+    const items = response.data.items ?? [];
+    videos.push(...items);
+    pageToken = response.data.nextPageToken ?? undefined;
+    if (!pageToken) return videos;
+    // Uploads are ordered by playlist insertion. Read a whole page beyond the
+    // window too, allowing delayed public releases behind the insertion boundary.
+    const allOlder =
+      items.length > 0 &&
+      items.every((video) => {
+        const insertedAt = Date.parse(video.snippet?.publishedAt ?? '');
+        const publishedAt = Date.parse(video.contentDetails?.videoPublishedAt ?? '');
+        return (
+          Number.isFinite(insertedAt) &&
+          insertedAt < since &&
+          Number.isFinite(publishedAt) &&
+          publishedAt < since
+        );
+      });
+    if (allOlder) return videos;
+  }
+  throw new Error('YouTube reconciliation page limit reached; poll watermark retained');
+}
+
 /**
  * Get the authenticated user's YouTube subscriptions
  *
@@ -378,6 +419,8 @@ export interface VideoDetails {
   durationSeconds: number;
   /** Full video description (from videos.list, not truncated like playlistItems) */
   description: string;
+  /** Actual video publication time, independent of playlist insertion. */
+  publishedAt?: string;
 }
 
 /**
@@ -422,6 +465,7 @@ export async function fetchVideoDetails(
         details.set(video.id, {
           durationSeconds: parseISO8601Duration(video.contentDetails.duration),
           description: video.snippet?.description ?? '',
+          ...(video.snippet?.publishedAt ? { publishedAt: video.snippet.publishedAt } : {}),
         });
       }
     }
@@ -452,7 +496,8 @@ export async function fetchVideoDetails(
 export async function fetchVideoDetailsBatched(
   client: YouTubeClient,
   videoIds: string[],
-  concurrency: number = 3
+  concurrency: number = 3,
+  strict: boolean = false
 ): Promise<Map<string, VideoDetails>> {
   if (videoIds.length === 0) {
     return new Map();
@@ -481,6 +526,7 @@ export async function fetchVideoDetailsBatched(
             error,
             chunkSize: chunk.length,
           });
+          if (strict) throw error;
           return new Map<string, VideoDetails>();
         }
       })
@@ -515,6 +561,7 @@ async function fetchVideoDetailsChunk(
       details.set(video.id, {
         durationSeconds: parseISO8601Duration(video.contentDetails.duration),
         description: video.snippet?.description ?? '',
+        ...(video.snippet?.publishedAt ? { publishedAt: video.snippet.publishedAt } : {}),
       });
     }
   }
