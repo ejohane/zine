@@ -52,7 +52,7 @@ struct AppRootView: View {
                     userCreatedAt: user.createdAt,
                     userEmail: user.primaryEmailAddress?.emailAddress
                 )
-                .id("\(user.id)-\(user.primaryEmailAddress?.emailAddress ?? "")")
+                .id("\(user.id)-\(user.primaryEmailAddress?.emailAddress ?? "")-\(configuration.apiBaseURL.absoluteString)")
             } else {
                 ZineAuthEntryView()
             }
@@ -60,7 +60,7 @@ struct AppRootView: View {
     }
 }
 
-private struct AuthenticatedAppView: View {
+struct AuthenticatedAppView: View {
     private enum SourcesPresentation {
         case firstUse
         case replay
@@ -81,13 +81,13 @@ private struct AuthenticatedAppView: View {
 
     private let configuration: AppConfiguration
     private let userID: String
-    private let client: APIClient
-    private let inboxCache: InboxCache
-    private let libraryCache: LibraryCache
-    private let offlineLibrarySynchronizer: OfflineLibrarySynchronizer
-
-    @State private var commandSession: NativeCommandSession
-    @State private var homeStore: HomeStore
+    @State private var session: AuthenticatedAppSession
+    private var client: APIClient { session.client }
+    private var inboxCache: InboxCache { session.inboxCache }
+    private var libraryCache: LibraryCache { session.libraryCache }
+    private var offlineLibrarySynchronizer: OfflineLibrarySynchronizer { session.offlineLibrarySynchronizer }
+    private var commandSession: NativeCommandSession { session.commandSession }
+    private var homeStore: HomeStore { session.homeStore }
     @State private var sourcesPresentation: SourcesPresentation?
     @State private var search = ""
     @State private var searchTabReselection = 0
@@ -107,7 +107,7 @@ private struct AuthenticatedAppView: View {
     @State private var externalOpenError: String?
     @Namespace private var navigationTransition
 
-    init(configuration: AppConfiguration, userID: String, userCreatedAt: Date, userEmail: String?) {
+    init(configuration: AppConfiguration, userID: String, userCreatedAt: Date, userEmail: String?, initialSession: AuthenticatedAppSession? = nil) {
         self.configuration = configuration
         self.userID = userID
         let replayRequested = SourcesOnboardingReplayAccess.consumePreviewRequest(
@@ -120,29 +120,15 @@ private struct AuthenticatedAppView: View {
         _sourcesPresentation = State(initialValue: replayRequested
             ? .replay
             : (shouldPresentFirstUse ? .firstUse : nil))
-        let bookmarkMutationOutbox = OfflineBookmarkMutationOutbox(userID: userID)
-        let client = APIClient(
-            baseURL: configuration.apiBaseURL,
+        _session = State(initialValue: initialSession ?? AuthenticatedAppSession(
+            baseURL: configuration.apiBaseURL, userID: userID,
             tokenProvider: {
                 guard let token = try await Clerk.shared.auth.getToken() else {
                     throw APIError.missingSession
                 }
                 return token
-            },
-            articleBodyCache: ArticleBodyCache(userID: userID),
-            bookmarkMutationOutbox: bookmarkMutationOutbox
-        )
-        let homeCache = HomeCache(userID: userID)
-        inboxCache = InboxCache(userID: userID)
-        self.client = client
-        _commandSession = State(initialValue: NativeCommandSession(client: client))
-        let libraryCache = LibraryCache(userID: userID)
-        self.libraryCache = libraryCache
-        offlineLibrarySynchronizer = OfflineLibrarySynchronizer(
-            client: client,
-            libraryCache: libraryCache
-        )
-        _homeStore = State(initialValue: HomeStore(client: client, cache: homeCache))
+            }
+        ))
     }
 
     var body: some View {
@@ -654,5 +640,32 @@ struct ConfigurationRequiredView: View {
         } description: {
             Text("Copy Configuration/Local.xcconfig.example to Local.xcconfig and add Zine’s Clerk publishable key.")
         }
+    }
+}
+
+/// One dependency graph for the lifetime of the authenticated SwiftUI identity.
+/// View reconstruction must not pair retained stores with a newly created client.
+@MainActor
+final class AuthenticatedAppSession {
+    let client: APIClient
+    let inboxCache: InboxCache
+    let libraryCache: LibraryCache
+    let homeStore: HomeStore
+    let commandSession: NativeCommandSession
+    let offlineLibrarySynchronizer: OfflineLibrarySynchronizer
+
+    init(baseURL: URL, userID: String, tokenProvider: @escaping APIClient.TokenProvider,
+         transport: URLSession = .shared, baseDirectory: URL? = nil) {
+        let client = APIClient(
+            baseURL: baseURL, tokenProvider: tokenProvider, session: transport,
+            articleBodyCache: ArticleBodyCache(userID: userID, baseDirectory: baseDirectory),
+            bookmarkMutationOutbox: OfflineBookmarkMutationOutbox(userID: userID, baseDirectory: baseDirectory)
+        )
+        self.client = client
+        inboxCache = InboxCache(userID: userID, baseDirectory: baseDirectory)
+        libraryCache = LibraryCache(userID: userID, baseDirectory: baseDirectory)
+        homeStore = HomeStore(client: client, cache: HomeCache(userID: userID, baseDirectory: baseDirectory))
+        commandSession = NativeCommandSession(client: client)
+        offlineLibrarySynchronizer = OfflineLibrarySynchronizer(client: client, libraryCache: libraryCache)
     }
 }

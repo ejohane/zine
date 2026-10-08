@@ -1159,7 +1159,9 @@ struct APIClient {
 
     private func request<Response: Decodable>(url: URL) async throws -> Response {
         let revision = await bookmarkState.revision
-        let response: Response = try await send(URLRequest(url: url))
+        // Reconciliation must see the server, not a cached pre-mutation page.
+        let response: Response = try await send(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData))
+        try Task.checkCancellation()
         if let detail = response as? BookmarkResponse {
             let pending = Set(await bookmarkMutationOutbox?.pendingMutations().map(\.bookmarkID) ?? [])
             if !pending.contains(detail.item.id) { await bookmarkState.reconcile([detail.item], startedAt: revision) }

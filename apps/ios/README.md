@@ -175,3 +175,12 @@ xcodebuild -project apps/ios/ZineNative.xcodeproj -scheme ZineNative \
 ```
 
 The reader’s Links control opens a sheet of unique web destinations from the article body, in article order, with linked text, surrounding context, and domain. Each row can save its destination to Zine and fills the bookmark immediately, rolling back with retry feedback if the request fails. Successful saves refresh Home and Library through the app’s bookmark-save event. It excludes direct media/assets, downloads, same-article anchors, and navigation regions, and opens destinations using the system URL handler. No preview metadata is fetched.
+
+### Inbox mutation fixture
+
+A Debug build launched with `-screenshot-inbox-mutations-fixture` opens the real
+Home/Inbox shell with two synthetic podcast items, an isolated temporary cache,
+and a fixture-only URLSession transport. Use **Rebuild shell**, open Inbox, archive
+an item, and return Home to exercise shared session lifetime and preview membership.
+The fixture makes no Clerk or production requests and is not authenticated runtime
+verification. Restart the fixture app to reset its synthetic archive state.
