@@ -33,9 +33,7 @@ final class HomeStore {
     var sections: [HomeDashboardSection] {
         Self.makeSections(
             home: visibleHome,
-            inboxItems: client.bookmarkState.overlay(inboxItems).filter {
-                $0.state == "INBOX" && !$0.isFinished
-            },
+            inboxItems: visibleInboxItems,
             optimisticOpenedItems: Array(optimisticOpenedItems.values),
             hiddenItemIDs: hiddenItemIDs.subtracting(client.bookmarkState.changedIDs)
         ).compactMap { section in
@@ -140,7 +138,32 @@ final class HomeStore {
     private var hiddenItemIDs: Set<String> = []
     private var optimisticOpenedItems: [String: HomeItem] = [:]
 
-    var inboxPreviewItems: [Bookmark] { inboxItems }
+    private var inboxMembership = BookmarkMembershipSnapshot()
+    private var reloadGeneration = 0
+
+    private var visibleInboxItems: [Bookmark] {
+        client.bookmarkState.overlay(inboxItems).filter {
+            $0.state == "INBOX" && !$0.isFinished
+                && inboxMembership.includes($0.id, state: client.bookmarkState)
+        }
+    }
+    var inboxPreviewItems: [Bookmark] { Array(visibleInboxItems.prefix(4)) }
+
+    private func setInboxItems(_ received: [Bookmark], startedAt: Int? = nil) {
+        if let startedAt {
+            inboxMembership.accept(previousIDs: inboxItems.map(\.id), receivedIDs: received.map(\.id),
+                                   startedAt: startedAt, queuedIDs: [])
+        }
+        let receivedIDs = Set(received.map(\.id))
+        // Keep rollback candidates; membership fences prevent old snapshots from
+        // treating an omission in a genuinely newer page as continued membership.
+        var updated = received
+        for (index, item) in inboxItems.enumerated()
+        where client.bookmarkState.changedIDs.contains(item.id) && !receivedIDs.contains(item.id) {
+            updated.insert(item, at: min(index, updated.endIndex))
+        }
+        inboxItems = updated
+    }
 
     init(client: APIClient, cache: HomeCache) {
         self.client = client
@@ -148,19 +171,25 @@ final class HomeStore {
     }
 
     func reload() async {
+        reloadGeneration += 1
+        let generation = reloadGeneration
+        func isCurrent() -> Bool { !Task.isCancelled && generation == reloadGeneration }
         errorMessage = nil
 
         if let snapshot = await cache.load() {
+            guard isCurrent() else { return }
             if let cachedHome = snapshot.home {
-                setHome(await client.overlayHome(cachedHome))
+                let overlaid = await client.overlayHome(cachedHome)
+                guard isCurrent() else { return }
+                setHome(overlaid)
             } else {
                 home = nil
             }
-            inboxItems = snapshot.inboxItems
+            setInboxItems(snapshot.inboxItems)
         }
 
         isLoading = sections.isEmpty
-        defer { isLoading = false }
+        defer { if generation == reloadGeneration { isLoading = false } }
 
         var networkErrors: [Error] = []
         var didUpdate = false
@@ -170,7 +199,7 @@ final class HomeStore {
             let readRevision = client.bookmarkState.revision
             let response = try await client.getHome()
             let queuedIDs = queuedAtStart.union(await client.pendingBookmarkMutationIDs())
-            guard !Task.isCancelled else { return }
+            guard isCurrent() else { return }
             setHome(response, startedAt: readRevision, queuedIDs: queuedIDs)
             reconcileOptimisticOpenedItems()
             didUpdate = true
@@ -180,17 +209,21 @@ final class HomeStore {
             networkErrors.append(error)
         }
 
-        guard !Task.isCancelled else { return }
+        guard isCurrent() else { return }
 
         do {
+            let readRevision = client.bookmarkState.revision
             let response = try await client.listInbox(query: InboxQuery(), limit: 4)
-            inboxItems = Array(response.items.prefix(4))
+            guard isCurrent() else { return }
+            setInboxItems(Array(response.items.prefix(4)), startedAt: readRevision)
             didUpdate = true
         } catch is CancellationError {
             return
         } catch {
             networkErrors.append(error)
         }
+
+        guard isCurrent() else { return }
 
         if networkErrors.isEmpty, let home {
             // Once the server confirms removal, later re-bookmarking or marking
@@ -203,7 +236,11 @@ final class HomeStore {
         }
 
         if didUpdate {
-            await cache.save(home: home, inboxItems: inboxItems)
+            let visibleIDs = Set(inboxPreviewItems.map(\.id))
+            let cachedInboxItems = inboxItems.filter {
+                visibleIDs.contains($0.id) || client.bookmarkState.isPending(id: $0.id)
+            }
+            await cache.save(home: home, inboxItems: cachedInboxItems)
         } else if sections.isEmpty {
             errorMessage = networkErrors.first?.localizedDescription ?? "Please try again."
         }
