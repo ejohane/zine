@@ -1,3 +1,4 @@
+import { markOwnedItemOpened } from '../../weekly-recaps/evidence';
 // apps/worker/src/trpc/routers/items.ts
 import { TRPCError } from '@trpc/server';
 import {
@@ -917,48 +918,17 @@ export const itemsRouter = router({
    * Record that an item was opened from detail.
    */
   markOpened: protectedProcedure
-    .input(z.object({ id: z.string().min(1) }))
+    .input(
+      z.object({ id: z.string().min(1), interactionId: z.string().min(1).max(128).optional() })
+    )
     .mutation(async ({ input, ctx }) => {
-      const now = new Date().toISOString();
-      const nowMs = Date.now();
-
-      const existing = await ctx.db
-        .select({ id: userItems.id, itemId: userItems.itemId, state: userItems.state })
-        .from(userItems)
-        .where(and(eq(userItems.id, input.id), eq(userItems.userId, ctx.userId)))
-        .limit(1);
-
-      if (existing.length === 0) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: `Item ${input.id} not found`,
-        });
-      }
-
-      if (existing[0].state !== UserItemState.BOOKMARKED) {
-        return { success: true as const, updated: false };
-      }
-
-      await ctx.db
-        .update(userItems)
-        .set({
-          lastOpenedAt: now,
-          updatedAt: now,
-        })
-        .where(eq(userItems.id, input.id));
-
-      await insertConsumptionEvent(ctx, {
-        userItemId: existing[0].id,
-        itemId: existing[0].itemId,
-        eventType: 'OPENED',
-        occurredAt: nowMs,
-        source: 'ITEM_DETAIL_OPEN',
-        metadata: {
-          state: existing[0].state,
-        },
+      const result = await markOwnedItemOpened(ctx.db, {
+        userId: ctx.userId,
+        userItemId: input.id,
+        interactionId: input.interactionId,
       });
-
-      return { success: true as const, updated: true, lastOpenedAt: now };
+      if (!result) throw new TRPCError({ code: 'NOT_FOUND', message: 'Item not found' });
+      return result;
     }),
 
   /**
@@ -1007,7 +977,10 @@ export const itemsRouter = router({
         .where(eq(userItems.id, input.id));
 
       const previousPosition = existing[0].progressPosition ?? 0;
-      const deltaSeconds = Math.max(0, Math.round(input.position - previousPosition));
+      const normalizedReading = input.duration === 1 && input.position <= 1;
+      const deltaSeconds = normalizedReading
+        ? 0
+        : Math.max(0, Math.round(input.position - previousPosition));
 
       if (deltaSeconds > 0) {
         await insertConsumptionEvent(ctx, {

@@ -1,9 +1,10 @@
 import { SignIn, SignUp } from '@clerk/clerk-react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 
 import { Colors } from '@zine/design-system';
 
 import { AppWordmark } from './app-wordmark';
+import { authContinuation } from './lib/publication-continuation';
 import { useAuthAvailability } from './lib/trpc';
 
 const clerkAppearance = {
@@ -22,6 +23,10 @@ const clerkAppearance = {
 };
 
 export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
+  const location = useLocation();
+  const continuation = authContinuation(location.search);
+  const destination = continuation?.returnTo || '/welcome';
+  const query = continuation?.query || '';
   const { isEnabled, mode: authMode } = useAuthAvailability();
 
   if (!isEnabled) {
@@ -36,7 +41,7 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   }
 
   if (authMode === 'development-bypass') {
-    return <Navigate to="/welcome" replace />;
+    return <Navigate to={destination} replace />;
   }
 
   return (
@@ -50,16 +55,18 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
               appearance={clerkAppearance}
               path="/sign-in"
               routing="path"
-              signUpUrl="/sign-up"
-              fallbackRedirectUrl="/welcome"
+              signUpUrl={`/sign-up${query}`}
+              fallbackRedirectUrl={destination}
+              forceRedirectUrl={destination}
             />
           ) : (
             <SignUp
               appearance={clerkAppearance}
               path="/sign-up"
               routing="path"
-              signInUrl="/sign-in"
-              fallbackRedirectUrl="/welcome"
+              signInUrl={`/sign-in${query}`}
+              fallbackRedirectUrl={destination}
+              forceRedirectUrl={destination}
             />
           )}
         </div>

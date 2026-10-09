@@ -1,8 +1,8 @@
 import { type JsonObject, UserItemState } from '@zine/shared';
-import { and, eq } from 'drizzle-orm';
-import { ulid } from 'ulid';
+import { and, eq, sql } from 'drizzle-orm';
 import type { Database } from '../db';
-import { userItemConsumptionEvents, userItems } from '../db/schema';
+import { userItems } from '../db/schema';
+import { savedEvidence, finishedEvidence } from '../weekly-recaps/evidence';
 import { bookmarkEnrichmentIntent, dispatchBookmarkEnrichment } from '../enrichment/outbox';
 import { syncPeopleForUserItemBestEffort } from '../people/service';
 import type { Bindings } from '../types';
@@ -46,18 +46,12 @@ export async function changeItemFinishedState(
   const shouldBookmark =
     input.bookmarkOnFinish && isFinished && item.state !== UserItemState.BOOKMARKED;
   const consumptionEvent = () =>
-    db.insert(userItemConsumptionEvents).values({
-      id: ulid(),
+    finishedEvidence(db, {
       userId,
       userItemId: item.id,
-      itemId: item.itemId,
-      eventType: isFinished ? 'FINISHED' : 'UNFINISHED',
+      isFinished,
       occurredAt: toggleTimeMs ?? Date.now(),
-      positionSeconds: null,
-      durationSeconds: null,
-      deltaSeconds: null,
-      source: 'MANUAL_FINISH_TOGGLE',
-      metadata: input.eventMetadata ? JSON.stringify(input.eventMetadata) : null,
+      metadata: input.eventMetadata,
     });
 
   if (item.isFinished !== isFinished || shouldBookmark) {
@@ -65,7 +59,12 @@ export async function changeItemFinishedState(
     const update = db
       .update(userItems)
       .set({
-        ...(shouldBookmark ? { state: UserItemState.BOOKMARKED, bookmarkedAt: updatedAt } : {}),
+        ...(shouldBookmark
+          ? {
+              state: UserItemState.BOOKMARKED,
+              bookmarkedAt: sql`CASE WHEN state='BOOKMARKED' THEN bookmarked_at ELSE ${updatedAt} END`,
+            }
+          : {}),
         isFinished,
         finishedAt,
         updatedAt,
@@ -75,6 +74,13 @@ export async function changeItemFinishedState(
       // Saving through completion must persist the follow-up work with the save.
       // Include the event so a failed batch can safely be retried in full.
       await db.batch([
+        savedEvidence(db, {
+          userId,
+          userItemId: item.id,
+          occurredAt: Date.parse(updatedAt),
+          source: 'FINISH_SAVE',
+        }),
+        ...(item.isFinished !== isFinished ? [consumptionEvent()] : []),
         update,
         bookmarkEnrichmentIntent(db, {
           userId,
@@ -82,11 +88,9 @@ export async function changeItemFinishedState(
           itemId: item.itemId,
           trigger: item.state === UserItemState.INBOX ? 'inbox_bookmark' : 'manual_save',
         }),
-        ...(item.isFinished !== isFinished ? [consumptionEvent()] : []),
       ]);
     } else {
-      await update;
-      await consumptionEvent();
+      await db.batch([consumptionEvent(), update]);
     }
   }
 

@@ -6,12 +6,14 @@ import { renderRoute } from './test/render-router';
 vi.mock('@clerk/clerk-react', () => import('./test/mocks/clerk'));
 vi.mock('./lib/trpc', () => import('./test/mocks/trpc'));
 
+import { storeIntent, intentPath } from './lib/publication-continuation';
 import { AuthPage } from './auth-page';
 import { resetTrpcMocks, setAuthAvailability } from './test/mocks/trpc';
 
 describe('AuthPage', () => {
   beforeEach(() => {
     resetTrpcMocks();
+    sessionStorage.clear();
   });
 
   test('shows configuration guidance when auth is unavailable', () => {
@@ -54,6 +56,21 @@ describe('AuthPage', () => {
 
     expect(screen.getByTestId('clerk-sign-up')).toHaveTextContent(
       'SignUp /sign-up path /welcome /sign-in'
+    );
+  });
+  test('retains explicit publication intent across sign-in and sign-up', () => {
+    setAuthAvailability({ isEnabled: true, mode: 'clerk' });
+    const intent = storeIntent({
+      action: 'subscribe',
+      publicationId: '01J00000000000000000000001',
+    });
+    renderRoute(<AuthPage mode="sign-in" />, {
+      route: `/sign-in?continue=${intent.key}`,
+      path: '/sign-in',
+    });
+    expect(screen.getByTestId('clerk-sign-in')).toHaveTextContent(intentPath(intent));
+    expect(screen.getByTestId('clerk-sign-in')).toHaveTextContent(
+      `/sign-up?continue=${intent.key}`
     );
   });
 });

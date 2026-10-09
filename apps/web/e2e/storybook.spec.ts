@@ -27,3 +27,18 @@ for (const storyId of stories) {
     });
   });
 }
+
+for (const storyId of [
+  'publications-reader--independent-issue',
+  'publications-reader--weekly-issue',
+  'publications-reader--publication-archive',
+  'publications-reader--unavailable',
+  'publications-reader--temporary-failure',
+]) {
+  test(`public reader accessibility ${storyId}`, async ({ page }) => {
+    await page.goto(`/iframe.html?id=${storyId}&viewMode=story`);
+    await expect(page.locator('#storybook-root .publication-reader')).toBeVisible();
+    const accessibility = await new AxeBuilder({ page }).include('#storybook-root').analyze();
+    expect(accessibility.violations).toEqual([]);
+  });
+}

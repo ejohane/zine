@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "publicPublication": {
+    "id": "01J00000000000000000000001",
+    "handle": "01J00000000000000000000001",
+    "displayName": "Loose Threads",
+    "description": "Things that stayed with me.",
+    "coverUrl": null,
+    "editor": { "displayName": "Example Editor" }
+  },
+  "publicIssue": {
+    "id": "01J00000000000000000000002",
+    "publication": {
+      "id": "01J00000000000000000000001",
+      "handle": "01J00000000000000000000001",
+      "displayName": "Loose Threads",
+      "description": "Things that stayed with me.",
+      "coverUrl": null,
+      "editor": { "displayName": "Example Editor" }
+    },
+    "kind": "INDEPENDENT",
+    "title": "Thinking about cities",
+    "coverUrl": null,
+    "introduction": "Three perspectives.",
+    "revision": 3,
+    "publishedAt": "2026-10-08T12:00:00.000Z",
+    "sections": [
+      {
+        "id": "01J00000000000000000000003",
+        "heading": null,
+        "selections": [
+          {
+            "id": "01J00000000000000000000004",
+            "contentType": "ARTICLE",
+            "title": "Public essay",
+            "creatorName": "Example Author",
+            "sourceName": "example.org",
+            "originalUrl": "https://example.org/essay",
+            "artworkUrl": null,
+            "commentary": "Worth your time.",
+            "firstPublishedRevision": 3,
+            "originalAvailability": "AVAILABLE"
+          }
+        ]
+      }
+    ]
+  },
+  "weeklyIssue": {
+    "id": "01J00000000000000000000002",
+    "publication": {
+      "id": "01J00000000000000000000001",
+      "handle": "01J00000000000000000000001",
+      "displayName": "Loose Threads",
+      "description": "Things that stayed with me.",
+      "coverUrl": null,
+      "editor": { "displayName": "Example Editor" }
+    },
+    "kind": "WEEKLY",
+    "title": "Thinking about cities",
+    "coverUrl": null,
+    "introduction": "Three perspectives.",
+    "revision": 3,
+    "publishedAt": "2026-10-08T12:00:00.000Z",
+    "sections": [
+      {
+        "id": "01J00000000000000000000003",
+        "heading": null,
+        "selections": [
+          {
+            "id": "01J00000000000000000000004",
+            "contentType": "ARTICLE",
+            "title": "Public essay",
+            "creatorName": "Example Author",
+            "sourceName": "example.org",
+            "originalUrl": "https://example.org/essay",
+            "artworkUrl": null,
+            "commentary": "Worth your time.",
+            "firstPublishedRevision": 3,
+            "originalAvailability": "AVAILABLE"
+          }
+        ]
+      }
+    ]
+  },
+  "ownerDraft": {
+    "id": "01J00000000000000000000002",
+    "publication": {
+      "id": "01J00000000000000000000001",
+      "handle": "01J00000000000000000000001",
+      "displayName": "Loose Threads",
+      "description": "Things that stayed with me.",
+      "coverUrl": null,
+      "editor": { "displayName": "Example Editor" }
+    },
+    "kind": "INDEPENDENT",
+    "title": "Thinking about cities",
+    "coverUrl": null,
+    "introduction": "Three perspectives.",
+    "revision": 3,
+    "publishedAt": null,
+    "sections": [
+      {
+        "id": "01J00000000000000000000003",
+        "heading": null,
+        "selections": [
+          {
+            "id": "01J00000000000000000000004",
+            "contentType": "ARTICLE",
+            "title": "Public essay",
+            "creatorName": "Example Author",
+            "sourceName": "example.org",
+            "originalUrl": "https://example.org/essay",
+            "artworkUrl": null,
+            "commentary": "Worth your time.",
+            "firstPublishedRevision": null,
+            "originalAvailability": "AVAILABLE",
+            "itemId": "canonical-item",
+            "bookmarkId": "owned-bookmark"
+          }
+        ]
+      }
+    ],
+    "status": "DRAFT",
+    "coverAssetId": null,
+    "weeklyWindowId": null
+  },
+  "conflict": {
+    "error": "REVISION_CONFLICT",
+    "code": "REVISION_CONFLICT",
+    "details": { "currentRevision": 4 }
+  },
+  "ineligible": {
+    "error": "INELIGIBLE_SELECTIONS",
+    "code": "INELIGIBLE_SELECTIONS",
+    "details": { "reason": "PRIVATE_SOURCE" }
+  },
+  "tombstone": {
+    "publicationId": "01J00000000000000000000001",
+    "issueId": "01J00000000000000000000002",
+    "available": false
+  },
+  "event": {
+    "id": "01J00000000000000000000005",
+    "cursor": 1,
+    "publicationId": "01J00000000000000000000001",
+    "issueId": "01J00000000000000000000002",
+    "revision": 3,
+    "kind": "ISSUE_PUBLISHED",
+    "selectionIds": ["01J00000000000000000000004"],
+    "occurredAt": "2026-10-08T12:00:00.000Z"
+  }
+}

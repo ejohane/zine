@@ -21,7 +21,7 @@ let package = Package(
                 "Core/Persistence/EditorialIssueCache.swift",
                 "Core/Persistence/InboxCache.swift", "Core/Persistence/OfflineLibrarySynchronizer.swift",
                 "Core/Persistence/PeopleDailyCache.swift", "Core/Share", "Core/ZineTheme.swift",
-                "Features/Creators", "Features/Inbox",
+                "Features/Creators", "Features/Inbox", "Features/Publications/PublicationViews.swift", "Features/Publications/PublicationIssueEditorView.swift", "Features/Publications/PublicationSocialViews.swift", "Features/Publications/PublicationPush.swift", "Features/Library/DiscoveryReferencesView.swift",
                 "Features/Library/ActionRowHaptic.swift", "Features/Library/BookmarkDescription.swift",
                 "Features/Library/BookmarkDetailView.swift", "Features/Library/BookmarkRow.swift",
                 "Features/Library/CreatorAvatar.swift", "Features/Library/LibraryView.swift",
@@ -42,6 +42,7 @@ let package = Package(
             sources: [
                 "Features/Home/HomeStore.swift", "Core/Persistence/HomeCache.swift", "Core/API", "Core/Automation", "Core/Models", "Core/Persistence/ArticleBodyCache.swift",
                 "Core/Persistence/LibraryCache.swift", "Core/Persistence/OfflineBookmarkMutationOutbox.swift",
+                "Core/Persistence/PublicationDraftCache.swift", "Features/Publications/IssueEditorStore.swift",
                 "Features/Library/LibraryStore.swift", "Features/Reader/ArticleReaderStore.swift",
                 "Features/Subscriptions/SubscriptionModels.swift",
             ]),

@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -67,10 +67,19 @@ export default defineConfig({
             },
             workbox: {
               navigateFallback: '/index.html',
-              navigateFallbackDenylist: [/^\/trpc\//, /^\/(about|privacy|terms)(\/|$)/],
+              navigateFallbackDenylist: [
+                /^\/trpc\//,
+                /^\/api\//,
+                /^\/(p|i)(\/|$)/,
+                /^\/\.well-known\//,
+                /^\/(about|privacy|terms)(\/|$)/,
+              ],
               runtimeCaching: [
                 {
-                  urlPattern: ({ request }) => request.destination === 'image',
+                  urlPattern: ({ request, url }) =>
+                    request.destination === 'image' &&
+                    !url.pathname.startsWith('/api/') &&
+                    !url.pathname.startsWith('/publication-'),
                   handler: 'StaleWhileRevalidate',
                   options: {
                     cacheName: 'zine-images',
@@ -111,6 +120,15 @@ export default defineConfig({
   server: {
     port: Number(process.env.WEB_PORT ?? 5173),
     host: '0.0.0.0',
+    proxy: {
+      '/api/v1': {
+        target:
+          process.env.VITE_API_URL ||
+          loadEnv('development', __dirname, 'VITE_').VITE_API_URL ||
+          'http://localhost:8787',
+        changeOrigin: true,
+      },
+    },
   },
   preview: {
     port: Number(process.env.WEB_PORT ?? 4173),

@@ -11,6 +11,16 @@ import type { SyncQueueMessage } from './sync/types';
  * Environment bindings available to the Worker
  */
 export interface Bindings {
+  /** Publication push configuration; signing key is injected as a secret. */
+  APNS_ENABLED?: string;
+  APNS_TEAM_ID?: string;
+  APNS_KEY_ID?: string;
+  APNS_PRIVATE_KEY?: string;
+  APNS_TOPIC?: string;
+  /** Separate publication covers; never expose reader-content storage. */
+  PUBLICATION_MEDIA?: R2Bucket;
+  /** Optional host capability for decoding and sanitizing cover images. */
+  PUBLICATION_IMAGES?: ImagesBinding;
   /** D1 database for persistent storage */
   DB: D1Database;
   /** Canonical X archive plus frozen people-first Daily View artifacts. */

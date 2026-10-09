@@ -567,6 +567,11 @@ struct BookmarkDetailView: View {
                 .padding(.top, 22)
             }
 
+            if bookmark != nil {
+                DiscoveryReferencesView(bookmarkID: content.id, client: client, foreground: detailPrimaryText, secondary: detailSecondaryText)
+                    .padding(.top, 16)
+            }
+
             if !usesArticleDetail && !content.tags.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack {
@@ -661,6 +666,8 @@ struct BookmarkDetailView: View {
                     .foregroundStyle(ZineTheme.secondaryText)
                     .tint(ZineTheme.bookmarkDescriptionLink)
             }
+
+            if bookmark != nil { DiscoveryReferencesView(bookmarkID: content.id, client: client) }
 
             if !content.tags.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {

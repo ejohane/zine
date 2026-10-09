@@ -1,3 +1,4 @@
+import { savedEvidence } from '../weekly-recaps/evidence';
 import { and, eq } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import {
@@ -1728,10 +1729,11 @@ async function ingestNewsletterMessage(params: {
     );
   }
 
-  await params.db
+  const userItemId = ulid();
+  const insertSavedItem = params.db
     .insert(userItems)
     .values({
-      id: ulid(),
+      id: userItemId,
       userId: params.userId,
       itemId: canonicalItem.id,
       state: params.autoBookmark ? 'BOOKMARKED' : 'INBOX',
@@ -1750,6 +1752,18 @@ async function ingestNewsletterMessage(params: {
     .onConflictDoNothing({
       target: [userItems.userId, userItems.itemId],
     });
+  if (params.autoBookmark)
+    await params.db.batch([
+      insertSavedItem,
+      savedEvidence(params.db, {
+        userId: params.userId,
+        userItemId,
+        occurredAt: Date.parse(nowIso),
+        source: 'NEWSLETTER_AUTO_SAVE',
+        newlyCreated: true,
+      }),
+    ]);
+  else await insertSavedItem;
 
   await params.db
     .insert(newsletterFeedMessages)

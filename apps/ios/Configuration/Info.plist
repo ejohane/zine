@@ -76,6 +76,10 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>ZINEAPNSEnvironment</key>
+	<string>$(ZINE_APNS_ENVIRONMENT)</string>
+	<key>ZINEPublicationHost</key>
+	<string>$(ZINE_PUBLICATION_HOST)</string>
 	<key>ZINEAPIBaseURL</key>
 	<string>$(ZINE_API_BASE_URL)</string>
 	<key>ZINEClerkPublishableKey</key>

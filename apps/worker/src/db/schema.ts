@@ -1,5 +1,13 @@
 import { sql } from 'drizzle-orm';
-import { sqliteTable, text, integer, real, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
+import {
+  sqliteTable,
+  text,
+  integer,
+  real,
+  uniqueIndex,
+  index,
+  primaryKey,
+} from 'drizzle-orm/sqlite-core';
 
 // Users
 // NOTE: Legacy table using ISO8601 TEXT timestamps. New tables should use Unix ms INTEGER.
@@ -205,6 +213,7 @@ export const editorialFeedbackEvents = sqliteTable(
     targetCreatorsJson: text('target_creators_json').notNull().default('[]'),
     targetCanonicalUrlsJson: text('target_canonical_urls_json').notNull().default('[]'),
     targetSourceIdsJson: text('target_source_ids_json').notNull().default('[]'),
+    targetSourceSnapshotJson: text('target_source_snapshot_json'),
     occurredAt: integer('occurred_at').notNull(),
     payloadHash: text('payload_hash').notNull(),
     createdAt: integer('created_at').notNull(),
@@ -1471,3 +1480,360 @@ export const bookmarkEnrichmentOutbox = sqliteTable(
     index('bookmark_enrichment_outbox_due_idx').on(table.nextAttemptAt),
   ]
 );
+
+// Personal publishing. SQL migration 0034 is the authoritative CHECK/index contract.
+export const personalPublications = sqliteTable('personal_publications', {
+  id: text('id').primaryKey(),
+  ownerId: text('owner_id')
+    .unique()
+    .references(() => users.id, { onDelete: 'set null' }),
+  handle: text('handle').notNull().unique(),
+  editorName: text('editor_name').notNull(),
+  displayName: text('display_name'),
+  description: text('description'),
+  coverAssetId: text('cover_asset_id'),
+  revision: integer('revision').notNull().default(1),
+  createdAt: integer('created_at').notNull(),
+  unavailableAt: integer('unavailable_at'),
+});
+export const personalPublicationAssets = sqliteTable('personal_publication_assets', {
+  id: text('id').primaryKey(),
+  ownerId: text('owner_id').references(() => users.id, { onDelete: 'set null' }),
+  storageKey: text('storage_key').notNull(),
+  contentType: text('content_type').notNull(),
+  byteSize: integer('byte_size').notNull(),
+  createdAt: integer('created_at').notNull(),
+  unavailableAt: integer('unavailable_at'),
+});
+export const personalIssues = sqliteTable(
+  'personal_issues',
+  {
+    id: text('id').primaryKey(),
+    publicationId: text('publication_id')
+      .notNull()
+      .references(() => personalPublications.id),
+    kind: text('kind').notNull(),
+    status: text('status').notNull().default('DRAFT'),
+    title: text('title').notNull().default(''),
+    introduction: text('introduction'),
+    coverAssetId: text('cover_asset_id'),
+    revision: integer('revision').notNull().default(1),
+    publishedAt: integer('published_at'),
+    weeklyWindowId: text('weekly_window_id'),
+    weeklyTimezone: text('weekly_timezone'),
+    weeklyStart: integer('weekly_start'),
+    weeklyEnd: integer('weekly_end'),
+    createdAt: integer('created_at').notNull(),
+    unavailableAt: integer('unavailable_at'),
+  },
+  (t) => [
+    uniqueIndex('personal_issue_window_idx').on(t.publicationId, t.weeklyWindowId),
+    index('personal_issues_archive_idx').on(t.publicationId, t.status, t.unavailableAt, t.id),
+  ]
+);
+export const personalIssueSections = sqliteTable(
+  'personal_issue_sections',
+  {
+    id: text('id').primaryKey(),
+    issueId: text('issue_id')
+      .notNull()
+      .references(() => personalIssues.id),
+    heading: text('heading'),
+    position: integer('position').notNull(),
+    removedAt: integer('removed_at'),
+  },
+  (t) => [index('personal_sections_issue_idx').on(t.issueId, t.position)]
+);
+export const personalIssueSelections = sqliteTable(
+  'personal_issue_selections',
+  {
+    id: text('id').primaryKey(),
+    issueId: text('issue_id')
+      .notNull()
+      .references(() => personalIssues.id),
+    sectionId: text('section_id')
+      .notNull()
+      .references(() => personalIssueSections.id),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => items.id),
+    bookmarkId: text('bookmark_id'),
+    metadataJson: text('metadata_json').notNull(),
+    sourceFingerprint: text('source_fingerprint').notNull(),
+    commentary: text('commentary'),
+    position: integer('position').notNull(),
+    firstPublishedRevision: integer('first_published_revision'),
+    firstPublishedAt: integer('first_published_at'),
+    removedAt: integer('removed_at'),
+  },
+  (t) => [
+    uniqueIndex('personal_selection_item_idx')
+      .on(t.issueId, t.itemId)
+      .where(sql`${t.removedAt} IS NULL`),
+    index('personal_selections_issue_idx').on(t.issueId, t.sectionId, t.position),
+  ]
+);
+export const personalPublicationMutations = sqliteTable(
+  'personal_publication_mutations',
+  {
+    id: text('id').primaryKey(),
+    actorId: text('actor_id')
+      .notNull()
+      .references(() => users.id),
+    operation: text('operation').notNull(),
+    key: text('key').notNull(),
+    requestHash: text('request_hash').notNull(),
+    responseJson: text('response_json').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [uniqueIndex('personal_mutation_key_idx').on(t.actorId, t.operation, t.key)]
+);
+export const personalPublicationEvents = sqliteTable(
+  'personal_publication_events',
+  {
+    sequence: integer('sequence').primaryKey({ autoIncrement: true }),
+    id: text('id').notNull().unique(),
+    publicationId: text('publication_id')
+      .notNull()
+      .references(() => personalPublications.id),
+    issueId: text('issue_id')
+      .notNull()
+      .references(() => personalIssues.id),
+    revision: integer('revision').notNull(),
+    kind: text('kind').notNull(),
+    selectionIdsJson: text('selection_ids_json').notNull(),
+    occurredAt: integer('occurred_at').notNull(),
+  },
+  (t) => [uniqueIndex('personal_event_revision_idx').on(t.issueId, t.revision, t.kind)]
+);
+export const personalPublicationOutbox = sqliteTable(
+  'personal_publication_outbox',
+  {
+    eventId: text('event_id')
+      .primaryKey()
+      .references(() => personalPublicationEvents.id),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: integer('next_attempt_at').notNull(),
+    completedAt: integer('completed_at'),
+  },
+  (t) => [index('personal_outbox_due_idx').on(t.completedAt, t.nextAttemptAt)]
+);
+export const personalPublicationSubscriptions = sqliteTable(
+  'personal_publication_subscriptions',
+  {
+    publicationId: text('publication_id')
+      .notNull()
+      .references(() => personalPublications.id),
+    subscriberId: text('subscriber_id')
+      .notNull()
+      .references(() => users.id),
+    muted: integer('muted').notNull().default(0),
+    generation: integer('generation').notNull().default(1),
+    subscribedAt: integer('subscribed_at').notNull(),
+    endedAt: integer('ended_at'),
+  },
+  (t) => [
+    uniqueIndex('personal_subscription_identity_idx').on(t.publicationId, t.subscriberId),
+    index('personal_subscriber_list_idx').on(t.publicationId, t.endedAt, t.subscriberId),
+  ]
+);
+
+// Publication delivery and reader-owned provenance (migration 0036).
+export const personalDeliveryPreferences = sqliteTable('personal_delivery_preferences', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  timezone: text('timezone').notNull().default('UTC'),
+  updatedAt: integer('updated_at').notNull(),
+});
+export const personalPublicationActivity = sqliteTable(
+  'personal_publication_activity',
+  {
+    id: text('id').primaryKey(),
+    recipientId: text('recipient_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    publicationId: text('publication_id')
+      .notNull()
+      .references(() => personalPublications.id),
+    generation: integer('generation').notNull(),
+    logicalKey: text('logical_key').notNull(),
+    kind: text('kind', { enum: ['ISSUE_PUBLISHED', 'DAILY_ADDITIONS'] }).notNull(),
+    issueIdsJson: text('issue_ids_json').notNull(),
+    selectionIdsJson: text('selection_ids_json').notNull(),
+    createdAt: integer('created_at').notNull(),
+    readAt: integer('read_at'),
+  },
+  (t) => [
+    uniqueIndex('personal_activity_logical_idx').on(t.recipientId, t.logicalKey),
+    index('personal_activity_recipient_idx').on(t.recipientId, t.id),
+  ]
+);
+export const personalDigestCursors = sqliteTable(
+  'personal_digest_cursors',
+  {
+    recipientId: text('recipient_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    publicationId: text('publication_id')
+      .notNull()
+      .references(() => personalPublications.id),
+    generation: integer('generation').notNull(),
+    coveredCursor: integer('covered_cursor').notNull().default(0),
+    nextDueAt: integer('next_due_at').notNull(),
+    timezone: text('timezone').notNull(),
+    claimToken: text('claim_token'),
+    leaseUntil: integer('lease_until'),
+    cutoff: integer('cutoff'),
+    localDate: text('local_date'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.recipientId, t.publicationId] }),
+    index('personal_digest_due_idx').on(t.nextDueAt, t.leaseUntil),
+  ]
+);
+export const personalPushInstallations = sqliteTable(
+  'personal_push_installations',
+  {
+    id: text('id').primaryKey(),
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    token: text('token').notNull(),
+    environment: text('environment', { enum: ['sandbox', 'production'] }).notNull(),
+    topic: text('topic').notNull(),
+    version: integer('version').notNull().default(1),
+    enabled: integer('enabled').notNull().default(1),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [
+    uniqueIndex('personal_push_token_idx').on(t.environment, t.topic, t.token),
+    index('personal_push_owner_idx').on(t.ownerId, t.enabled),
+  ]
+);
+export const personalPushJobs = sqliteTable(
+  'personal_push_jobs',
+  {
+    id: text('id').primaryKey(),
+    activityId: text('activity_id')
+      .notNull()
+      .references(() => personalPublicationActivity.id, { onDelete: 'cascade' }),
+    installationId: text('installation_id')
+      .notNull()
+      .references(() => personalPushInstallations.id, { onDelete: 'cascade' }),
+    tokenVersion: integer('token_version').notNull(),
+    state: text('state', { enum: ['PENDING', 'SENT', 'SUPPRESSED', 'FAILED'] }).notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: integer('next_attempt_at').notNull(),
+    leaseToken: text('lease_token'),
+    leaseUntil: integer('lease_until'),
+    reason: text('reason'),
+    apnsId: text('apns_id'),
+  },
+  (t) => [
+    uniqueIndex('personal_push_job_identity_idx').on(
+      t.activityId,
+      t.installationId,
+      t.tokenVersion
+    ),
+    index('personal_push_due_idx').on(t.state, t.nextAttemptAt, t.leaseUntil),
+  ]
+);
+export const personalIssueVisits = sqliteTable(
+  'personal_issue_visits',
+  {
+    readerId: text('reader_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    issueId: text('issue_id')
+      .notNull()
+      .references(() => personalIssues.id),
+    lastSeenRevision: integer('last_seen_revision').notNull(),
+    presentedAt: integer('presented_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.readerId, t.issueId] })]
+);
+export const personalDiscoveryReferences = sqliteTable(
+  'personal_discovery_references',
+  {
+    id: text('id').primaryKey(),
+    userItemId: text('user_item_id')
+      .notNull()
+      .references(() => userItems.id, { onDelete: 'cascade' }),
+    selectionId: text('selection_id').notNull(),
+    issueId: text('issue_id').notNull(),
+    publicationId: text('publication_id').notNull(),
+    publicationName: text('publication_name').notNull(),
+    issueTitle: text('issue_title').notNull(),
+    editorName: text('editor_name').notNull(),
+    commentary: text('commentary'),
+    savedAt: integer('saved_at').notNull(),
+  },
+  (t) => [
+    uniqueIndex('personal_discovery_identity_idx').on(t.userItemId, t.selectionId),
+    index('personal_discovery_bookmark_idx').on(t.userItemId, t.savedAt, t.id),
+  ]
+);
+
+// Private weekly retrospective state (migration 0035).
+export const weeklyRecapPreferences = sqliteTable('weekly_recap_preferences', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id),
+  timezone: text('timezone').notNull(),
+  timezoneHistory: text('timezone_history').notNull(),
+  initializedAt: integer('initialized_at').notNull(),
+  trackingStartedAt: integer('tracking_started_at').notNull(),
+  catchupWeekStart: text('catchup_week_start').notNull(),
+});
+export const weeklyRecapWindows = sqliteTable(
+  'weekly_recap_windows',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    weekStart: text('week_start').notNull(),
+    timezone: text('timezone').notNull(),
+    startAt: integer('start_at').notNull(),
+    endAt: integer('end_at').notNull(),
+    generatedAt: integer('generated_at').notNull(),
+    snapshot: text('snapshot').notNull(),
+  },
+  (t) => [
+    uniqueIndex('weekly_recap_window_identity_idx').on(t.userId, t.weekStart),
+    index('weekly_recap_windows_owner_history').on(t.userId, t.weekStart),
+  ]
+);
+export const weeklyRecapJobs = sqliteTable('weekly_recap_jobs', {
+  id: text('id').primaryKey(),
+  ownerCursor: text('owner_cursor').notNull().default(''),
+});
+
+export const weeklyRecapDraftRequests = sqliteTable(
+  'weekly_recap_draft_requests',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    key: text('key').notNull(),
+    requestHash: text('request_hash').notNull(),
+    windowId: text('window_id')
+      .notNull()
+      .references(() => weeklyRecapWindows.id),
+    title: text('title').notNull(),
+    savedIds: text('saved_ids').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.key] })]
+);
+
+// Resumable fanout recipient checkpoint (migration 0037).
+export const personalPublicationFanout = sqliteTable('personal_publication_fanout', {
+  eventId: text('event_id')
+    .primaryKey()
+    .notNull()
+    .references(() => personalPublicationEvents.id, { onDelete: 'cascade' }),
+  recipientCursor: text('recipient_cursor').notNull().default(''),
+  leaseToken: text('lease_token'),
+  leaseUntil: integer('lease_until'),
+});

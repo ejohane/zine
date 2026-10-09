@@ -682,7 +682,11 @@ apiV1Routes.post('/bookmarks/:id/opened', apiAuth('bookmarks:write'), async (c) 
   const caller = appRouter.createCaller(await createContext(c));
 
   try {
-    const result = await caller.items.markOpened({ id: c.req.param('id') });
+    const interactionId = c.req.header('X-Zine-Interaction-Id');
+    const result = await caller.items.markOpened({
+      id: c.req.param('id'),
+      ...(interactionId ? { interactionId } : {}),
+    });
     return c.json({
       ...result,
       lastOpenedAt: 'lastOpenedAt' in result ? result.lastOpenedAt : null,

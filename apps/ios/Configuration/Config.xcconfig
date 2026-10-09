@@ -1,3 +1,4 @@
+ZINE_PUBLICATION_HOST = myzine.app
 ZINE_API_BASE_URL = https:/$()/api.myzine.app
 ZINE_CLERK_PUBLISHABLE_KEY = pk_live_Y2xlcmsubXl6aW5lLmFwcCQ
 ZINE_GOOGLE_CLIENT_ID = 973421703522-58dfb15bdqdhvhs2r9tt88ubgg45dkq1.apps.googleusercontent.com

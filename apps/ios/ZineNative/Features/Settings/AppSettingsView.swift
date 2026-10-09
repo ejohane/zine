@@ -78,6 +78,7 @@ struct AppSettingsView: View {
             Button("Sign Out", role: .destructive) {
                 Task {
                     await store.signOut {
+                        await PublicationPush.shared.revoke()
                         try await clerk.auth.signOut()
                         await onSignedOut()
                     }

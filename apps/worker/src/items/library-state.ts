@@ -1,5 +1,6 @@
 import { UserItemState } from '@zine/shared';
-import { and, eq } from 'drizzle-orm';
+import { savedEvidence } from '../weekly-recaps/evidence';
+import { and, eq, ne } from 'drizzle-orm';
 import type { Database } from '../db';
 import { userItems } from '../db/schema';
 import { bookmarkEnrichmentIntent, dispatchBookmarkEnrichment } from '../enrichment/outbox';
@@ -53,9 +54,15 @@ export async function bookmarkItem(ctx: ItemStateContext, input: { id: string })
       bookmarkedAt: now,
       updatedAt: now,
     })
-    .where(eq(userItems.id, input.id));
+    .where(and(eq(userItems.id, input.id), ne(userItems.state, UserItemState.BOOKMARKED)));
   if (existing[0].state === UserItemState.INBOX) {
     await ctx.db.batch([
+      savedEvidence(ctx.db, {
+        userId: ctx.userId,
+        userItemId: input.id,
+        occurredAt: Date.parse(now),
+        source: 'INBOX_BOOKMARK',
+      }),
       update,
       bookmarkEnrichmentIntent(ctx.db, {
         userId: ctx.userId,
@@ -65,7 +72,15 @@ export async function bookmarkItem(ctx: ItemStateContext, input: { id: string })
       }),
     ]);
   } else {
-    await update;
+    await ctx.db.batch([
+      savedEvidence(ctx.db, {
+        userId: ctx.userId,
+        userItemId: input.id,
+        occurredAt: Date.parse(now),
+        source: 'MANUAL_SAVE',
+      }),
+      update,
+    ]);
   }
   // Also retries an existing intent when the client repeats a saved request.
   await dispatchBookmarkEnrichment(ctx, { userId: ctx.userId, userItemId: existing[0].id });

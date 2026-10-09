@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ulid } from 'ulid';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, ne } from 'drizzle-orm';
 import {
   ContentType,
   ContentTypeSchema,
@@ -11,6 +11,7 @@ import {
   UserItemState,
 } from '@zine/shared';
 import { items, userItems, users } from '../db/schema';
+import { savedEvidence } from '../weekly-recaps/evidence';
 import type { Database } from '../db';
 import type { Bindings } from '../types';
 import { extractArticle } from '../lib/article-extractor';
@@ -266,6 +267,12 @@ export async function saveBookmark(
 
     // 3b. Exists with different status (INBOX or ARCHIVED) - rebookmark it
     await ctx.db.batch([
+      savedEvidence(ctx.db, {
+        userId: ctx.userId,
+        userItemId: existingUserItem.id,
+        occurredAt: Date.parse(now),
+        source: 'MANUAL_SAVE',
+      }),
       ctx.db
         .update(userItems)
         .set({
@@ -274,7 +281,9 @@ export async function saveBookmark(
           handoffUrl,
           updatedAt: now,
         })
-        .where(eq(userItems.id, existingUserItem.id)),
+        .where(
+          and(eq(userItems.id, existingUserItem.id), ne(userItems.state, UserItemState.BOOKMARKED))
+        ),
       bookmarkEnrichmentIntent(ctx.db, {
         userId: ctx.userId,
         itemId,
@@ -334,6 +343,13 @@ export async function saveBookmark(
       finishedAt: null,
       createdAt: now,
       updatedAt: now,
+    }),
+    savedEvidence(ctx.db, {
+      userId: ctx.userId,
+      userItemId,
+      occurredAt: Date.parse(now),
+      source: 'MANUAL_SAVE',
+      newlyCreated: true,
     }),
     bookmarkEnrichmentIntent(ctx.db, {
       userId: ctx.userId,

@@ -172,7 +172,9 @@ describe('assembled Worker REST API with D1', () => {
       expect(
         await db.query.userItems.findFirst({ where: eq(userItems.id, 'owner-bookmark') })
       ).toEqual(saved);
-      expect(await db.select().from(userItemConsumptionEvents)).toHaveLength(1);
+      expect(
+        (await db.select().from(userItemConsumptionEvents)).map((event) => event.eventType).sort()
+      ).toEqual(['FINISHED', 'SAVED']);
       expect(await (await request('/bookmarks/owner-bookmark')).json()).toMatchObject({
         item: { state: 'BOOKMARKED', isFinished: true },
       });
@@ -283,7 +285,14 @@ describe('finish contracts across REST and tRPC HTTP', () => {
           eventType: 'FINISHED',
           occurredAt: Date.parse('2026-09-06T13:00:00Z'),
           source: 'MANUAL_FINISH_TOGGLE',
-          metadata: null,
+          metadata: JSON.stringify({
+            version: 1,
+            title: 'Route integration fixture',
+            creatorName: null,
+            contentType: 'VIDEO',
+            provider: 'YOUTUBE',
+            artworkUrl: null,
+          }),
           userId: 'owner',
           itemId: 'item',
           userItemId: 'owner-bookmark',
@@ -292,7 +301,14 @@ describe('finish contracts across REST and tRPC HTTP', () => {
           eventType: 'UNFINISHED',
           occurredAt: Date.parse('2026-09-06T13:01:00Z'),
           source: 'MANUAL_FINISH_TOGGLE',
-          metadata: null,
+          metadata: JSON.stringify({
+            version: 1,
+            title: 'Route integration fixture',
+            creatorName: null,
+            contentType: 'VIDEO',
+            provider: 'YOUTUBE',
+            artworkUrl: null,
+          }),
         },
       ]);
     }
@@ -352,7 +368,15 @@ describe('finish contracts across REST and tRPC HTTP', () => {
       {
         eventType: 'FINISHED',
         occurredAt: Date.parse('2026-09-06T13:00:00Z'),
-        metadata: JSON.stringify({ source: 'api_v1' }),
+        metadata: JSON.stringify({
+          version: 1,
+          title: 'Route integration fixture',
+          creatorName: null,
+          contentType: 'VIDEO',
+          provider: 'YOUTUBE',
+          artworkUrl: null,
+          source: 'api_v1',
+        }),
         source: 'MANUAL_FINISH_TOGGLE',
       },
     ]);
@@ -373,7 +397,9 @@ describe('finish contracts across REST and tRPC HTTP', () => {
       finishedAt: now,
       bookmarkedAt: expect.any(String),
     });
-    expect(await db.select().from(userItemConsumptionEvents)).toHaveLength(0);
+    expect(await db.select().from(userItemConsumptionEvents)).toMatchObject([
+      { eventType: 'SAVED' },
+    ]);
   });
 
   it('shares persisted state across REST sets and tRPC toggles', async () => {
@@ -441,8 +467,8 @@ describe.each(['REST', 'tRPC'] as const)('%s library state operations with D1', 
       expect((await mutate('bookmark')).status).toBe(200);
       expect(await read()).toMatchObject({
         state: 'BOOKMARKED',
-        bookmarkedAt: '2026-09-07T12:00:00.000Z',
-        updatedAt: '2026-09-07T12:00:00.000Z',
+        bookmarkedAt: state === 'BOOKMARKED' ? now : '2026-09-07T12:00:00.000Z',
+        updatedAt: state === 'BOOKMARKED' ? now : '2026-09-07T12:00:00.000Z',
         archivedAt: now,
         isFinished: true,
         finishedAt: now,
@@ -461,10 +487,14 @@ describe.each(['REST', 'tRPC'] as const)('%s library state operations with D1', 
       expect(await db.select().from(userPersonMentions)).toMatchObject([{ isActive: true }]);
       vi.setSystemTime(new Date('2026-09-07T12:01:00Z'));
       expect((await mutate('bookmark')).status).toBe(200);
-      expect(await read()).toMatchObject({ bookmarkedAt: '2026-09-07T12:01:00.000Z' });
+      expect(await read()).toMatchObject({
+        bookmarkedAt: state === 'BOOKMARKED' ? now : '2026-09-07T12:00:00.000Z',
+      });
       expect(send).toHaveBeenCalledTimes(state === 'INBOX' ? 1 : 0);
       expect(await db.select().from(userPeople)).toMatchObject([{ itemCount: 1 }]);
-      expect(await db.select().from(userItemConsumptionEvents)).toHaveLength(0);
+      expect(await db.select().from(userItemConsumptionEvents)).toMatchObject(
+        state === 'BOOKMARKED' ? [] : [{ eventType: 'SAVED' }]
+      );
     }
   );
 
@@ -489,7 +519,9 @@ describe.each(['REST', 'tRPC'] as const)('%s library state operations with D1', 
       expect(await db.select().from(userPersonMentions)).toMatchObject([{ isActive: true }]);
       expect(await db.select().from(userPeople)).toMatchObject([{ itemCount: 1 }]);
       expect(send).not.toHaveBeenCalled();
-      expect(await db.select().from(userItemConsumptionEvents)).toHaveLength(0);
+      expect(await db.select().from(userItemConsumptionEvents)).toMatchObject([
+        { eventType: 'SAVED' },
+      ]);
     }
   );
 
@@ -790,7 +822,9 @@ describe('REST completion saves with durable enrichment and People', () => {
       expect(await read()).toEqual(saved);
       expect(send).toHaveBeenCalledTimes(1);
       expect(await db.select().from(bookmarkEnrichmentOutbox)).toHaveLength(0);
-      expect(await db.select().from(userItemConsumptionEvents)).toHaveLength(1);
+      expect(
+        (await db.select().from(userItemConsumptionEvents)).map((event) => event.eventType).sort()
+      ).toEqual(['FINISHED', 'SAVED']);
       expect((await complete('owner-bookmark', false)).status).toBe(200);
       expect(send).toHaveBeenCalledTimes(1);
       expect(await db.select().from(userPersonMentions)).toMatchObject([{ isActive: true }]);
@@ -811,7 +845,9 @@ describe('REST completion saves with durable enrichment and People', () => {
     expect(send).toHaveBeenCalledTimes(2);
     expect(await read()).toEqual(saved);
     expect(await db.select().from(bookmarkEnrichmentOutbox)).toHaveLength(0);
-    expect(await db.select().from(userItemConsumptionEvents)).toHaveLength(1);
+    expect(
+      (await db.select().from(userItemConsumptionEvents)).map((event) => event.eventType).sort()
+    ).toEqual(['FINISHED', 'SAVED']);
   });
 
   it.each(['bookmark_enrichment_outbox', 'user_item_consumption_events'])(
@@ -844,7 +880,9 @@ describe('REST completion saves with durable enrichment and People', () => {
     expect(await read()).toMatchObject({ state: 'BOOKMARKED', finishedAt: now });
     expect(send).toHaveBeenCalledTimes(1);
     expect(await db.select().from(userPeople)).toMatchObject([{ itemCount: 1 }]);
-    expect(await db.select().from(userItemConsumptionEvents)).toHaveLength(0);
+    expect(await db.select().from(userItemConsumptionEvents)).toMatchObject([
+      { eventType: 'SAVED' },
+    ]);
   });
 
   it('does not enqueue new work when completing saved content or toggling unsaved content through tRPC', async () => {
@@ -965,7 +1003,9 @@ describe.each(['REST', 'tRPC'])('%s manual bookmark save contract', (api) => {
       expect((await result(await save({ providerId: 'video' }))).status).toBe('already_bookmarked');
       expect(await db.select().from(bookmarkEnrichmentOutbox)).toHaveLength(0);
       expect(send).toHaveBeenCalledTimes(2);
-      expect(await db.select().from(userItemConsumptionEvents)).toHaveLength(0);
+      expect(await db.select().from(userItemConsumptionEvents)).toMatchObject([
+        { eventType: 'SAVED' },
+      ]);
     }
   );
 
