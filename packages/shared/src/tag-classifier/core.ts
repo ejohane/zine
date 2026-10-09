@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const CatalogSchema = z
   .object({
-    version: z.union([z.literal(1), z.literal(2)]),
+    version: z.union([z.literal(1), z.literal(2), z.literal(3)]),
     tags: z
       .array(
         z.object({

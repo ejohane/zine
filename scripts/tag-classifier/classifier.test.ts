@@ -54,7 +54,7 @@ describe('topic classification', () => {
   });
   test('revised policy accepts short evidence while excluding incidental mentions', () => {
     const q = questionsFor(catalog);
-    expect(catalog.version).toBe(2);
+    expect(catalog.version).toBe(3);
     for (const id of ['postgresql', 'playwright', 'agent-harnesses', 'strength-training'])
       expect(q[id]).toBeDefined();
     expect(q.rust.criteria.true).toContain('Short evidence is sufficient');

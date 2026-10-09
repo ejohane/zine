@@ -31,6 +31,9 @@ export interface Bindings {
   ITEM_VECTORS?: VectorizeIndex;
   /** Current environment (development, staging, production) */
   ENVIRONMENT: string;
+  /** Opt-in Jev tagging; key is provisioned as a Worker secret. */
+  AUTO_TAGGING_ENABLED?: string;
+  TYPESAFE_API_KEY?: string;
   /** Workers AI model used for bookmark enrichment */
   ENRICHMENT_MODEL?: string;
   /** Workers AI model used for evidence-backed full-article understanding */
