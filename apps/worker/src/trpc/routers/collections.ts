@@ -595,7 +595,16 @@ export const collectionsRouter = router({
             })
           : null;
 
-      return { items: itemViews, nextCursor };
+      return {
+        items: itemViews,
+        nextCursor,
+        completionMembership: {
+          isFinished: rules.isFinished ?? null,
+          pinnedIds: pageResults
+            .filter((row) => row.collection_item_overrides?.action === CollectionOverrideAction.PIN)
+            .map((row) => row.user_items.id),
+        },
+      };
     }),
 
   forItem: protectedProcedure

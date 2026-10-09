@@ -3,6 +3,7 @@ import Foundation
 struct PaginatedBookmarksResponse: Decodable {
     let items: [Bookmark]
     let nextCursor: String?
+    var completionMembership: CollectionCompletionMembership? = nil
 }
 
 struct BookmarkResponse: Decodable {

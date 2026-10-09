@@ -2354,6 +2354,7 @@ describe('apiV1Routes', () => {
     mockCollectionItems.mockResolvedValue({
       items: [{ id: 'ui_collection', title: 'Collected bookmark' }],
       nextCursor: 'more-collection',
+      completionMembership: { isFinished: false, pinnedIds: ['ui_collection'] },
     });
     const app = createTestApp();
 
@@ -2377,6 +2378,7 @@ describe('apiV1Routes', () => {
     expect((await res.json()) as JsonBody).toMatchObject({
       items: [{ title: 'Collected bookmark' }],
       nextCursor: 'more-collection',
+      completionMembership: { isFinished: false, pinnedIds: ['ui_collection'] },
     });
   });
 

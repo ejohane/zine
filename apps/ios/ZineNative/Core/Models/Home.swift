@@ -113,6 +113,15 @@ enum HomeCollectionLayout: String, Codable, Hashable {
     case compactList = "COMPACT_LIST"
 }
 
+struct CollectionCompletionMembership: Codable, Hashable {
+    let isFinished: Bool?
+    let pinnedIds: [String]
+
+    func includes(id: String, isFinished: Bool) -> Bool {
+        pinnedIds.contains(id) || self.isFinished == nil || self.isFinished == isFinished
+    }
+}
+
 struct HomeCollection: Codable, Hashable, Identifiable {
     let collectionId: String
     let title: String
@@ -120,6 +129,8 @@ struct HomeCollection: Codable, Hashable, Identifiable {
     let position: Int
     let count: Int
     let items: [HomeItem]
+
+    var completionMembership: CollectionCompletionMembership? = nil
 
     var id: String { collectionId }
 }

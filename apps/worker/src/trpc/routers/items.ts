@@ -502,6 +502,14 @@ export const itemsRouter = router({
           position: section.position,
           count: sectionItems.length,
           items: toHomeItemViews(sectionItems),
+          completionMembership: {
+            isFinished: rules.isFinished ?? null,
+            pinnedIds: sectionItems
+              .filter(
+                (row) => row.collection_item_overrides?.action === CollectionOverrideAction.PIN
+              )
+              .map((row) => row.user_items.id),
+          },
         };
       })
     );

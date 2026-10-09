@@ -406,6 +406,7 @@ apiV1Routes.get('/collections/:id/items', apiAuth('bookmarks:read'), async (c) =
   return c.json({
     items: result.items,
     nextCursor: result.nextCursor,
+    completionMembership: result.completionMembership,
     requestId: c.get('requestId'),
     traceId: c.get('traceId'),
   });

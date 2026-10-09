@@ -56,7 +56,12 @@ struct HomeView: View {
     let registersNavigationDestinations: Bool
 
     @Namespace private var localTransitionNamespace
-    @State private var titleCollapseProgress: CGFloat = 0
+    @State private var localTitleCollapseState = ListTitleCollapseState()
+    private let suppliedTitleCollapseState: ListTitleCollapseState?
+
+    private var titleCollapseState: ListTitleCollapseState {
+        suppliedTitleCollapseState ?? localTitleCollapseState
+    }
 
     init(
         client: APIClient,
@@ -69,8 +74,10 @@ struct HomeView: View {
         tabReselection: Int = 0,
         onTitleCollapseProgressChanged: @escaping (CGFloat) -> Void = { _ in },
         transitionNamespace: Namespace.ID? = nil,
-        registersNavigationDestinations: Bool = true
+        registersNavigationDestinations: Bool = true,
+        titleCollapseState: ListTitleCollapseState? = nil
     ) {
+        suppliedTitleCollapseState = titleCollapseState
         self.client = client
         self.store = store
         self.density = density
@@ -132,10 +139,7 @@ struct HomeView: View {
             .toolbar {
                 if registersNavigationDestinations {
                     ToolbarItem(placement: .principal) {
-                        CollapsedListTitle(
-                            title: title,
-                            progress: titleCollapseProgress
-                        )
+                        ObservedListTitle(title: title, state: titleCollapseState, compact: true)
                     }
                 }
             }
@@ -169,7 +173,7 @@ struct HomeView: View {
         } else {
             ScrollView {
                 LazyVStack(spacing: density.sectionSpacing) {
-                    CollapsingListTitle(title: title, progress: titleCollapseProgress)
+                    ObservedListTitle(title: title, state: titleCollapseState)
                         .padding(.horizontal, 18)
 
                     ForEach(dashboardSections) { section in
@@ -189,7 +193,7 @@ struct HomeView: View {
                 let offset = geometry.contentOffset.y + geometry.contentInsets.top
                 return CollapsingListTitle.collapseProgress(scrollOffset: offset)
             } action: { _, progress in
-                titleCollapseProgress = progress
+                titleCollapseState.progress = progress
                 onTitleCollapseProgressChanged(progress)
             }
             .refreshable {

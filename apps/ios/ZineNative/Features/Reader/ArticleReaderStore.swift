@@ -88,11 +88,11 @@ final class ArticleReaderStore {
     }
 
     var isFinished: Bool {
-        finishedState.isFinished
+        finishedState.isUpdating ? finishedState.isFinished : (client.bookmarkState.patch(for: metadata.bookmarkID)?.isFinished ?? finishedState.isFinished)
     }
 
     var isUpdatingFinished: Bool {
-        finishedState.isUpdating
+        finishedState.isUpdating || client.bookmarkState.isPending(id: metadata.bookmarkID)
     }
 
     var phaseName: String {
@@ -195,14 +195,20 @@ final class ArticleReaderStore {
     }
 
     func beginFinishedToggle() -> OptimisticFinishedState.Mutation? {
-        finishedState.beginToggle()
+        guard !client.bookmarkState.isPending(id: metadata.bookmarkID) else { return nil }
+        if !finishedState.isUpdating, let patch = client.bookmarkState.patch(for: metadata.bookmarkID) {
+            finishedState.synchronize(isFinished: patch.isFinished, finishedAt: patch.finishedAt, isUpdating: false)
+        }
+        return finishedState.beginToggle()
     }
 
     func persistFinishedToggle(_ mutation: OptimisticFinishedState.Mutation) async -> Bool {
         do {
             let receipt = try await client.setFinishedWithReceipt(
                 id: metadata.bookmarkID,
-                isFinished: mutation.requestedIsFinished
+                isFinished: mutation.requestedIsFinished,
+                previousFinished: mutation.previousIsFinished,
+                previousFinishedAt: mutation.previousFinishedAt
             )
             lastFinishedDelivery = receipt.delivery
             finishedState.accept(

@@ -104,6 +104,8 @@ struct ZineNativeApp: App {
             ScreenshotDailyOverviewView()
         } else if ProcessInfo.processInfo.arguments.contains("-screenshot-daily-thread-fixture") {
             ScreenshotDailyThreadView()
+        } else if ProcessInfo.processInfo.arguments.contains("-screenshot-inbox-mutations-fixture") {
+            ScreenshotInboxMutationShell()
         } else if ProcessInfo.processInfo.arguments.contains("-screenshot-home-fixtures") {
             ScreenshotHomeTabShell()
         } else if ProcessInfo.processInfo.arguments.contains("-screenshot-fixtures") {

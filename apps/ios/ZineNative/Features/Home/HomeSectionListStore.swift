@@ -9,7 +9,17 @@ final class HomeSectionListStore {
         var nextCursor: String?
     }
 
-    private(set) var items: [Bookmark] = []
+    private var storedItems: [Bookmark] = []
+    private var membership = BookmarkMembershipSnapshot()
+    private(set) var items: [Bookmark] {
+        get { client.bookmarkState.overlay(storedItems).filter { membership.includes($0.id, state: client.bookmarkState) && shouldKeep($0) } }
+        set {
+            let receivedIDs = Set(newValue.map(\.id))
+            storedItems = newValue + storedItems.filter {
+                client.bookmarkState.changedIDs.contains($0.id) && !receivedIDs.contains($0.id)
+            }
+        }
+    }
     private(set) var isLoading = false
     private(set) var isLoadingMore = false
     private(set) var isResolvingInboxFilter = false
@@ -24,6 +34,7 @@ final class HomeSectionListStore {
     private var activeContentType: ContentType?
     private var inboxPages: [String: InboxPage] = [:]
     private var didHydrateInboxCache = false
+    private var completionMembership: CollectionCompletionMembership?
     private var removedIndices: [String: Int] = [:]
     private var pendingInboxItemIDs: Set<String> = []
     private var committedInboxItemIDs: Set<String> = []
@@ -85,7 +96,8 @@ final class HomeSectionListStore {
             guard !Task.isCancelled, activeContentType == contentType else { return }
         } else if filterChanged {
             activeContentType = contentType
-            items = []
+            storedItems = []
+            membership = BookmarkMembershipSnapshot()
             nextCursor = nil
             isLoadingMore = false
         }
@@ -98,8 +110,14 @@ final class HomeSectionListStore {
         }
 
         do {
+            let queuedAtStart = await client.pendingBookmarkMutationIDs()
+            let readRevision = client.bookmarkState.revision
             let response = try await request(contentType: contentType)
             guard !Task.isCancelled, activeContentType == contentType else { return }
+            completionMembership = response.completionMembership
+            let queuedIDs = queuedAtStart.union(await client.pendingBookmarkMutationIDs())
+            guard !Task.isCancelled, activeContentType == contentType else { return }
+            membership.accept(previousIDs: storedItems.map(\.id), receivedIDs: response.items.map(\.id), startedAt: readRevision, queuedIDs: queuedIDs)
             items = route == .inbox ? visibleInboxItems(response.items) : response.items
             nextCursor = response.nextCursor
             if route == .inbox {
@@ -170,6 +188,10 @@ final class HomeSectionListStore {
                 cursor: nextCursor
             )
             guard !Task.isCancelled, activeContentType == requestedContentType else { return }
+            if let membership = response.completionMembership {
+                completionMembership = CollectionCompletionMembership(isFinished: membership.isFinished, pinnedIds: (completionMembership?.pinnedIds ?? []) + membership.pinnedIds)
+            }
+            membership.includeReturned(response.items.map(\.id))
             let existingIDs = Set(items.map(\.id))
             items.append(contentsOf: response.items.filter {
                 !existingIDs.contains($0.id)
@@ -194,19 +216,8 @@ final class HomeSectionListStore {
     }
 
     func update(_ bookmark: Bookmark) {
-        guard let index = items.firstIndex(where: { $0.id == bookmark.id }) else { return }
-        if shouldKeep(bookmark) {
-            items[index] = bookmark
-            if route == .inbox {
-                for key in Array(inboxPages.keys) {
-                    if let pageIndex = inboxPages[key]?.items.firstIndex(where: { $0.id == bookmark.id }) {
-                        inboxPages[key]?.items[pageIndex] = bookmark
-                    }
-                }
-            }
-        } else {
-            items.remove(at: index)
-            if route == .inbox { removeInboxItemFromPages(id: bookmark.id) }
+        if let index = storedItems.firstIndex(where: { $0.id == bookmark.id }) {
+            storedItems[index] = bookmark
         }
     }
 
@@ -233,7 +244,7 @@ final class HomeSectionListStore {
     func bookmarkInboxItem(_ bookmark: Bookmark) async -> Bool {
         await updateInboxItem(
             bookmark,
-            request: { try await client.bookmarkItem(id: bookmark.id) },
+            request: { try await client.bookmarkItem(id: bookmark.id, bookmark: bookmark) },
             errorMessage: "The item couldn’t be bookmarked. Please try again."
         )
     }
@@ -241,7 +252,7 @@ final class HomeSectionListStore {
     func archiveInboxItem(_ bookmark: Bookmark) async -> Bool {
         await updateInboxItem(
             bookmark,
-            request: { try await client.archiveInboxItem(id: bookmark.id) },
+            request: { try await client.archiveInboxItem(id: bookmark.id, bookmark: bookmark) },
             errorMessage: "The item couldn’t be archived. Please try again."
         )
     }
@@ -342,7 +353,7 @@ final class HomeSectionListStore {
 
         switch route {
         case .collection:
-            return bookmark.state == "BOOKMARKED"
+            return bookmark.state == "BOOKMARKED" && (completionMembership?.includes(id: bookmark.id, isFinished: bookmark.isFinished) ?? true)
         case .inbox:
             return bookmark.state == "INBOX" && !bookmark.isFinished
         default:

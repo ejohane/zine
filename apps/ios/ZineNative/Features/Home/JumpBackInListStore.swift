@@ -4,7 +4,17 @@ import Observation
 @MainActor
 @Observable
 final class JumpBackInListStore {
-    private(set) var items: [Bookmark] = []
+    private var storedItems: [Bookmark] = []
+    private var membership = BookmarkMembershipSnapshot()
+    private(set) var items: [Bookmark] {
+        get { client.bookmarkState.overlay(storedItems).filter { membership.includes($0.id, state: client.bookmarkState) && $0.state == "BOOKMARKED" && !$0.isFinished } }
+        set {
+            let receivedIDs = Set(newValue.map(\.id))
+            storedItems = newValue + storedItems.filter {
+                client.bookmarkState.changedIDs.contains($0.id) && !receivedIDs.contains($0.id)
+            }
+        }
+    }
     private(set) var isLoading = false
     private(set) var isLoadingMore = false
     private(set) var errorMessage: String?
@@ -24,7 +34,8 @@ final class JumpBackInListStore {
         errorMessage = nil
 
         if filterChanged {
-            items = []
+            storedItems = []
+            membership = BookmarkMembershipSnapshot()
             nextCursor = nil
             isLoadingMore = false
         }
@@ -37,8 +48,13 @@ final class JumpBackInListStore {
         }
 
         do {
+            let queuedAtStart = await client.pendingBookmarkMutationIDs()
+            let readRevision = client.bookmarkState.revision
             let response = try await client.listOpenedBookmarks(contentType: contentType)
             guard !Task.isCancelled, activeContentType == contentType else { return }
+            let queuedIDs = queuedAtStart.union(await client.pendingBookmarkMutationIDs())
+            guard !Task.isCancelled, activeContentType == contentType else { return }
+            membership.accept(previousIDs: storedItems.map(\.id), receivedIDs: response.items.map(\.id), startedAt: readRevision, queuedIDs: queuedIDs)
             items = response.items
             nextCursor = response.nextCursor
             prefetchImages(in: response.items)
@@ -70,6 +86,7 @@ final class JumpBackInListStore {
                 cursor: nextCursor
             )
             guard !Task.isCancelled, activeContentType == requestedContentType else { return }
+            membership.includeReturned(response.items.map(\.id))
             let existingIDs = Set(items.map(\.id))
             items.append(contentsOf: response.items.filter { !existingIDs.contains($0.id) })
             self.nextCursor = response.nextCursor
@@ -82,14 +99,8 @@ final class JumpBackInListStore {
     }
 
     func update(_ bookmark: Bookmark) {
-        guard let index = items.firstIndex(where: { $0.id == bookmark.id }) else { return }
-        if bookmark.isFinished
-            || bookmark.state != "BOOKMARKED"
-            || (activeContentType != nil && bookmark.contentType != activeContentType)
-        {
-            items.remove(at: index)
-        } else {
-            items[index] = bookmark
+        if let index = storedItems.firstIndex(where: { $0.id == bookmark.id }) {
+            storedItems[index] = bookmark
         }
     }
 

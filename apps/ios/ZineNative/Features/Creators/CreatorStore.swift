@@ -5,8 +5,35 @@ import Observation
 @Observable
 final class CreatorStore {
     private(set) var profile: CreatorProfile?
-    private(set) var bookmarks: [Bookmark] = []
-    private(set) var completedBookmarks: [Bookmark] = []
+    private var bookmarkMembership = BookmarkMembershipSnapshot()
+    private var completedMembership = BookmarkMembershipSnapshot()
+    private var storedBookmarks: [Bookmark] = []
+    private(set) var bookmarks: [Bookmark] {
+        get { visibleBookmarks(finished: false) }
+        set { storedBookmarks = retainingMutatedRows(storedBookmarks, replacingWith: newValue) }
+    }
+    private var storedCompletedBookmarks: [Bookmark] = []
+    private(set) var completedBookmarks: [Bookmark] {
+        get { visibleBookmarks(finished: true) }
+        set { storedCompletedBookmarks = retainingMutatedRows(storedCompletedBookmarks, replacingWith: newValue) }
+    }
+
+    private func retainingMutatedRows(_ old: [Bookmark], replacingWith new: [Bookmark]) -> [Bookmark] {
+        let receivedIDs = Set(new.map(\.id))
+        return new + old.filter { client.bookmarkState.changedIDs.contains($0.id) && !receivedIDs.contains($0.id) }
+    }
+
+    private func visibleBookmarks(finished: Bool) -> [Bookmark] {
+        var seen = Set<String>()
+        let snapshot = finished ? completedMembership : bookmarkMembership
+        let candidates = (storedBookmarks + storedCompletedBookmarks).filter {
+            snapshot.includes($0.id, state: client.bookmarkState)
+        }
+        return client.bookmarkState.overlay(candidates).filter {
+            seen.insert($0.id).inserted && $0.state == "BOOKMARKED" && $0.isFinished == finished
+        }
+    }
+
     private(set) var latestContent: [CreatorContentItem] = []
     private(set) var latestProvider: Provider?
     private(set) var latestReason: String?
@@ -64,6 +91,7 @@ final class CreatorStore {
                 isFinished: false
             )
             guard !Task.isCancelled else { return }
+            bookmarkMembership.includeReturned(response.items.map(\.id))
             let existingIDs = Set(bookmarks.map(\.id))
             bookmarks.append(contentsOf: response.items.filter { !existingIDs.contains($0.id) })
             self.nextCursor = response.nextCursor
@@ -91,6 +119,7 @@ final class CreatorStore {
                 isFinished: true
             )
             guard !Task.isCancelled else { return }
+            completedMembership.includeReturned(response.items.map(\.id))
             let existingIDs = Set(completedBookmarks.map(\.id))
             completedBookmarks.append(
                 contentsOf: response.items.filter { !existingIDs.contains($0.id) }
@@ -117,12 +146,16 @@ final class CreatorStore {
         isLoadingBookmarks = reset && bookmarks.isEmpty
         defer { isLoadingBookmarks = false }
 
+        let queuedAtStart = await client.pendingBookmarkMutationIDs()
+        let readRevision = client.bookmarkState.revision
         do {
             let response = try await client.listCreatorBookmarks(
                 creatorId: creatorId,
                 isFinished: false
             )
+            let queuedIDs = queuedAtStart.union(await client.pendingBookmarkMutationIDs())
             guard !Task.isCancelled else { return }
+            bookmarkMembership.accept(previousIDs: (storedBookmarks + storedCompletedBookmarks).map(\.id), receivedIDs: response.items.map(\.id), startedAt: readRevision, queuedIDs: queuedIDs)
             bookmarks = response.items
             nextCursor = response.nextCursor
         } catch is CancellationError {
@@ -136,12 +169,16 @@ final class CreatorStore {
         isLoadingCompletedBookmarks = reset && completedBookmarks.isEmpty
         defer { isLoadingCompletedBookmarks = false }
 
+        let queuedAtStart = await client.pendingBookmarkMutationIDs()
+        let readRevision = client.bookmarkState.revision
         do {
             let response = try await client.listCreatorBookmarks(
                 creatorId: creatorId,
                 isFinished: true
             )
+            let queuedIDs = queuedAtStart.union(await client.pendingBookmarkMutationIDs())
             guard !Task.isCancelled else { return }
+            completedMembership.accept(previousIDs: (storedBookmarks + storedCompletedBookmarks).map(\.id), receivedIDs: response.items.map(\.id), startedAt: readRevision, queuedIDs: queuedIDs)
             completedBookmarks = response.items
             completedNextCursor = response.nextCursor
         } catch is CancellationError {

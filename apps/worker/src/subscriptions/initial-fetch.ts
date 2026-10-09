@@ -80,6 +80,7 @@ export interface InitialFetchEnv {
 interface YouTubePlaylistItem {
   contentDetails?: {
     videoId?: string;
+    videoPublishedAt?: string;
   };
   snippet?: {
     title?: string;
@@ -268,9 +269,8 @@ async function fetchLatestYouTubeVideo(
       }
 
       // Check publish date (skip scheduled content)
-      const publishedAt = video.snippet?.publishedAt
-        ? new Date(video.snippet.publishedAt).getTime()
-        : 0;
+      const publication = video.contentDetails?.videoPublishedAt ?? video.snippet?.publishedAt;
+      const publishedAt = publication ? Date.parse(publication) : Number.NaN;
 
       return publishedAt <= now;
     }) || [];
@@ -334,6 +334,7 @@ function convertToYouTubePlaylistItem(
     contentDetails: item.contentDetails
       ? {
           videoId: item.contentDetails.videoId ?? undefined,
+          videoPublishedAt: item.contentDetails.videoPublishedAt ?? undefined,
         }
       : undefined,
     snippet: item.snippet
