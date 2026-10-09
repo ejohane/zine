@@ -100,6 +100,15 @@ jobs:
           VITE_YOUTUBE_CLIENT_ID: ${{ vars.VITE_YOUTUBE_CLIENT_ID }}
         run: bun run --cwd apps/web build
 
+      - name: Bundle preview Worker dependencies
+        working-directory: apps/web
+        run: |
+          bunx wrangler@4.119.0 deploy \
+            --config wrangler.preview.toml \
+            --dry-run \
+            --outdir preview-worker-bundle
+          bun -e 'const path = "wrangler.preview.toml"; const source = await Bun.file(path).text(); const main = "main = \"src/preview-worker.ts\""; if (!source.includes(main)) throw new Error("Preview entrypoint changed"); await Bun.write(path, source.replace(main, "main = \"preview-worker-bundle/preview-worker.js\""));'
+
       - name: Upload immutable preview bundle
         uses: actions/upload-artifact@v4
         with:
@@ -108,7 +117,7 @@ jobs:
           retention-days: 3
           path: |
             apps/web/dist
-            apps/web/src/preview-worker.ts
+            apps/web/preview-worker-bundle
             apps/web/wrangler.preview.toml
 
   deploy:
