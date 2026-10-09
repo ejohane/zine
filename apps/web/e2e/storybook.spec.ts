@@ -11,7 +11,8 @@ const stories = [
 
 for (const storyId of stories) {
   test(`storybook ${storyId}`, async ({ page }) => {
-    await page.goto(`/iframe.html?id=${storyId}&viewMode=story`);
+    // Playwright owns the Axe scan here; keep the Storybook addon in manual mode.
+    await page.goto(`/iframe.html?id=${storyId}&viewMode=story&globals=a11y.manual:!true`);
     await page.waitForLoadState('networkidle');
 
     const storyRoot = page.locator('#storybook-root');
@@ -36,7 +37,8 @@ for (const storyId of [
   'publications-reader--temporary-failure',
 ]) {
   test(`public reader accessibility ${storyId}`, async ({ page }) => {
-    await page.goto(`/iframe.html?id=${storyId}&viewMode=story`);
+    // Playwright owns the Axe scan here; keep the Storybook addon in manual mode.
+    await page.goto(`/iframe.html?id=${storyId}&viewMode=story&globals=a11y.manual:!true`);
     await expect(page.locator('#storybook-root .publication-reader')).toBeVisible();
     const accessibility = await new AxeBuilder({ page }).include('#storybook-root').analyze();
     expect(accessibility.violations).toEqual([]);
