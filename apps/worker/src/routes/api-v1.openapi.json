@@ -6156,6 +6156,100 @@
           }
         }
       }
+    },
+    "/api/v1/bookmarks/{id}/tag-suggestions": {
+      "get": {
+        "tags": ["Bookmarks"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "summary": "List pending generated tag suggestions",
+        "description": "Generated suggestions remain separate from assigned tags. Only the authenticated owner can read them.",
+        "responses": {
+          "200": {
+            "description": "Pending suggestions with id, name, confidence"
+          },
+          "404": {
+            "description": "Bookmark not found"
+          }
+        },
+        "operationId": "listTagSuggestions",
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current"
+      }
+    },
+    "/api/v1/bookmarks/{id}/tag-suggestions/{suggestionId}": {
+      "post": {
+        "tags": ["Bookmarks"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "suggestionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "summary": "Accept or dismiss a generated tag",
+        "description": "Acceptance atomically merges a normal tag. Decisions survive reclassification. Retrying acceptance is idempotent.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["decision"],
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": ["ACCEPTED", "DISMISSED"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated assigned tags and pending suggestions"
+          },
+          "400": {
+            "description": "Invalid decision"
+          },
+          "404": {
+            "description": "Bookmark or suggestion not found"
+          }
+        },
+        "operationId": "decideTagSuggestion",
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current"
+      }
     }
   },
   "components": {

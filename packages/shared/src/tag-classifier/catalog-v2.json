@@ -1,0 +1,1225 @@
+{
+  "version": 2,
+  "tags": [
+    {
+      "id": "ai",
+      "name": "AI",
+      "definition": "Artificial intelligence methods, systems, capabilities, and applications"
+    },
+    {
+      "id": "machine-learning",
+      "name": "Machine learning",
+      "definition": "Learning predictive or generative behavior from training data"
+    },
+    {
+      "id": "language-models",
+      "name": "Language models",
+      "definition": "Models trained to understand or generate human language"
+    },
+    {
+      "id": "ai-agents",
+      "name": "AI agents",
+      "definition": "Software systems using AI to plan and execute actions with tools"
+    },
+    {
+      "id": "ai-safety",
+      "name": "AI safety",
+      "definition": "Preventing harmful behavior and managing risks of AI systems"
+    },
+    {
+      "id": "ai-evaluation",
+      "name": "AI evaluation",
+      "definition": "Measuring model capabilities, reliability, and behavior with tests"
+    },
+    {
+      "id": "ai-alignment",
+      "name": "AI alignment",
+      "definition": "Making AI behavior conform to intended goals and human values"
+    },
+    {
+      "id": "prompt-engineering",
+      "name": "Prompt engineering",
+      "definition": "Designing instructions and context to guide model behavior"
+    },
+    {
+      "id": "retrieval-augmented-generation",
+      "name": "Retrieval augmented generation",
+      "definition": "Retrieving source material to ground language-model answers"
+    },
+    {
+      "id": "computer-vision",
+      "name": "Computer vision",
+      "definition": "Computational interpretation of images and visual scenes"
+    },
+    {
+      "id": "speech-recognition",
+      "name": "Speech recognition",
+      "definition": "Converting spoken audio into machine-readable text"
+    },
+    {
+      "id": "generative-media",
+      "name": "Generative media",
+      "definition": "AI generation of images, audio, video, or other media"
+    },
+    {
+      "id": "neural-networks",
+      "name": "Neural networks",
+      "definition": "Architectures and training of interconnected learned computational units"
+    },
+    {
+      "id": "deep-learning",
+      "name": "Deep learning",
+      "definition": "Training and applying multilayer neural networks"
+    },
+    {
+      "id": "reinforcement-learning",
+      "name": "Reinforcement learning",
+      "definition": "Learning behavior through rewards and interaction with environments"
+    },
+    {
+      "id": "model-training",
+      "name": "Model training",
+      "definition": "Processes for fitting, fine-tuning, and optimizing model parameters"
+    },
+    {
+      "id": "model-inference",
+      "name": "Model inference",
+      "definition": "Serving and executing trained models to produce predictions"
+    },
+    {
+      "id": "robotics",
+      "name": "Robotics",
+      "definition": "Designing and controlling machines that act in the physical world"
+    },
+    {
+      "id": "automation",
+      "name": "Automation",
+      "definition": "Replacing repeatable human tasks with software or machines"
+    },
+    {
+      "id": "human-ai-interaction",
+      "name": "Human AI interaction",
+      "definition": "How people communicate, collaborate, and work with AI"
+    },
+    {
+      "id": "software-engineering",
+      "name": "Software engineering",
+      "definition": "Practices for building, maintaining, and operating software systems"
+    },
+    {
+      "id": "programming-languages",
+      "name": "Programming languages",
+      "definition": "Language design, semantics, and comparative programming approaches"
+    },
+    {
+      "id": "typescript",
+      "name": "TypeScript",
+      "definition": "Programming using TypeScript and its static type system"
+    },
+    {
+      "id": "javascript",
+      "name": "JavaScript",
+      "definition": "Programming using JavaScript and its runtime behavior"
+    },
+    {
+      "id": "python",
+      "name": "Python",
+      "definition": "Programming using Python and its ecosystem"
+    },
+    {
+      "id": "swift",
+      "name": "Swift",
+      "definition": "Programming using Swift and its language features"
+    },
+    {
+      "id": "rust",
+      "name": "Rust",
+      "definition": "Programming using Rust and its ownership and safety mechanisms"
+    },
+    {
+      "id": "go",
+      "name": "Go",
+      "definition": "Programming using Go and its concurrency and language features"
+    },
+    {
+      "id": "functional-programming",
+      "name": "Functional programming",
+      "definition": "Programming with functions, immutability, and composition"
+    },
+    {
+      "id": "compilers",
+      "name": "Compilers",
+      "definition": "Translating source programs into executable or intermediate representations"
+    },
+    {
+      "id": "type-systems",
+      "name": "Type systems",
+      "definition": "Formal and practical mechanisms for checking program types"
+    },
+    {
+      "id": "algorithms",
+      "name": "Algorithms",
+      "definition": "Computational procedures and their correctness or efficiency"
+    },
+    {
+      "id": "data-structures",
+      "name": "Data structures",
+      "definition": "Organizing data for efficient computation and access"
+    },
+    {
+      "id": "software-architecture",
+      "name": "Software architecture",
+      "definition": "Structural organization and boundaries of software systems"
+    },
+    {
+      "id": "api-design",
+      "name": "API design",
+      "definition": "Designing interfaces between software services or components"
+    },
+    {
+      "id": "testing",
+      "name": "Testing",
+      "definition": "Verifying software behavior through automated or manual tests"
+    },
+    {
+      "id": "debugging",
+      "name": "Debugging",
+      "definition": "Diagnosing and correcting software defects"
+    },
+    {
+      "id": "developer-tools",
+      "name": "Developer tools",
+      "definition": "Tools supporting software authoring, diagnosis, and delivery"
+    },
+    {
+      "id": "version-control",
+      "name": "Version control",
+      "definition": "Tracking and managing changes to source files and code"
+    },
+    {
+      "id": "open-source",
+      "name": "Open source",
+      "definition": "Development, governance, and distribution of openly licensed software"
+    },
+    {
+      "id": "code-review",
+      "name": "Code review",
+      "definition": "Examining proposed code changes for correctness and maintainability"
+    },
+    {
+      "id": "refactoring",
+      "name": "Refactoring",
+      "definition": "Restructuring software while preserving intended behavior"
+    },
+    {
+      "id": "technical-debt",
+      "name": "Technical debt",
+      "definition": "Accumulated engineering compromises and their management"
+    },
+    {
+      "id": "distributed-systems",
+      "name": "Distributed systems",
+      "definition": "Coordinating computation and state across multiple machines"
+    },
+    {
+      "id": "concurrency",
+      "name": "Concurrency",
+      "definition": "Managing simultaneous or interleaved computations"
+    },
+    {
+      "id": "databases",
+      "name": "Databases",
+      "definition": "Storing, querying, and maintaining structured persistent data"
+    },
+    {
+      "id": "sql",
+      "name": "SQL",
+      "definition": "Relational querying and manipulation with Structured Query Language"
+    },
+    {
+      "id": "data-modeling",
+      "name": "Data modeling",
+      "definition": "Designing representations, schemas, and relationships for data"
+    },
+    {
+      "id": "search-systems",
+      "name": "Search systems",
+      "definition": "Indexing and retrieving information based on user queries"
+    },
+    {
+      "id": "vector-databases",
+      "name": "Vector databases",
+      "definition": "Storage and retrieval using vector representations and similarity"
+    },
+    {
+      "id": "caching",
+      "name": "Caching",
+      "definition": "Reusing stored results to improve access speed and efficiency"
+    },
+    {
+      "id": "infrastructure",
+      "name": "Infrastructure",
+      "definition": "Foundational compute, storage, and networking systems for services"
+    },
+    {
+      "id": "cloud-computing",
+      "name": "Cloud computing",
+      "definition": "Computing resources delivered as managed network services"
+    },
+    {
+      "id": "serverless",
+      "name": "Serverless",
+      "definition": "Applications running on managed event-driven compute without server management"
+    },
+    {
+      "id": "containers",
+      "name": "Containers",
+      "definition": "Packaging and isolating software in portable runtime environments"
+    },
+    {
+      "id": "kubernetes",
+      "name": "Kubernetes",
+      "definition": "Orchestration and operation of containerized workloads with Kubernetes"
+    },
+    {
+      "id": "devops",
+      "name": "DevOps",
+      "definition": "Practices integrating software development and service operations"
+    },
+    {
+      "id": "ci-and-cd",
+      "name": "CI and CD",
+      "definition": "Automated integration, validation, and deployment of software changes"
+    },
+    {
+      "id": "observability",
+      "name": "Observability",
+      "definition": "Understanding system behavior through logs, metrics, and traces"
+    },
+    {
+      "id": "reliability-engineering",
+      "name": "Reliability engineering",
+      "definition": "Engineering services to withstand failures and meet availability goals"
+    },
+    {
+      "id": "performance-engineering",
+      "name": "Performance engineering",
+      "definition": "Measuring and improving software latency, throughput, and resource usage"
+    },
+    {
+      "id": "networking",
+      "name": "Networking",
+      "definition": "Communication protocols and connections between computing systems"
+    },
+    {
+      "id": "edge-computing",
+      "name": "Edge computing",
+      "definition": "Executing computation near users or data sources"
+    },
+    {
+      "id": "storage-systems",
+      "name": "Storage systems",
+      "definition": "Durable and scalable management of digital data"
+    },
+    {
+      "id": "message-queues",
+      "name": "Message queues",
+      "definition": "Asynchronous delivery and processing of software messages"
+    },
+    {
+      "id": "data-pipelines",
+      "name": "Data pipelines",
+      "definition": "Moving and transforming data between processing stages"
+    },
+    {
+      "id": "web-development",
+      "name": "Web development",
+      "definition": "Building websites and browser-based applications"
+    },
+    {
+      "id": "frontend-development",
+      "name": "Frontend development",
+      "definition": "Building client interfaces and browser interaction behavior"
+    },
+    {
+      "id": "backend-development",
+      "name": "Backend development",
+      "definition": "Building server-side services and application logic"
+    },
+    {
+      "id": "mobile-development",
+      "name": "Mobile development",
+      "definition": "Building applications for mobile devices"
+    },
+    {
+      "id": "ios-development",
+      "name": "iOS development",
+      "definition": "Building applications for Apple's iOS platform"
+    },
+    {
+      "id": "android-development",
+      "name": "Android development",
+      "definition": "Building applications for the Android platform"
+    },
+    {
+      "id": "desktop-applications",
+      "name": "Desktop applications",
+      "definition": "Building software interfaces and behavior for desktop computers"
+    },
+    {
+      "id": "accessibility",
+      "name": "Accessibility",
+      "definition": "Making products and content usable by people with disabilities"
+    },
+    {
+      "id": "security",
+      "name": "Security",
+      "definition": "Protecting systems and data from unauthorized or harmful activity"
+    },
+    {
+      "id": "cybersecurity",
+      "name": "Cybersecurity",
+      "definition": "Threats, defenses, and attacks involving digital systems"
+    },
+    {
+      "id": "application-security",
+      "name": "Application security",
+      "definition": "Preventing vulnerabilities in application code and behavior"
+    },
+    {
+      "id": "cryptography",
+      "name": "Cryptography",
+      "definition": "Mathematical techniques for confidentiality, integrity, and authentication"
+    },
+    {
+      "id": "authentication",
+      "name": "Authentication",
+      "definition": "Verifying identities when accessing systems"
+    },
+    {
+      "id": "privacy",
+      "name": "Privacy",
+      "definition": "Control and protection of personal information"
+    },
+    {
+      "id": "data-governance",
+      "name": "Data governance",
+      "definition": "Policies and responsibilities for managing organizational data"
+    },
+    {
+      "id": "incident-response",
+      "name": "Incident response",
+      "definition": "Detecting, containing, and recovering from security or service incidents"
+    },
+    {
+      "id": "product-management",
+      "name": "Product management",
+      "definition": "Defining, prioritizing, and coordinating product development"
+    },
+    {
+      "id": "product-strategy",
+      "name": "Product strategy",
+      "definition": "Choosing product direction, differentiation, and market opportunities"
+    },
+    {
+      "id": "user-research",
+      "name": "User research",
+      "definition": "Studying users' needs, behaviors, and contexts"
+    },
+    {
+      "id": "interaction-design",
+      "name": "Interaction design",
+      "definition": "Designing how people act within and respond to interfaces"
+    },
+    {
+      "id": "user-experience",
+      "name": "User experience",
+      "definition": "Overall usability and experience of products and services"
+    },
+    {
+      "id": "interface-design",
+      "name": "Interface design",
+      "definition": "Designing visual controls, layouts, and application surfaces"
+    },
+    {
+      "id": "design-systems",
+      "name": "Design systems",
+      "definition": "Reusable standards and components supporting coherent interface design"
+    },
+    {
+      "id": "typography",
+      "name": "Typography",
+      "definition": "Selecting and arranging letterforms for communication"
+    },
+    {
+      "id": "graphic-design",
+      "name": "Graphic design",
+      "definition": "Visual communication through composition, imagery, and type"
+    },
+    {
+      "id": "branding",
+      "name": "Branding",
+      "definition": "Developing recognizable identity and associations for organizations or products"
+    },
+    {
+      "id": "information-architecture",
+      "name": "Information architecture",
+      "definition": "Organizing and labeling information for navigation and understanding"
+    },
+    {
+      "id": "prototyping",
+      "name": "Prototyping",
+      "definition": "Creating preliminary representations to explore and test ideas"
+    },
+    {
+      "id": "usability-testing",
+      "name": "Usability testing",
+      "definition": "Observing people using products to identify interaction problems"
+    },
+    {
+      "id": "service-design",
+      "name": "Service design",
+      "definition": "Designing coordinated experiences across service touchpoints"
+    },
+    {
+      "id": "industrial-design",
+      "name": "Industrial design",
+      "definition": "Designing manufactured physical products for function and experience"
+    },
+    {
+      "id": "animation",
+      "name": "Animation",
+      "definition": "Creating motion in visual media or interfaces"
+    },
+    {
+      "id": "color-theory",
+      "name": "Color theory",
+      "definition": "Relationships and perception of colors in visual composition"
+    },
+    {
+      "id": "startups",
+      "name": "Startups",
+      "definition": "Building early-stage companies under uncertainty"
+    },
+    {
+      "id": "entrepreneurship",
+      "name": "Entrepreneurship",
+      "definition": "Creating and developing business ventures"
+    },
+    {
+      "id": "venture-capital",
+      "name": "Venture capital",
+      "definition": "Equity investment in high-growth private companies"
+    },
+    {
+      "id": "fundraising",
+      "name": "Fundraising",
+      "definition": "Securing financial resources for a company or project"
+    },
+    {
+      "id": "bootstrapping",
+      "name": "Bootstrapping",
+      "definition": "Building a business primarily from its own revenue or founders' resources"
+    },
+    {
+      "id": "business-models",
+      "name": "Business models",
+      "definition": "How organizations create, deliver, and capture economic value"
+    },
+    {
+      "id": "pricing",
+      "name": "Pricing",
+      "definition": "Setting and evaluating prices for products or services"
+    },
+    {
+      "id": "marketing",
+      "name": "Marketing",
+      "definition": "Attracting and communicating value to prospective customers"
+    },
+    {
+      "id": "content-marketing",
+      "name": "Content marketing",
+      "definition": "Using published content to attract and retain audiences"
+    },
+    {
+      "id": "sales",
+      "name": "Sales",
+      "definition": "Converting prospects into paying customers through selling processes"
+    },
+    {
+      "id": "customer-retention",
+      "name": "Customer retention",
+      "definition": "Keeping customers engaged and reducing customer loss"
+    },
+    {
+      "id": "growth-strategy",
+      "name": "Growth strategy",
+      "definition": "Approaches to increasing adoption, revenue, or market reach"
+    },
+    {
+      "id": "market-research",
+      "name": "Market research",
+      "definition": "Studying markets, competition, and customer demand"
+    },
+    {
+      "id": "leadership",
+      "name": "Leadership",
+      "definition": "Guiding people and organizations toward goals"
+    },
+    {
+      "id": "management",
+      "name": "Management",
+      "definition": "Coordinating work, resources, and organizational responsibilities"
+    },
+    {
+      "id": "hiring",
+      "name": "Hiring",
+      "definition": "Recruiting and selecting people for roles"
+    },
+    {
+      "id": "organizational-culture",
+      "name": "Organizational culture",
+      "definition": "Shared norms and behaviors within organizations"
+    },
+    {
+      "id": "teamwork",
+      "name": "Teamwork",
+      "definition": "Collaboration and coordination among people working together"
+    },
+    {
+      "id": "remote-work",
+      "name": "Remote work",
+      "definition": "Working and collaborating outside a shared physical workplace"
+    },
+    {
+      "id": "negotiation",
+      "name": "Negotiation",
+      "definition": "Reaching agreements through discussion of competing interests"
+    },
+    {
+      "id": "decision-making",
+      "name": "Decision making",
+      "definition": "Human or organizational judgment when choosing actions under uncertainty or competing priorities; not software query planning or merely encoding UI conventions"
+    },
+    {
+      "id": "strategy",
+      "name": "Strategy",
+      "definition": "Long-term choices and resource allocation toward objectives"
+    },
+    {
+      "id": "economics",
+      "name": "Economics",
+      "definition": "Production, distribution, incentives, and allocation of scarce resources"
+    },
+    {
+      "id": "macroeconomics",
+      "name": "Macroeconomics",
+      "definition": "Economy-wide growth, employment, inflation, and policy"
+    },
+    {
+      "id": "microeconomics",
+      "name": "Microeconomics",
+      "definition": "Economic behavior of individuals, firms, and markets"
+    },
+    {
+      "id": "labor-markets",
+      "name": "Labor markets",
+      "definition": "Employment, wages, labor supply, and demand"
+    },
+    {
+      "id": "trade",
+      "name": "Trade",
+      "definition": "Exchange of goods and services across markets or borders"
+    },
+    {
+      "id": "inflation",
+      "name": "Inflation",
+      "definition": "Changes in general price levels and purchasing power"
+    },
+    {
+      "id": "monetary-policy",
+      "name": "Monetary policy",
+      "definition": "Central-bank actions affecting money, credit, and interest rates"
+    },
+    {
+      "id": "fiscal-policy",
+      "name": "Fiscal policy",
+      "definition": "Government taxation and spending choices"
+    },
+    {
+      "id": "economic-inequality",
+      "name": "Economic inequality",
+      "definition": "Unequal distribution of income, wealth, or economic opportunity"
+    },
+    {
+      "id": "personal-finance",
+      "name": "Personal finance",
+      "definition": "Managing household income, spending, savings, and financial goals"
+    },
+    {
+      "id": "investing",
+      "name": "Investing",
+      "definition": "Allocating capital to assets for expected returns"
+    },
+    {
+      "id": "stock-markets",
+      "name": "Stock markets",
+      "definition": "Trading, valuation, and behavior of public equities"
+    },
+    {
+      "id": "bonds",
+      "name": "Bonds",
+      "definition": "Debt securities, yields, and fixed-income investing"
+    },
+    {
+      "id": "real-estate",
+      "name": "Real estate",
+      "definition": "Property markets, ownership, development, and investment"
+    },
+    {
+      "id": "retirement-planning",
+      "name": "Retirement planning",
+      "definition": "Financial preparation for later life and leaving paid work"
+    },
+    {
+      "id": "banking",
+      "name": "Banking",
+      "definition": "Financial institutions providing deposits, credit, and payment services"
+    },
+    {
+      "id": "payments",
+      "name": "Payments",
+      "definition": "Systems and processes for transferring money"
+    },
+    {
+      "id": "insurance",
+      "name": "Insurance",
+      "definition": "Managing financial risks through coverage contracts"
+    },
+    {
+      "id": "cryptocurrency",
+      "name": "Cryptocurrency",
+      "definition": "Digital assets secured and transferred using cryptographic networks"
+    },
+    {
+      "id": "blockchain",
+      "name": "Blockchain",
+      "definition": "Distributed ledgers and mechanisms for agreeing on transaction history"
+    },
+    {
+      "id": "public-policy",
+      "name": "Public policy",
+      "definition": "Government choices addressing collective problems"
+    },
+    {
+      "id": "politics",
+      "name": "Politics",
+      "definition": "Political power, parties, elections, and governance"
+    },
+    {
+      "id": "democracy",
+      "name": "Democracy",
+      "definition": "Representative government, participation, and democratic institutions"
+    },
+    {
+      "id": "geopolitics",
+      "name": "Geopolitics",
+      "definition": "Relations and strategic competition among countries"
+    },
+    {
+      "id": "international-relations",
+      "name": "International relations",
+      "definition": "Diplomacy and cooperation or conflict between states"
+    },
+    {
+      "id": "law",
+      "name": "Law",
+      "definition": "Legal systems, obligations, disputes, and interpretation"
+    },
+    {
+      "id": "regulation",
+      "name": "Regulation",
+      "definition": "Rules and oversight governing activities and industries"
+    },
+    {
+      "id": "civil-liberties",
+      "name": "Civil liberties",
+      "definition": "Individual freedoms and protections against state interference"
+    },
+    {
+      "id": "education",
+      "name": "Education",
+      "definition": "Teaching, learning systems, and educational institutions"
+    },
+    {
+      "id": "learning-science",
+      "name": "Learning science",
+      "definition": "Evidence about how people acquire and retain knowledge"
+    },
+    {
+      "id": "higher-education",
+      "name": "Higher education",
+      "definition": "Universities, colleges, and postsecondary learning"
+    },
+    {
+      "id": "online-learning",
+      "name": "Online learning",
+      "definition": "Education delivered through digital and networked media"
+    },
+    {
+      "id": "science",
+      "name": "Science",
+      "definition": "Scientific methods, discoveries, and research practices"
+    },
+    {
+      "id": "physics",
+      "name": "Physics",
+      "definition": "Matter, energy, forces, and physical laws"
+    },
+    {
+      "id": "quantum-computing",
+      "name": "Quantum computing",
+      "definition": "Computation using quantum states and operations"
+    },
+    {
+      "id": "mathematics",
+      "name": "Mathematics",
+      "definition": "Abstract structures, quantities, proofs, and mathematical relationships"
+    },
+    {
+      "id": "statistics",
+      "name": "Statistics",
+      "definition": "Inference and analysis of data under uncertainty"
+    },
+    {
+      "id": "biology",
+      "name": "Biology",
+      "definition": "Living organisms, their systems, and biological processes"
+    },
+    {
+      "id": "genetics",
+      "name": "Genetics",
+      "definition": "Genes, heredity, and genetic variation"
+    },
+    {
+      "id": "neuroscience",
+      "name": "Neuroscience",
+      "definition": "Nervous systems and the biological basis of behavior"
+    },
+    {
+      "id": "chemistry",
+      "name": "Chemistry",
+      "definition": "Composition, properties, and reactions of substances"
+    },
+    {
+      "id": "astronomy",
+      "name": "Astronomy",
+      "definition": "Celestial objects, cosmic phenomena, and the universe"
+    },
+    {
+      "id": "space-exploration",
+      "name": "Space exploration",
+      "definition": "Missions, technologies, and activity beyond Earth"
+    },
+    {
+      "id": "materials-science",
+      "name": "Materials science",
+      "definition": "Relationships between material structure, properties, and applications"
+    },
+    {
+      "id": "energy",
+      "name": "Energy",
+      "definition": "Production, distribution, and use of energy resources"
+    },
+    {
+      "id": "renewable-energy",
+      "name": "Renewable energy",
+      "definition": "Energy derived from replenishing natural sources"
+    },
+    {
+      "id": "nuclear-energy",
+      "name": "Nuclear energy",
+      "definition": "Energy production through nuclear reactions"
+    },
+    {
+      "id": "climate-change",
+      "name": "Climate change",
+      "definition": "Long-term climate shifts, causes, impacts, and responses"
+    },
+    {
+      "id": "environment",
+      "name": "Environment",
+      "definition": "Natural ecosystems and human impacts on them"
+    },
+    {
+      "id": "conservation",
+      "name": "Conservation",
+      "definition": "Protecting species, habitats, and natural resources"
+    },
+    {
+      "id": "sustainability",
+      "name": "Sustainability",
+      "definition": "Practices sustaining environmental and social resources over time"
+    },
+    {
+      "id": "agriculture",
+      "name": "Agriculture",
+      "definition": "Cultivation, farming, and production of food or other crops"
+    },
+    {
+      "id": "food-systems",
+      "name": "Food systems",
+      "definition": "Production, distribution, access, and governance of food"
+    },
+    {
+      "id": "transportation",
+      "name": "Transportation",
+      "definition": "Moving people and goods through vehicles and infrastructure"
+    },
+    {
+      "id": "urban-planning",
+      "name": "Urban planning",
+      "definition": "Design and governance of cities, land use, and public infrastructure"
+    },
+    {
+      "id": "architecture",
+      "name": "Architecture",
+      "definition": "Design of buildings and built spaces"
+    },
+    {
+      "id": "housing",
+      "name": "Housing",
+      "definition": "Availability, affordability, and conditions of residential accommodation"
+    },
+    {
+      "id": "health",
+      "name": "Health",
+      "definition": "Human physical and mental well-being and healthcare"
+    },
+    {
+      "id": "medicine",
+      "name": "Medicine",
+      "definition": "Diagnosis, treatment, and prevention of disease"
+    },
+    {
+      "id": "public-health",
+      "name": "Public health",
+      "definition": "Population-level prevention and promotion of health"
+    },
+    {
+      "id": "mental-health",
+      "name": "Mental health",
+      "definition": "Psychological well-being, distress, and mental disorders"
+    },
+    {
+      "id": "psychology",
+      "name": "Psychology",
+      "definition": "Human cognition, emotion, and behavior"
+    },
+    {
+      "id": "cognitive-science",
+      "name": "Cognitive science",
+      "definition": "Interdisciplinary study of minds and cognition"
+    },
+    {
+      "id": "nutrition",
+      "name": "Nutrition",
+      "definition": "Dietary intake and its relationship to health"
+    },
+    {
+      "id": "exercise",
+      "name": "Exercise",
+      "definition": "Physical activity and training for fitness or health"
+    },
+    {
+      "id": "sleep",
+      "name": "Sleep",
+      "definition": "Sleep behavior, physiology, quality, and recovery"
+    },
+    {
+      "id": "longevity",
+      "name": "Longevity",
+      "definition": "Aging processes and extending healthy lifespan"
+    },
+    {
+      "id": "mindfulness",
+      "name": "Mindfulness",
+      "definition": "Practices of attention and awareness of present experience"
+    },
+    {
+      "id": "relationships",
+      "name": "Relationships",
+      "definition": "Interpersonal connection, communication, and relationship dynamics"
+    },
+    {
+      "id": "parenting",
+      "name": "Parenting",
+      "definition": "Raising and caring for children"
+    },
+    {
+      "id": "child-development",
+      "name": "Child development",
+      "definition": "Physical, cognitive, and emotional growth of children"
+    },
+    {
+      "id": "productivity",
+      "name": "Productivity",
+      "definition": "Managing attention, time, and work to achieve outcomes"
+    },
+    {
+      "id": "knowledge-management",
+      "name": "Knowledge management",
+      "definition": "Organizational or personal systems for capturing, organizing, sharing, and retrieving knowledge; not merely documenting interface rules"
+    },
+    {
+      "id": "note-taking",
+      "name": "Note taking",
+      "definition": "Recording and organizing notes for thinking or reference"
+    },
+    {
+      "id": "writing",
+      "name": "Writing",
+      "definition": "Crafting written expression and developing written work"
+    },
+    {
+      "id": "reading",
+      "name": "Reading",
+      "definition": "Reading practices, comprehension, and engagement with texts"
+    },
+    {
+      "id": "creativity",
+      "name": "Creativity",
+      "definition": "Generating and developing original ideas or expressions"
+    },
+    {
+      "id": "critical-thinking",
+      "name": "Critical thinking",
+      "definition": "Reasoning skills and methods for assessing arguments, evidence, and assumptions; not any technical analysis or investigation"
+    },
+    {
+      "id": "philosophy",
+      "name": "Philosophy",
+      "definition": "Fundamental inquiry about reality, knowledge, and values"
+    },
+    {
+      "id": "ethics",
+      "name": "Ethics",
+      "definition": "Reasoning about right action, responsibilities, and moral values"
+    },
+    {
+      "id": "history",
+      "name": "History",
+      "definition": "Study and interpretation of past events and societies"
+    },
+    {
+      "id": "sociology",
+      "name": "Sociology",
+      "definition": "Social structures, institutions, and collective behavior"
+    },
+    {
+      "id": "anthropology",
+      "name": "Anthropology",
+      "definition": "Human cultures, societies, and their development"
+    },
+    {
+      "id": "culture",
+      "name": "Culture",
+      "definition": "Shared meanings, practices, and creative life in society"
+    },
+    {
+      "id": "literature",
+      "name": "Literature",
+      "definition": "Literary works, interpretation, and traditions"
+    },
+    {
+      "id": "art",
+      "name": "Art",
+      "definition": "Visual artistic creation, interpretation, and practice"
+    },
+    {
+      "id": "music",
+      "name": "Music",
+      "definition": "Musical creation, performance, listening, and analysis"
+    },
+    {
+      "id": "film",
+      "name": "Film",
+      "definition": "Cinema, filmmaking, and interpretation of films"
+    },
+    {
+      "id": "photography",
+      "name": "Photography",
+      "definition": "Creating and interpreting photographic images"
+    },
+    {
+      "id": "journalism",
+      "name": "Journalism",
+      "definition": "Reporting, verification, and production of news"
+    },
+    {
+      "id": "media",
+      "name": "Media",
+      "definition": "Communication industries, platforms, and their societal effects"
+    },
+    {
+      "id": "social-media",
+      "name": "Social media",
+      "definition": "Networked platforms for sharing and interacting with content"
+    },
+    {
+      "id": "creator-economy",
+      "name": "Creator economy",
+      "definition": "Businesses and livelihoods built around independent content creators"
+    },
+    {
+      "id": "gaming",
+      "name": "Gaming",
+      "definition": "Video games, game development, and player experiences"
+    },
+    {
+      "id": "game-design",
+      "name": "Game design",
+      "definition": "Designing game rules, mechanics, and player experiences"
+    },
+    {
+      "id": "sports",
+      "name": "Sports",
+      "definition": "Competitive athletic activities and their organization"
+    },
+    {
+      "id": "cycling",
+      "name": "Cycling",
+      "definition": "Bicycle riding, training, equipment, and cycling culture"
+    },
+    {
+      "id": "running",
+      "name": "Running",
+      "definition": "Running practice, training, races, and equipment"
+    },
+    {
+      "id": "travel",
+      "name": "Travel",
+      "definition": "Visiting places and planning journeys away from home"
+    },
+    {
+      "id": "cooking",
+      "name": "Cooking",
+      "definition": "Preparing food through recipes, techniques, and culinary practice"
+    },
+    {
+      "id": "gardening",
+      "name": "Gardening",
+      "definition": "Cultivating plants in gardens and domestic spaces"
+    },
+    {
+      "id": "crafts",
+      "name": "Crafts",
+      "definition": "Making objects using manual skills and materials"
+    },
+    {
+      "id": "fashion",
+      "name": "Fashion",
+      "definition": "Clothing design, style, and fashion industries"
+    },
+    {
+      "id": "interior-design",
+      "name": "Interior design",
+      "definition": "Designing functional and aesthetic indoor spaces"
+    },
+    {
+      "id": "community-building",
+      "name": "Community building",
+      "definition": "Developing participation and connection within communities"
+    },
+    {
+      "id": "volunteering",
+      "name": "Volunteering",
+      "definition": "Unpaid work serving communities or public causes"
+    },
+    {
+      "id": "religion",
+      "name": "Religion",
+      "definition": "Religious beliefs, practices, institutions, and traditions"
+    },
+    {
+      "id": "postgresql",
+      "name": "PostgreSQL",
+      "definition": "The PostgreSQL relational database, its features, queries, and operation"
+    },
+    {
+      "id": "interviewing",
+      "name": "Interview",
+      "definition": "Job interviews, interviewing candidates, and technical or behavioral interview practice"
+    },
+    {
+      "id": "principal-engineer",
+      "name": "Principal engineer",
+      "definition": "Principal-level individual contributor engineering experience, responsibilities, and career"
+    },
+    {
+      "id": "staff-engineer",
+      "name": "Staff engineer",
+      "definition": "Staff-level individual contributor engineering experience, responsibilities, and career"
+    },
+    {
+      "id": "weight-lifting",
+      "name": "Weight lifting",
+      "definition": "Training with weights for muscle development or strength"
+    },
+    {
+      "id": "diet",
+      "name": "Diet",
+      "definition": "Food choices and eating patterns for health, fitness, or body composition"
+    },
+    {
+      "id": "strength-training",
+      "name": "Strength training",
+      "definition": "Training to develop muscular strength through resistance"
+    },
+    {
+      "id": "fitness",
+      "name": "Fitness",
+      "definition": "Physical conditioning, training, and maintaining physical fitness"
+    },
+    {
+      "id": "business",
+      "name": "Business",
+      "definition": "Building, operating, or financing companies and commercial activity"
+    },
+    {
+      "id": "tech-industry",
+      "name": "Tech industry",
+      "definition": "Technology companies, their businesses, workforce, and industry developments"
+    },
+    {
+      "id": "design",
+      "name": "Design",
+      "definition": "Creating and shaping visual or interactive products and experiences"
+    },
+    {
+      "id": "design-engineering",
+      "name": "Design engineering",
+      "definition": "Combining design and implementation skills to prototype and build interfaces"
+    },
+    {
+      "id": "data",
+      "name": "Data",
+      "definition": "The use, management, processing, and implications of digital data"
+    },
+    {
+      "id": "playwright",
+      "name": "Playwright",
+      "definition": "The Playwright browser automation and testing tools, including Playwright CLI"
+    },
+    {
+      "id": "vibe-coding",
+      "name": "Vibecode",
+      "definition": "Building software through natural-language direction of AI coding tools"
+    },
+    {
+      "id": "agent-harnesses",
+      "name": "Harness",
+      "definition": "Agent harness software providing model instructions, tools, execution loops, and model integration"
+    }
+  ]
+}

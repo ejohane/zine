@@ -49,3 +49,18 @@ struct NativeMutationReceipt<Value> {
     let value: Value
     let delivery: NativeMutationDelivery
 }
+
+struct TagSuggestion: Decodable, Identifiable, Equatable {
+    let id: String
+    let name: String
+    let confidence: Double
+}
+
+struct TagSuggestionsResponse: Decodable {
+    let suggestions: [TagSuggestion]
+}
+
+struct TagSuggestionDecisionResponse: Decodable {
+    let suggestions: [TagSuggestion]
+    let tags: [BookmarkTag]
+}

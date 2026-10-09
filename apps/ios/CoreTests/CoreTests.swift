@@ -104,3 +104,56 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(unsupported.error, "unsupported_version")
     }
 }
+
+extension CoreTests {
+    @MainActor
+    func testSuggestionClientKeepsSuggestionsSeparateAndUsesDecisionEndpoint() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [SuggestionProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let client = APIClient(baseURL: URL(string: "https://suggestions.invalid")!, tokenProvider: { "fixture" }, session: session)
+        let suggestions = try await client.tagSuggestions(id: "bookmark")
+        XCTAssertEqual(suggestions.map(\.name), ["AI"])
+        let accepted = try await client.decideTagSuggestion(id: "bookmark", suggestionID: "suggestion", accept: true)
+        XCTAssertEqual(accepted.tags.map(\.name), ["AI"])
+        XCTAssertTrue(accepted.suggestions.isEmpty)
+        let dismissed = try await client.decideTagSuggestion(id: "bookmark", suggestionID: "suggestion", accept: false)
+        XCTAssertTrue(dismissed.tags.isEmpty)
+        XCTAssertTrue(dismissed.suggestions.isEmpty)
+    }
+}
+
+private final class SuggestionProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "suggestions.invalid" }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        do {
+            let data: Data
+            if request.httpMethod == "GET", request.url?.path == "/api/v1/bookmarks/bookmark/tag-suggestions" {
+                data = Data(#"{"suggestions":[{"id":"suggestion","name":"AI","confidence":0.95}]}"#.utf8)
+            } else if request.httpMethod == "POST", request.url?.path == "/api/v1/bookmarks/bookmark/tag-suggestions/suggestion" {
+                var body = request.httpBody ?? Data()
+                if let stream = request.httpBodyStream {
+                    stream.open()
+                    defer { stream.close() }
+                    var bytes = [UInt8](repeating: 0, count: 1024)
+                    while stream.hasBytesAvailable {
+                        let count = stream.read(&bytes, maxLength: bytes.count)
+                        if count <= 0 { break }
+                        body.append(bytes, count: count)
+                    }
+                }
+                let json = try JSONSerialization.jsonObject(with: body) as? [String: String]
+                guard let decision = json?["decision"], ["ACCEPTED", "DISMISSED"].contains(decision) else { throw APIError.invalidResponse }
+                data = decision == "ACCEPTED"
+                    ? Data(#"{"tags":[{"id":"tag","name":"AI"}],"suggestions":[]}"#.utf8)
+                    : Data(#"{"tags":[],"suggestions":[]}"#.utf8)
+            } else { throw APIError.invalidResponse }
+            client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type":"application/json"])!, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch { client?.urlProtocol(self, didFailWithError: error) }
+    }
+    override func stopLoading() {}
+}

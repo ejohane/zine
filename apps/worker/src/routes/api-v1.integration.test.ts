@@ -1261,3 +1261,55 @@ describe('podcast destination ownership and source preservation', () => {
     ).toEqual(before);
   });
 });
+
+describe('tag suggestion REST lifecycle', () => {
+  it('merges acceptance, rejects other owners and invalid decisions, and persists dismissal', async () => {
+    await bindings.DB.prepare(
+      "INSERT INTO tag_suggestions (id,user_item_id,normalized_name,name,confidence,generated_at) VALUES ('suggestion','owner-bookmark','ai','AI',0.95,1),('dismiss','owner-bookmark','testing','Testing',0.9,1)"
+    ).run();
+    expect((await request('/bookmarks/other-bookmark/tag-suggestions')).status).toBe(404);
+    expect(
+      (
+        await request('/bookmarks/other-bookmark/tag-suggestions/suggestion', 'POST', {
+          decision: 'ACCEPTED',
+        })
+      ).status
+    ).toBe(404);
+    expect(
+      (
+        await request('/bookmarks/owner-bookmark/tag-suggestions/suggestion', 'POST', {
+          decision: 'BOGUS',
+        })
+      ).status
+    ).toBe(400);
+    const pending = await request('/bookmarks/owner-bookmark/tag-suggestions');
+    expect(await pending.json()).toMatchObject({
+      suggestions: [{ name: 'AI' }, { name: 'Testing' }],
+    });
+    for (let n = 0; n < 2; n++) {
+      const accepted = await request(
+        '/bookmarks/owner-bookmark/tag-suggestions/suggestion',
+        'POST',
+        { decision: 'ACCEPTED' }
+      );
+      expect(accepted.status).toBe(200);
+      expect(await accepted.json()).toMatchObject({
+        tags: [{ name: 'AI' }],
+        suggestions: [{ name: 'Testing' }],
+      });
+    }
+    expect(
+      (
+        await request('/bookmarks/owner-bookmark/tag-suggestions/dismiss', 'POST', {
+          decision: 'DISMISSED',
+        })
+      ).status
+    ).toBe(200);
+    expect(await (await request('/bookmarks/owner-bookmark/tag-suggestions')).json()).toMatchObject(
+      { suggestions: [] }
+    );
+    expect(await (await request('/bookmarks/owner-bookmark')).json()).toMatchObject({
+      item: { tags: [{ name: 'AI' }] },
+    });
+  });
+});

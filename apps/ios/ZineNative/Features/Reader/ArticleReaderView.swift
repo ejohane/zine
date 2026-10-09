@@ -770,6 +770,9 @@ struct ArticleTagEditorView: View {
 
     @State private var availableTags: [BookmarkTag]
     @State private var selectedTagNames: [String]
+    @State private var suggestions: [TagSuggestion] = []
+    @State private var suggestionError: String?
+    @State private var decidingSuggestion = false
     @State private var query = ""
     @State private var isLoading = true
     @State private var isSaving = false
@@ -810,7 +813,7 @@ struct ArticleTagEditorView: View {
                     .autocorrectionDisabled()
                     .submitLabel(.done)
                     .onSubmit(addQuery)
-                    .disabled(isSaving)
+                    .disabled(isSaving || decidingSuggestion)
                     .accessibilityLabel("Tag input")
 
                 if normalizedQuery.count > BookmarkShareStore.maximumTagLength {
@@ -854,6 +857,47 @@ struct ArticleTagEditorView: View {
                 }
 
                 ScrollView {
+                    if !suggestions.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Suggested tags")
+                                .font(.headline)
+                            Text("Add or dismiss suggestions. Changes save immediately.")
+                                .font(.caption)
+                                .foregroundStyle(sheetPalette.secondaryText)
+                            ForEach(suggestions) { suggestion in
+                                HStack {
+                                    Text(suggestion.name)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    Button("Add") {
+                                        Task { await decide(suggestion, accept: true) }
+                                    }
+                                    .frame(minWidth: 44, minHeight: 44)
+                                    .disabled(selectedTagNames.count >= BookmarkShareStore.maximumTagCount)
+                                    .accessibilityLabel("Add suggested tag \(suggestion.name)")
+                                    Button {
+                                        Task { await decide(suggestion, accept: false) }
+                                    } label: {
+                                        Image(systemName: "xmark")
+                                            .frame(width: 44, height: 44)
+                                    }
+                                    .accessibilityLabel("Dismiss suggested tag \(suggestion.name)")
+                                }
+                                .frame(minHeight: 44)
+                            }
+                        }
+                        .padding(14)
+                        .background(sheetPalette.controlBackground, in: .rect(cornerRadius: 16))
+                        .disabled(isSaving || decidingSuggestion)
+                        .padding(.bottom, 16)
+                    }
+                    if let suggestionError {
+                        HStack {
+                            Text(suggestionError).font(.caption)
+                            Button("Retry") { Task { await loadSuggestions() } }
+                        }
+                        .foregroundStyle(sheetPalette.secondaryText)
+                        .padding(.bottom, 12)
+                    }
                     LazyVStack(spacing: 0) {
                         ForEach(filteredTags) { tag in
                             tagRow(tag)
@@ -891,7 +935,7 @@ struct ArticleTagEditorView: View {
                         ActionRowHaptics.play(style: .heavy)
                         dismiss()
                     }
-                        .disabled(isSaving)
+                        .disabled(isSaving || decidingSuggestion)
                 }
             }
             .safeAreaInset(edge: .bottom) {
@@ -907,7 +951,7 @@ struct ArticleTagEditorView: View {
                     .opacity(isSaving ? 0.65 : 1)
                 }
                 .buttonStyle(.plain)
-                .disabled(isSaving)
+                .disabled(isSaving || decidingSuggestion)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
                 .background(sheetPalette.background)
@@ -915,8 +959,9 @@ struct ArticleTagEditorView: View {
         }
         .contentSheetStyle(sheetPalette)
         .presentationDetents([.medium, .large])
-        .interactiveDismissDisabled(isSaving)
+        .interactiveDismissDisabled(isSaving || decidingSuggestion)
         .task { await loadTags() }
+        .task { await loadSuggestions() }
         .alert("Couldn’t save tags", isPresented: Binding(
             get: { saveErrorMessage != nil },
             set: { if !$0 { saveErrorMessage = nil } }
@@ -967,7 +1012,7 @@ struct ArticleTagEditorView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(isDisabled || isSaving)
+        .disabled(isDisabled || isSaving || decidingSuggestion)
         .accessibilityLabel("\(tag.name) tag")
         .accessibilityValue(isSelected ? "Selected" : "Not selected")
     }
@@ -1000,6 +1045,36 @@ struct ArticleTagEditorView: View {
 
     private func tagKey(_ value: String) -> String {
         BookmarkShareStore.normalizedTagName(value).lowercased()
+    }
+
+    private func loadSuggestions() async {
+        suggestionError = nil
+        do {
+            suggestions = try await client.tagSuggestions(id: bookmarkID)
+        } catch is CancellationError {
+            return
+        } catch {
+            suggestionError = "Couldn’t load suggested tags."
+        }
+    }
+
+    private func decide(_ suggestion: TagSuggestion, accept: Bool) async {
+        guard !isSaving, !decidingSuggestion else { return }
+        decidingSuggestion = true
+        defer { decidingSuggestion = false }
+        do {
+            let response = try await client.decideTagSuggestion(id: bookmarkID, suggestionID: suggestion.id, accept: accept)
+            suggestions = response.suggestions
+            availableTags = uniqueTags(availableTags + response.tags)
+            if accept, !containsTag(named: suggestion.name) {
+                selectedTagNames.append(suggestion.name)
+            }
+            onSaved(response.tags)
+        } catch is CancellationError {
+            return
+        } catch {
+            saveErrorMessage = "Couldn’t update this suggestion. Please try again."
+        }
     }
 
     private func loadTags() async {

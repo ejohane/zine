@@ -1,3 +1,4 @@
+import { listTagSuggestions, decideTagSuggestion } from '../../tagging/service';
 import { TRPCError } from '@trpc/server';
 import { BookmarkSaveInputSchema, saveBookmark } from '../../bookmarks/save';
 import { ContentTypeSchema, ProviderSchema, UserItemState } from '@zine/shared';
@@ -677,6 +678,39 @@ apiV1Routes.put('/bookmarks/:id/tags', apiAuth('bookmarks:write'), async (c) => 
     return trpcErrorResponse(c, error);
   }
 });
+
+apiV1Routes.get('/bookmarks/:id/tag-suggestions', apiAuth('bookmarks:read'), async (c) => {
+  try {
+    const suggestions = await listTagSuggestions(c.env.DB, c.get('userId')!, c.req.param('id'));
+    return c.json({ suggestions, requestId: c.get('requestId'), traceId: c.get('traceId') });
+  } catch (error) {
+    return trpcErrorResponse(c, error);
+  }
+});
+
+apiV1Routes.post(
+  '/bookmarks/:id/tag-suggestions/:suggestionId',
+  apiAuth('bookmarks:write'),
+  async (c) => {
+    const parsed = z
+      .object({ decision: z.enum(['ACCEPTED', 'DISMISSED']) })
+      .safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success)
+      return c.json({ error: 'Invalid decision', code: 'INVALID_REQUEST_BODY' }, 400);
+    try {
+      const result = await decideTagSuggestion(
+        c.env.DB,
+        c.get('userId')!,
+        c.req.param('id'),
+        c.req.param('suggestionId'),
+        parsed.data.decision
+      );
+      return c.json({ ...result, requestId: c.get('requestId'), traceId: c.get('traceId') });
+    } catch (error) {
+      return trpcErrorResponse(c, error);
+    }
+  }
+);
 
 apiV1Routes.post('/bookmarks/:id/opened', apiAuth('bookmarks:write'), async (c) => {
   const caller = appRouter.createCaller(await createContext(c));

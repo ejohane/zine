@@ -1481,7 +1481,7 @@ export const bookmarkEnrichmentOutbox = sqliteTable(
   ]
 );
 
-// Personal publishing. SQL migration 0034 is the authoritative CHECK/index contract.
+// Personal publishing. SQL migration 0035 is the authoritative CHECK/index contract.
 export const personalPublications = sqliteTable('personal_publications', {
   id: text('id').primaryKey(),
   ownerId: text('owner_id')
@@ -1775,7 +1775,7 @@ export const personalDiscoveryReferences = sqliteTable(
   ]
 );
 
-// Private weekly retrospective state (migration 0035).
+// Private weekly retrospective state (migration 0036).
 export const weeklyRecapPreferences = sqliteTable('weekly_recap_preferences', {
   userId: text('user_id')
     .primaryKey()
@@ -1827,7 +1827,7 @@ export const weeklyRecapDraftRequests = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.key] })]
 );
 
-// Resumable fanout recipient checkpoint (migration 0037).
+// Resumable fanout recipient checkpoint (migration 0038).
 export const personalPublicationFanout = sqliteTable('personal_publication_fanout', {
   eventId: text('event_id')
     .primaryKey()
@@ -1837,3 +1837,31 @@ export const personalPublicationFanout = sqliteTable('personal_publication_fanou
   leaseToken: text('lease_token'),
   leaseUntil: integer('lease_until'),
 });
+
+// Suggestions and decisions are separate from the user's assigned tags.
+export const tagSuggestionRuns = sqliteTable('tag_suggestion_runs', {
+  userItemId: text('user_item_id')
+    .primaryKey()
+    .references(() => userItems.id, { onDelete: 'cascade' }),
+  fingerprint: text('fingerprint').notNull(),
+  token: text('token').notNull(),
+  status: text('status').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+export const tagSuggestions = sqliteTable(
+  'tag_suggestions',
+  {
+    id: text('id').primaryKey(),
+    userItemId: text('user_item_id')
+      .notNull()
+      .references(() => userItems.id, { onDelete: 'cascade' }),
+    normalizedName: text('normalized_name').notNull(),
+    name: text('name').notNull(),
+    confidence: real('confidence').notNull(),
+    decision: text('decision').notNull().default('PENDING'),
+    generatedAt: integer('generated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('tag_suggestions_bookmark_name_idx').on(table.userItemId, table.normalizedName),
+  ]
+);

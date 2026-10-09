@@ -664,8 +664,10 @@ describe('subscriber timezone initialization', () => {
 });
 
 describe('in-flight migration compatibility', () => {
-  it('0037 safely applies when the identical checkpoint table already exists', async () => {
-    const migration = bindings.TEST_MIGRATIONS.find((m) => m.name.includes('0037'));
+  it('checkpoint migration safely applies when the identical table already exists', async () => {
+    const migration = bindings.TEST_MIGRATIONS.find((m) =>
+      m.name.includes('add_publication_fanout_checkpoint')
+    );
     expect(migration).toBeDefined();
     await db.batch(migration!.queries.map((query) => db.prepare(query)));
     expect(
