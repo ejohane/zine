@@ -319,6 +319,19 @@ export async function recordEditorialFeedback(
     return { accepted: true as const, duplicate: true, eventId: existing.id };
   }
 
+  const openedSource =
+    feedback.targetType === 'SOURCE' && feedback.eventType === 'OPENED'
+      ? edition.sources.find((source) => source.id === feedback.targetId)
+      : undefined;
+  const sourceSnapshot = openedSource
+    ? JSON.stringify({
+        title: openedSource.title,
+        creatorName: openedSource.creator,
+        contentType: openedSource.contentType,
+        provider: openedSource.origin === 'X' ? 'X' : 'WEB',
+        canonicalUrl: openedSource.canonicalUrl,
+      })
+    : null;
   const eventId = ulid(now);
   const occurredAt = feedback.occurredAt ? Math.min(Date.parse(feedback.occurredAt), now) : now;
   try {
@@ -327,8 +340,8 @@ export async function recordEditorialFeedback(
         `INSERT INTO editorial_feedback_events
          (id, user_id, client_event_id, edition_id, target_type, target_id, event_type,
           target_topics_json, target_creators_json, target_canonical_urls_json,
-          target_source_ids_json, occurred_at, payload_hash, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          target_source_ids_json, occurred_at, payload_hash, created_at, target_source_snapshot_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         eventId,
@@ -344,7 +357,8 @@ export async function recordEditorialFeedback(
         JSON.stringify(targetContext.sourceIds),
         occurredAt,
         payloadHash,
-        now
+        now,
+        sourceSnapshot
       )
       .run();
   } catch (error) {

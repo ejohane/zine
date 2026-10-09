@@ -42,6 +42,15 @@ struct AppRootView: View {
     let configuration: AppConfiguration
 
     @Environment(Clerk.self) private var clerk
+    @State private var publicDestination: PublicationDestination?
+    @State private var showsPublicationSignIn = false
+
+    private var publicationClient: APIClient {
+        APIClient(baseURL: configuration.apiBaseURL, tokenProvider: {
+            guard let token = try await Clerk.shared.auth.getToken() else { throw APIError.missingSession }
+            return token
+        })
+    }
 
     var body: some View {
         Group {
@@ -57,6 +66,33 @@ struct AppRootView: View {
                 ZineAuthEntryView()
             }
         }
+        .onOpenURL { url in
+            if let destination = PublicationDestination.parse(url) { publicDestination = destination }
+            else { Task { try? await Clerk.shared.handle(url) } }
+        }
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+            if let url = activity.webpageURL, let destination = PublicationDestination.parse(url) { publicDestination = destination }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .zinePublicationPushOpened)) { note in
+            if let destination = note.object as? PublicationDestination { publicDestination = destination }
+        }
+        .sheet(item: $publicDestination) { destination in
+            NavigationStack {
+                PublicationDestinationView(destination: destination, context: publicationContext)
+                    .navigationDestination(for: PublicationDestination.self) { route in
+                        PublicationDestinationView(destination: route, context: publicationContext)
+                    }
+                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { publicDestination = nil } } }
+            }
+            .sheet(isPresented: $showsPublicationSignIn, onDismiss: {
+                if clerk.user == nil { NotificationCenter.default.post(name: .zinePublicationAuthCancelled, object: nil) }
+            }) { ZineAuthEntryView() }
+            .onChange(of: clerk.user?.id) { _, id in if id != nil { showsPublicationSignIn = false } }
+        }
+        .task(id: clerk.user?.id) { await PublicationPush.shared.configure(client: publicationClient, userID: clerk.user?.id) }
+    }
+    private var publicationContext: PublicationContext {
+        PublicationContext(client: publicationClient, userID: clerk.user?.id, signIn: { showsPublicationSignIn = true })
     }
 }
 
@@ -230,6 +266,16 @@ struct AuthenticatedAppView: View {
             )
             .toolbar {
                 if selectedTab == .home && navigationPath.isEmpty {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Menu {
+                            Button("My Zine", systemImage: "book.closed") { navigationPath.append(PublicationDestination.mine) }
+                            Button("Weekly Wrapped", systemImage: "sparkles") { navigationPath.append(PublicationDestination.wrapped) }
+                            Button("Activity", systemImage: "bell") { navigationPath.append(PublicationDestination.activity) }
+                            Button("Subscriptions", systemImage: "person.2") { navigationPath.append(PublicationDestination.subscriptions) }
+                        } label: { Image(systemName: "book.closed").foregroundStyle(ZineTheme.primaryText).frame(width: 44, height: 44) }
+                        .accessibilityLabel("Your Zine")
+                        .accessibilityIdentifier("home-publication-menu")
+                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
                             navigationPath.append(SettingsEntryRoute.root)
@@ -246,6 +292,9 @@ struct AuthenticatedAppView: View {
                 }
             }
             .environment(\.zineTabNavigationActions, tabNavigationActions)
+            .navigationDestination(for: PublicationDestination.self) { destination in
+                PublicationDestinationView(destination: destination, context: PublicationContext(client: client, userID: userID))
+            }
             .navigationDestination(for: SettingsEntryRoute.self) { _ in
                 AppSettingsView(
                     client: client,
@@ -565,7 +614,12 @@ struct AuthenticatedAppView: View {
     }
 
     private func handleExternalOpen(_ bookmark: Bookmark) {
-        guard bookmark.state == "BOOKMARKED", !bookmark.isFinished else { return }
+        // Rereading finished content is still real activity. Keep Home promotion limited
+        // to unfinished bookmarks while recording every explicit owned open.
+        if bookmark.state != "BOOKMARKED" || bookmark.isFinished {
+            Task { try? await client.markOpened(id: bookmark.id) }
+            return
+        }
 
         let openedAt = Date()
         externalOpenEvent = ExternalBookmarkOpenEvent(
@@ -586,14 +640,15 @@ struct AuthenticatedAppView: View {
     }
 
     private func persistHomeItemExternalOpen(_ item: HomeItem) async {
+        let interactionID = UUID().uuidString
         do {
-            try await client.markOpened(id: item.id)
+            try await client.markOpened(id: item.id, interactionID: interactionID)
         } catch is CancellationError {
             return
         } catch {
             do {
                 try await Task.sleep(for: .milliseconds(500))
-                try await client.markOpened(id: item.id)
+                try await client.markOpened(id: item.id, interactionID: interactionID)
             } catch is CancellationError {
                 return
             } catch {
@@ -607,14 +662,15 @@ struct AuthenticatedAppView: View {
     }
 
     private func persistExternalOpen(_ bookmark: Bookmark, openedAt: Date) async {
+        let interactionID = UUID().uuidString
         do {
-            try await client.markOpened(id: bookmark.id)
+            try await client.markOpened(id: bookmark.id, interactionID: interactionID)
         } catch is CancellationError {
             return
         } catch {
             do {
                 try await Task.sleep(for: .milliseconds(500))
-                try await client.markOpened(id: bookmark.id)
+                try await client.markOpened(id: bookmark.id, interactionID: interactionID)
             } catch is CancellationError {
                 return
             } catch {

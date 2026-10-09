@@ -1,0 +1,114 @@
+.publication-reader {
+  max-width: 72ch;
+  margin: 0 auto;
+  padding: 1.5rem clamp(1rem, 4vw, 2rem) 3rem;
+  color: var(--text);
+  background: var(--surface-canvas);
+  min-height: 100dvh;
+  overflow-wrap: anywhere;
+}
+.publication-reader a {
+  color: inherit;
+  text-underline-offset: 0.2em;
+}
+.publication-reader a:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+}
+.publication-reader ::selection {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+.publication-reader__masthead {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  padding-block: 0.5rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.publication-reader__masthead a:last-child {
+  text-decoration: none;
+}
+.publication-reader__intro {
+  padding-block: 2.5rem 1rem;
+}
+.publication-reader h1,
+.publication-reader h2,
+.publication-reader h3 {
+  margin: 0 0 0.75rem;
+  text-wrap: balance;
+}
+.publication-reader__cover {
+  width: 100%;
+  aspect-ratio: 1200 / 630;
+  object-fit: cover;
+  margin-bottom: 2rem;
+  border-radius: var(--radius);
+}
+.publication-reader__byline,
+.publication-reader__source {
+  color: var(--text-subheader);
+  margin: 0.5rem 0 1rem;
+}
+.publication-reader__introduction,
+.publication-reader__commentary {
+  white-space: pre-wrap;
+  margin-block: 1.5rem;
+}
+.publication-reader__section {
+  padding-top: 1rem;
+}
+.publication-reader__section > h2 {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.publication-reader__selection {
+  display: grid;
+  grid-template-columns: 1fr;
+  padding-block: 2rem;
+  border-bottom: 1px solid var(--border);
+}
+.publication-reader__selection h3 a {
+  text-decoration: none;
+}
+.publication-reader__selection h3 a:hover {
+  text-decoration: underline;
+}
+.publication-reader__artwork {
+  max-width: 100%;
+  max-height: 20rem;
+  object-fit: cover;
+  margin-bottom: 1.25rem;
+  border-radius: var(--radius);
+}
+.publication-reader__actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.publication-reader__actions > a {
+  color: var(--inline-link);
+}
+.publication-reader__archive {
+  padding-block: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.publication-reader__status {
+  min-height: 1.5rem;
+  margin-block: 0.75rem 0;
+}
+.publication-reader__footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  color: var(--text-subheader);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .publication-reader a {
+    transition: color 150ms ease-out;
+  }
+}

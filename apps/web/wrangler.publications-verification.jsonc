@@ -1,0 +1,28 @@
+{
+  "name": "zine-publications-reader-verification",
+  "main": "src/public-worker.ts",
+  "compatibility_date": "2026-10-08",
+  "workers_dev": true,
+  "routes": [
+    {
+      "pattern": "publications-test.myzine.app",
+      "custom_domain": true,
+    },
+  ],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "not_found_handling": "single-page-application",
+  },
+  "vars": {
+    "UPSTREAM_API_URL": "https://zine-publications-verification.yw9bvbwb9f.workers.dev",
+    "APPLE_APPLICATION_IDENTIFIER": "TRA7965NM5.app.zine.native",
+  },
+  "services": [
+    {
+      "binding": "API",
+      "service": "zine-publications-verification",
+    },
+  ],
+}

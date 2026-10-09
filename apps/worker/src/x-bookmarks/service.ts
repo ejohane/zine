@@ -1,3 +1,4 @@
+import { savedEvidence } from '../weekly-recaps/evidence';
 import { and, count, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { ulid } from 'ulid';
@@ -511,16 +512,26 @@ async function upsertXUserItem(params: {
     return false;
   }
 
-  await params.db.insert(userItems).values({
-    id: ulid(),
-    userId: params.userId,
-    itemId: params.itemId,
-    state: UserItemState.BOOKMARKED,
-    ingestedAt: params.nowIso,
-    bookmarkedAt: params.nowIso,
-    createdAt: params.nowIso,
-    updatedAt: params.nowIso,
-  });
+  const userItemId = ulid();
+  await params.db.batch([
+    params.db.insert(userItems).values({
+      id: userItemId,
+      userId: params.userId,
+      itemId: params.itemId,
+      state: UserItemState.BOOKMARKED,
+      ingestedAt: params.nowIso,
+      bookmarkedAt: params.nowIso,
+      createdAt: params.nowIso,
+      updatedAt: params.nowIso,
+    }),
+    savedEvidence(params.db, {
+      userId: params.userId,
+      userItemId,
+      occurredAt: Date.parse(params.nowIso),
+      source: 'X_BOOKMARK_IMPORT',
+      newlyCreated: true,
+    }),
+  ]);
 
   return true;
 }

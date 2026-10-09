@@ -9,6 +9,15 @@ import { Hono } from 'hono';
 import type { Env } from '../types';
 import { expectLoggerErrorCalls, mockLogger } from '../test/mock-logger';
 
+const mockDeletePublicationOwner = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+vi.mock('../publications/cleanup', () => ({ deletePublicationOwner: mockDeletePublicationOwner }));
+const mockCleanupPublicationDelivery = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+vi.mock('../publications/delivery/cleanup', () => ({
+  cleanupPublicationDelivery: mockCleanupPublicationDelivery,
+}));
+const mockCleanupWeeklyRecaps = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+vi.mock('../weekly-recaps/service', () => ({ cleanupWeeklyRecaps: mockCleanupWeeklyRecaps }));
+
 // Mock svix for testing
 vi.mock('svix', () => ({
   Webhook: vi.fn().mockImplementation(() => ({
@@ -260,6 +269,11 @@ describe('POST /api/auth/webhook', () => {
 
     const body = (await res.json()) as JsonResponse;
     expect(body.eventType).toBe('user.deleted');
+    expect(mockCleanupPublicationDelivery).toHaveBeenCalledWith(mockEnv.DB, 'user_456');
+    expect(mockCleanupWeeklyRecaps).toHaveBeenCalledWith(mockEnv.DB, 'user_456');
+    expect(mockCleanupPublicationDelivery.mock.invocationCallOrder[0]).toBeLessThan(
+      mockDeletePublicationOwner.mock.invocationCallOrder[0]
+    );
     expect(mockEnv.ARTICLE_CONTENT.list).toHaveBeenCalledWith({
       prefix: 'editorial/users/user_456/',
       limit: 1_000,

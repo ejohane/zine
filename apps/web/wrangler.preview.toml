@@ -18,3 +18,7 @@ service = "zine-worker-production"
 UPSTREAM_API_URL = "https://api.myzine.app"
 PREVIEW_ID = "local-preview"
 PREVIEW_GIT_SHA = "local"
+
+# Existing preview backend is production: fail closed for mutations.
+PREVIEW_READ_ONLY = "true"
+APPLE_APPLICATION_IDENTIFIER = "TRA7965NM5.app.zine.native"

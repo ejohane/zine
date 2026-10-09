@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port ${WEB_PORT:-5173}",
     "build": "vite build",
-    "deploy": "bun run build && bunx wrangler@3.95.0 deploy",
-    "deploy:production": "bun run build && bunx wrangler@3.95.0 deploy --env production",
+    "deploy": "bun run build && bunx wrangler@4.119.0 deploy",
+    "deploy:production": "bun run build && bunx wrangler@4.119.0 deploy --env production",
     "preview": "vite preview --host 0.0.0.0 --port ${WEB_PORT:-4173}",
     "test": "vitest run && bun test scripts/preview-target.test.ts",
     "test:watch": "vitest",
@@ -17,7 +17,8 @@
     "storybook:build": "storybook build",
     "storybook:test": "bun run storybook:build && playwright test -c playwright.storybook.config.ts",
     "lint": "eslint src --ext .ts,.tsx --cache --cache-location .eslintcache",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:publications": "bun run build && playwright test -c playwright.publications.config.ts"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.3",

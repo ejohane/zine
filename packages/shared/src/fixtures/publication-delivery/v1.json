@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "preferences": { "timezone": "America/Chicago", "configured": true },
+  "visit": { "lastSeenRevision": 3 },
+  "activity": {
+    "id": "01ARZ3NDEKTSV4RRFFQ69G5FAA",
+    "publicationId": "01ARZ3NDEKTSV4RRFFQ69G5FAB",
+    "type": "DAILY_ADDITIONS",
+    "publicationName": "Loose Threads",
+    "issueIds": ["01ARZ3NDEKTSV4RRFFQ69G5FAC"],
+    "selectionIds": ["01ARZ3NDEKTSV4RRFFQ69G5FAD"],
+    "createdAt": "2026-10-08T14:00:00Z",
+    "readAt": null,
+    "available": true
+  },
+  "reference": {
+    "id": "01ARZ3NDEKTSV4RRFFQ69G5FAE",
+    "publicationId": "01ARZ3NDEKTSV4RRFFQ69G5FAB",
+    "issueId": "01ARZ3NDEKTSV4RRFFQ69G5FAC",
+    "selectionId": "01ARZ3NDEKTSV4RRFFQ69G5FAD",
+    "publicationName": "Loose Threads",
+    "issueTitle": "Thinking about cities",
+    "editorName": "Erik Johansson",
+    "commentary": "A perspective that stayed with me.",
+    "savedAt": "2026-10-08T15:00:00Z",
+    "available": true
+  }
+}

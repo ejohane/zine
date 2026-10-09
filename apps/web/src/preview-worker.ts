@@ -1,3 +1,4 @@
+import { publicWorkerFetch, isPublicPath } from './public-worker';
 interface PreviewWorkerEnv {
   API: {
     fetch(request: Request): Promise<Response>;
@@ -5,6 +6,8 @@ interface PreviewWorkerEnv {
   ASSETS: {
     fetch(request: Request): Promise<Response>;
   };
+  APPLE_APPLICATION_IDENTIFIER?: string;
+  PREVIEW_READ_ONLY?: string;
   PREVIEW_GIT_SHA?: string;
   PREVIEW_ID?: string;
   UPSTREAM_API_URL?: string;
@@ -14,7 +17,9 @@ const FORWARDED_REQUEST_HEADERS = [
   'accept',
   'authorization',
   'content-type',
+  'idempotency-key',
   'x-zine-client-request-id',
+  'x-zine-interaction-id',
   'x-zine-trace-id',
 ] as const;
 
@@ -86,7 +91,19 @@ export default {
       );
     }
 
+    if (isPublicPath(url.pathname) || url.pathname === '/.well-known/apple-app-site-association') {
+      return withPreviewHeaders(await publicWorkerFetch(request, env), previewId);
+    }
     if (isPreviewApiPath(url.pathname)) {
+      if (
+        env.PREVIEW_READ_ONLY === 'true' &&
+        !['GET', 'HEAD', 'OPTIONS'].includes(request.method)
+      ) {
+        return Response.json(
+          { error: 'This preview is read-only.' },
+          { status: 403, headers: { 'Cache-Control': 'no-store' } }
+        );
+      }
       const upstreamApiUrl = env.UPSTREAM_API_URL?.trim();
       if (!upstreamApiUrl) {
         return Response.json(

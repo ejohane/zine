@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 
+import { PublicPage } from './public-publications/page';
 import { AuthPage } from './auth-page';
 import { BookmarksPage } from './bookmarks-page';
 import { PreviewBanner } from './components/preview-banner';
@@ -27,6 +28,8 @@ export default function App() {
     <BrowserRouter>
       <PwaProvider>
         <Routes>
+          <Route path="/p/:publicationId" element={<PublicPage />} />
+          <Route path="/i/:issueId" element={<PublicPage />} />
           <Route path="/sign-in/*" element={<AuthPage mode="sign-in" />} />
           <Route path="/sign-up/*" element={<AuthPage mode="sign-up" />} />
           <Route

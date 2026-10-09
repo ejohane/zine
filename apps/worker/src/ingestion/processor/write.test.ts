@@ -35,6 +35,7 @@ const createPreparedItem = (
 const createMockDb = () => {
   const inserted: Array<{ table: unknown; values: Record<string, unknown> }> = [];
   const insert = (table: unknown) => ({
+    select: () => ({ onConflictDoNothing: () => ({}) }), // Conditional evidence is verified in real D1.
     values: (values: Record<string, unknown>) => {
       inserted.push({ table, values });
       return { onConflictDoNothing: () => ({}) };

@@ -1,3 +1,4 @@
+import { savedEvidence } from '../weekly-recaps/evidence';
 import { and, asc, eq, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import { Provider, UserItemState } from '@zine/shared';
@@ -355,6 +356,17 @@ async function ingestEntry(params: {
       })
       .onConflictDoNothing()
   );
+
+  if (autoBookmark)
+    statements.push(
+      savedEvidence(db, {
+        userId,
+        userItemId: prepared.item.userItemId,
+        occurredAt: Date.parse(nowISO),
+        source: 'RSS_AUTO_SAVE',
+        newlyCreated: true,
+      })
+    );
 
   statements.push(
     db

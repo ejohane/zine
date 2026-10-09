@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "preferences": {
+    "timezone": "America/Chicago",
+    "pendingTimezone": null,
+    "pendingEffectiveAt": null,
+    "trackingStartedAt": "2026-09-29T12:00:00.000Z"
+  },
+  "mixed": {
+    "id": "01K71R1J00N7FGJZK42EB1AV2T",
+    "weekStart": "2026-09-27",
+    "timezone": "America/Chicago",
+    "startAt": "2026-09-27T05:00:00.000Z",
+    "endAt": "2026-10-04T05:00:00.000Z",
+    "generatedAt": "2026-10-04T05:05:00.000Z",
+    "coverage": {
+      "state": "PARTIAL",
+      "reliableSince": "2026-09-29T12:00:00.000Z",
+      "limitations": [
+        "Earlier activity uses remaining snapshot timestamps.",
+        "External navigation proves opening only."
+      ]
+    },
+    "candidates": [
+      {
+        "id": "01K71R1J00N7FGJZK42EB1AV2V",
+        "itemId": "01K71R1J00N7FGJZK42EB1AV2V",
+        "savedBookmarkId": "01K71R1J00N7FGJZK42EB1AV2W",
+        "title": "A week of ideas",
+        "creatorName": "Example author",
+        "contentType": "ARTICLE",
+        "provider": "WEB",
+        "artworkUrl": null,
+        "evidence": [
+          {
+            "kind": "SAVED",
+            "source": "MANUAL_SAVE",
+            "observedAt": "2026-09-29T12:00:00.000Z",
+            "legacy": false
+          },
+          {
+            "kind": "OPENED",
+            "source": "ITEM_DETAIL_OPEN",
+            "observedAt": "2026-09-30T12:00:00.000Z",
+            "legacy": false
+          }
+        ],
+        "publicationEligibility": "CHECK_ON_SELECTION"
+      }
+    ],
+    "highlights": [
+      {
+        "label": "SAVED",
+        "count": 1
+      },
+      {
+        "label": "OPENED",
+        "count": 1
+      },
+      {
+        "label": "FINISHED",
+        "count": 0
+      }
+    ],
+    "selectedCandidateIds": [],
+    "issueId": null
+  },
+  "empty": {
+    "id": "01K71R1J00N7FGJZK42EB1AV2X",
+    "weekStart": "2026-09-27",
+    "timezone": "America/Chicago",
+    "startAt": "2026-09-27T05:00:00.000Z",
+    "endAt": "2026-10-04T05:00:00.000Z",
+    "generatedAt": "2026-10-04T05:05:00.000Z",
+    "coverage": {
+      "state": "PARTIAL",
+      "reliableSince": "2026-09-29T12:00:00.000Z",
+      "limitations": [
+        "Earlier activity uses remaining snapshot timestamps.",
+        "External navigation proves opening only."
+      ]
+    },
+    "candidates": [],
+    "highlights": [
+      {
+        "label": "SAVED",
+        "count": 0
+      },
+      {
+        "label": "OPENED",
+        "count": 0
+      },
+      {
+        "label": "FINISHED",
+        "count": 0
+      }
+    ],
+    "selectedCandidateIds": [],
+    "issueId": null
+  }
+}

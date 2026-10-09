@@ -246,6 +246,41 @@
       "when": 1791500000000,
       "tag": "0034_add_tag_suggestions",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1791504000000,
+      "tag": "0035_add_personal_publications",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1791504000001,
+      "tag": "0036_add_weekly_wrapped",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1791504000002,
+      "tag": "0037_add_publication_delivery",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1791504000003,
+      "tag": "0038_add_publication_fanout_checkpoint",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1791504000004,
+      "tag": "0039_add_wrapped_editorial_source",
+      "breakpoints": true
     }
   ]
 }

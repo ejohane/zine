@@ -37,6 +37,7 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 
 @main
 struct ZineNativeApp: App {
+    @UIApplicationDelegateAdaptor(PublicationAppDelegate.self) private var publicationDelegate
     private let configuration = AppConfiguration.current
     @AppStorage(AppAppearance.storageKey) private var storedAppearance = AppAppearance.system.rawValue
 
@@ -123,9 +124,7 @@ struct ZineNativeApp: App {
         if configuration.isClerkConfigured {
             AppRootView(configuration: configuration)
                 .environment(Clerk.shared)
-                .onOpenURL { url in
-                    Task { try? await Clerk.shared.handle(url) }
-                }
+
         } else {
             ConfigurationRequiredView()
         }

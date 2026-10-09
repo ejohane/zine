@@ -64,5 +64,5 @@ jobs:
         run: bun run --cwd apps/web build
 
       - name: Deploy to Cloudflare Workers
-        run: bunx wrangler@3.95.0 deploy --env production
+        run: bunx wrangler@4.119.0 deploy --env production
         working-directory: apps/web

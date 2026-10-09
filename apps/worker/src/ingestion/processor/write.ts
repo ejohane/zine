@@ -1,3 +1,4 @@
+import { savedEvidence } from '../../weekly-recaps/evidence';
 import { ulid } from 'ulid';
 import type { BatchItem } from 'drizzle-orm/batch';
 
@@ -61,6 +62,17 @@ export function buildIngestionStatements(
       })
       .onConflictDoNothing()
   );
+
+  if (autoBookmark)
+    statements.push(
+      savedEvidence(db, {
+        userId,
+        userItemId: prepared.userItemId,
+        occurredAt: Date.parse(nowISO),
+        source: 'PROVIDER_AUTO_SAVE',
+        newlyCreated: true,
+      })
+    );
 
   statements.push(
     db

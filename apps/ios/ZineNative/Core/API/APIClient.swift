@@ -680,9 +680,11 @@ struct APIClient {
         let _: EmptyResponse = try await send(request)
     }
 
-    func markOpened(id: String) async throws {
+    func markOpened(id: String, interactionID: String = UUID().uuidString) async throws {
         var request = URLRequest(url: baseURL.appending(path: "/api/v1/bookmarks/\(id)/opened"))
         request.httpMethod = "POST"
+        request.setValue(interactionID, forHTTPHeaderField: "X-Zine-Interaction-Id")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let _: EmptyResponse = try await send(request)
     }
 

@@ -1,3 +1,5 @@
+import { cleanupWeeklyRecaps } from '../weekly-recaps/service';
+import { cleanupPublicationDelivery } from '../publications/delivery/cleanup';
 /**
  * Authentication routes
  *
@@ -10,6 +12,7 @@
  */
 
 import { Hono } from 'hono';
+import { deletePublicationOwner } from '../publications/cleanup';
 import { Webhook } from 'svix';
 import { eq } from 'drizzle-orm';
 import type { Env, Bindings } from '../types';
@@ -17,6 +20,7 @@ import { createDb } from '../db';
 import {
   users,
   userItems,
+  userItemConsumptionEvents,
   sources,
   providerItemsSeen,
   xBookmarkItems,
@@ -80,6 +84,9 @@ async function deleteArtifactPrefix(bucket: R2Bucket, prefix: string): Promise<v
 }
 
 async function deleteUserData(env: Bindings, userId: string): Promise<void> {
+  await cleanupPublicationDelivery(env.DB, userId);
+  await cleanupWeeklyRecaps(env.DB, userId);
+  await deletePublicationOwner(env, userId);
   const safeUserId = encodeURIComponent(userId);
   await deleteArtifactPrefix(env.ARTICLE_CONTENT, `editorial/users/${safeUserId}/`);
   await deleteArtifactPrefix(env.ARTICLE_CONTENT, `people-daily/users/${safeUserId}/`);
@@ -94,6 +101,7 @@ async function deleteUserData(env: Bindings, userId: string): Promise<void> {
   await db.delete(providerItemsSeen).where(eq(providerItemsSeen.userId, userId));
   await db.delete(xBookmarkItems).where(eq(xBookmarkItems.userId, userId));
   await db.delete(xBookmarkSyncs).where(eq(xBookmarkSyncs.userId, userId));
+  await db.delete(userItemConsumptionEvents).where(eq(userItemConsumptionEvents.userId, userId));
   await db.delete(userItems).where(eq(userItems.userId, userId));
   await db.delete(sources).where(eq(sources.userId, userId));
   await db.delete(users).where(eq(users.id, userId));

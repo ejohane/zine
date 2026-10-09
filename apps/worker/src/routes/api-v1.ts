@@ -1,4 +1,7 @@
+import weeklyRecaps from './api-v1/weekly-recaps';
+import publicationDelivery from './api-v1/publication-delivery';
 import { Hono } from 'hono';
+import publications from './api-v1/publications';
 import type { Env } from '../types';
 import openApiSpec from './api-v1.openapi.json';
 import subscriptions from './api-v1/subscriptions';
@@ -12,6 +15,9 @@ import editorial from './api-v1/editorial';
 
 const apiV1Routes = new Hono<Env>();
 apiV1Routes.get('/openapi.json', (c) => c.json(openApiSpec));
+apiV1Routes.route('/', publications);
+apiV1Routes.route('/', weeklyRecaps);
+apiV1Routes.route('/', publicationDelivery);
 apiV1Routes.route('/', subscriptions);
 apiV1Routes.route('/', sync);
 apiV1Routes.route('/', library);
