@@ -27,6 +27,12 @@
     },
     "typecheck": {
       "dependsOn": ["^build"]
+    },
+    "@zine/worker#dev": {
+      "cache": false,
+      "persistent": true,
+      "env": ["WORKER_PORT", "WORKER_INSPECTOR_PORT", "AUTO_TAGGING_ENABLED"],
+      "passThroughEnv": ["TYPESAFE_API_KEY"]
     }
   }
 }

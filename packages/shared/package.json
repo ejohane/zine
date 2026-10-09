@@ -41,6 +41,10 @@
     "./telemetry": {
       "types": "./src/telemetry.ts",
       "import": "./src/telemetry.ts"
+    },
+    "./tag-classifier": {
+      "types": "./src/tag-classifier/index.ts",
+      "import": "./src/tag-classifier/index.ts"
     }
   },
   "files": [

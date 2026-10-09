@@ -1,3 +1,4 @@
+import { generateTagSuggestions } from '../tagging/service';
 import { enrichPodcastDestinations } from '../rss/saved-player-destinations';
 import { ulid } from 'ulid';
 import { and, desc, eq } from 'drizzle-orm';
@@ -448,6 +449,20 @@ async function processMessage(message: EnrichmentMessage, db: Database, env: Bin
   const existingCanonical = await findCompleteCanonical(db, effectiveBody);
 
   try {
+    const fullText = sourceEvidence.blocks.map((block) => block.text).join('\n\n');
+    await generateTagSuggestions(env, body.userId, {
+      bookmarkId: body.userItemId,
+      itemId: body.itemId,
+      title: source.item.title,
+      description: source.item.summary,
+      text: fullText.slice(0, 24000),
+      contentType: String(source.item.contentType),
+      provider: String(source.item.provider),
+      publisher: source.item.publisher,
+      creator: source.creator?.name ?? null,
+      coverage: fullText.length > 24000 ? 'PARTIAL_CONTENT' : sourceEvidence.coverage,
+      warnings: fullText.length > 24000 ? ['TAGGING_TEXT_TRUNCATED'] : [],
+    });
     if (existingCanonical) {
       const suggestions = normalizeSuggestedTags(
         buildTagsFromCanonical(existingCanonical),

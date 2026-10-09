@@ -533,6 +533,30 @@ struct APIClient {
         }
     }
 
+    func tagSuggestions(id: String) async throws -> [TagSuggestion] {
+        let response: TagSuggestionsResponse = try await request(
+            url: baseURL.appending(path: "/api/v1/bookmarks/\(id)/tag-suggestions")
+        )
+        return response.suggestions
+    }
+
+    func decideTagSuggestion(id: String, suggestionID: String, accept: Bool) async throws -> TagSuggestionDecisionResponse {
+        // Deliver older offline tag replacements first so they cannot undo a new acceptance.
+        let failures = await flushPendingBookmarkMutations()
+        let pending = await bookmarkMutationOutbox?.pendingMutations() ?? []
+        guard !failures.contains(where: { $0.hasPrefix(id + ":") }),
+              !pending.contains(where: { $0.bookmarkID == id }) else {
+            throw APIError.server(status: 409, message: "Sync your pending changes before updating suggestions.", code: "PENDING_BOOKMARK_CHANGES")
+        }
+        var request = URLRequest(url: baseURL.appending(path: "/api/v1/bookmarks/\(id)/tag-suggestions/\(suggestionID)"))
+        request.httpMethod = "POST"
+        request.httpBody = try JSONEncoder().encode(["decision": accept ? "ACCEPTED" : "DISMISSED"])
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let response: TagSuggestionDecisionResponse = try await send(request)
+        await bookmarkMutationOutbox?.cacheKnownTags(response.tags)
+        return response
+    }
+
     func setTags(id: String, tags: [String], bookmark: Bookmark? = nil) async throws -> [BookmarkTag] {
         try await setTagsWithReceipt(id: id, tags: tags, bookmark: bookmark).value
     }

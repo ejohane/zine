@@ -71,6 +71,12 @@ jobs:
       - name: Run worker tests
         run: bun run test:worker:ci
 
+      - name: Check read-only tag classifier
+        run: |
+          bun run typecheck:tag-classifier
+          bun run test:tag-classifier
+          bunx eslint scripts/tag-classifier/*.ts
+
       - name: Test local development lifecycle and data provisioning
         run: bun run test:local-development
 

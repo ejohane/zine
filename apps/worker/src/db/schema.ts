@@ -1471,3 +1471,31 @@ export const bookmarkEnrichmentOutbox = sqliteTable(
     index('bookmark_enrichment_outbox_due_idx').on(table.nextAttemptAt),
   ]
 );
+
+// Suggestions and decisions are separate from the user's assigned tags.
+export const tagSuggestionRuns = sqliteTable('tag_suggestion_runs', {
+  userItemId: text('user_item_id')
+    .primaryKey()
+    .references(() => userItems.id, { onDelete: 'cascade' }),
+  fingerprint: text('fingerprint').notNull(),
+  token: text('token').notNull(),
+  status: text('status').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+export const tagSuggestions = sqliteTable(
+  'tag_suggestions',
+  {
+    id: text('id').primaryKey(),
+    userItemId: text('user_item_id')
+      .notNull()
+      .references(() => userItems.id, { onDelete: 'cascade' }),
+    normalizedName: text('normalized_name').notNull(),
+    name: text('name').notNull(),
+    confidence: real('confidence').notNull(),
+    decision: text('decision').notNull().default('PENDING'),
+    generatedAt: integer('generated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('tag_suggestions_bookmark_name_idx').on(table.userItemId, table.normalizedName),
+  ]
+);
