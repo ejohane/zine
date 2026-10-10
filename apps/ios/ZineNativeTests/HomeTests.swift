@@ -271,7 +271,7 @@ final class HomeTests: XCTestCase {
             return XCTFail("Expected Jump Back In to be the first section")
         }
 
-        XCTAssertEqual(items.map(\.id), [bookmark.id, previouslyOpened.id])
+        XCTAssertEqual(items.map(\.id), [bookmark.id])
     }
 
     @MainActor

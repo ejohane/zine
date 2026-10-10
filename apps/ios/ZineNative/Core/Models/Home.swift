@@ -22,6 +22,10 @@ struct HomeItem: Codable, Hashable, Identifiable {
     let progress: BookmarkProgress?
 
     init(bookmark: Bookmark, openedAt: Date) {
+        self.init(bookmark: bookmark, lastOpenedAt: openedAt.formatted(.iso8601))
+    }
+
+    init(bookmark: Bookmark, lastOpenedAt: String) {
         id = bookmark.id
         itemId = bookmark.itemId
         title = bookmark.title
@@ -39,7 +43,7 @@ struct HomeItem: Codable, Hashable, Identifiable {
         publishedAt = bookmark.publishedAt
         readingTimeMinutes = bookmark.readingTimeMinutes
         bookmarkedAt = bookmark.bookmarkedAt
-        lastOpenedAt = openedAt.formatted(.iso8601)
+        self.lastOpenedAt = lastOpenedAt
         progress = bookmark.progress
     }
 

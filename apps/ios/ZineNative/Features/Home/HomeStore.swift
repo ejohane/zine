@@ -35,7 +35,8 @@ final class HomeStore {
             home: visibleHome,
             inboxItems: visibleInboxItems,
             optimisticOpenedItems: Array(optimisticOpenedItems.values),
-            hiddenItemIDs: hiddenItemIDs.subtracting(client.bookmarkState.changedIDs)
+            hiddenItemIDs: hiddenItemIDs.subtracting(client.bookmarkState.changedIDs),
+            jumpBackInHiddenIDs: client.bookmarkState.hiddenUnfinishedIDs
         ).compactMap { section in
             switch section {
             case .collection(var collection):
@@ -48,7 +49,7 @@ final class HomeStore {
                     position: collection.position, count: visible.count, items: visible,
                     completionMembership: collection.completionMembership)
                 return .collection(collection)
-            case .jumpBackIn(let items): return .jumpBackIn(visibleUnfinished(items))
+            case .jumpBackIn: return section
             case .quickWins(let items): return .quickWins(visibleUnfinished(items))
             case .recentlySaved(let items): return .recentlySaved(visibleUnfinished(items))
             case .podcasts(let items): return .podcasts(visibleUnfinished(items))
@@ -61,6 +62,22 @@ final class HomeStore {
         }
     }
 
+    private var effectiveHiddenItemIDs: Set<String> {
+        hiddenItemIDs.subtracting(client.bookmarkState.changedIDs)
+            .union(client.bookmarkState.hiddenUnfinishedIDs)
+    }
+
+    // Observe the full eligible buffer, not the cropped grid, so removals trigger refill.
+    var jumpBackInCandidateIDs: [String] {
+        jumpBackInCandidates.map(\.id)
+    }
+
+    private var jumpBackInCandidates: [HomeItem] {
+        Self.orderedOpenedItems(
+            (visibleHome?.jumpBackIn ?? []) + Array(optimisticOpenedItems.values)
+        ).filter { !effectiveHiddenItemIDs.contains($0.id) }
+    }
+
     private var visibleHome: HomeResponse? {
         guard let home else { return nil }
         func visible(_ items: [HomeItem], key: String) -> [HomeItem] {
@@ -68,7 +85,7 @@ final class HomeStore {
         }
         return HomeResponse(
             recentBookmarks: visible(home.recentBookmarks, key: "recently-saved"),
-            jumpBackIn: visible(home.jumpBackIn, key: "jump-back-in"),
+            jumpBackIn: visibleUnfinished(visible(home.jumpBackIn, key: "jump-back-in")),
             byContentType: HomeContentTypeSections(
                 videos: visible(home.byContentType.videos, key: "videos"),
                 podcasts: visible(home.byContentType.podcasts, key: "podcasts"),
@@ -140,6 +157,10 @@ final class HomeStore {
 
     private var inboxMembership = BookmarkMembershipSnapshot()
     private var reloadGeneration = 0
+    private var openedCursor: String?
+    private var openedHistoryExhausted = false
+    private var isReloading = false
+    @ObservationIgnored private var refillTask: (id: UUID, task: Task<Void, Never>)?
 
     private var visibleInboxItems: [Bookmark] {
         client.bookmarkState.overlay(inboxItems).filter {
@@ -173,6 +194,8 @@ final class HomeStore {
     func reload() async {
         reloadGeneration += 1
         let generation = reloadGeneration
+        isReloading = true
+        defer { if generation == reloadGeneration { isReloading = false } }
         func isCurrent() -> Bool { !Task.isCancelled && generation == reloadGeneration }
         errorMessage = nil
 
@@ -201,7 +224,9 @@ final class HomeStore {
             let queuedIDs = queuedAtStart.union(await client.pendingBookmarkMutationIDs())
             guard isCurrent() else { return }
             setHome(response, startedAt: readRevision, queuedIDs: queuedIDs)
-            reconcileOptimisticOpenedItems()
+            openedCursor = nil
+            openedHistoryExhausted = false
+            reconcileOptimisticOpenedItems(startedAt: readRevision)
             didUpdate = true
         } catch is CancellationError {
             return
@@ -235,14 +260,75 @@ final class HomeStore {
             hiddenItemIDs.formIntersection(serverIDs)
         }
 
+        isReloading = false
+        await refillJumpBackIn()
+        guard isCurrent() else { return }
+
         if didUpdate {
-            let visibleIDs = Set(inboxPreviewItems.map(\.id))
-            let cachedInboxItems = inboxItems.filter {
-                visibleIDs.contains($0.id) || client.bookmarkState.isPending(id: $0.id)
-            }
-            await cache.save(home: home, inboxItems: cachedInboxItems)
+            await saveCache()
         } else if sections.isEmpty {
             errorMessage = networkErrors.first?.localizedDescription ?? "Please try again."
+        }
+    }
+
+    private func saveCache() async {
+        let visibleIDs = Set(inboxPreviewItems.map(\.id))
+        let cachedInboxItems = inboxItems.filter {
+            visibleIDs.contains($0.id) || client.bookmarkState.isPending(id: $0.id)
+        }
+        await cache.save(home: home, inboxItems: cachedInboxItems)
+    }
+
+    // The Home endpoint is only a recent buffer. Walk the canonical opened list
+    // from its first page (it overlaps Home), following its timestamp + ID cursor.
+    // Retain every returned candidate for immediate rollback/restoration and cache restart.
+    func refillJumpBackIn() async {
+        while let running = refillTask {
+            await running.task.value
+            if refillTask?.id == running.id { refillTask = nil }
+        }
+        guard !isReloading, home != nil, jumpBackInCandidates.count < 7,
+              !openedHistoryExhausted, !Task.isCancelled else { return }
+        let generation = reloadGeneration
+        let task = Task { await self.loadMoreOpened(generation: generation) }
+        let id = UUID()
+        refillTask = (id, task)
+        await task.value
+        if refillTask?.id == id { refillTask = nil }
+    }
+
+    private func loadMoreOpened(generation: Int) async {
+        var seenCursors: Set<String> = []
+        while jumpBackInCandidates.count < 7, !openedHistoryExhausted {
+            guard !Task.isCancelled, generation == reloadGeneration else { return }
+            let requestedCursor = openedCursor
+            do {
+                let page = try await client.listOpenedBookmarks(cursor: requestedCursor)
+                guard !Task.isCancelled, generation == reloadGeneration, let current = home else { return }
+                let returned = page.items.compactMap { bookmark -> HomeItem? in
+                    guard bookmark.state == "BOOKMARKED", !bookmark.isFinished,
+                          let openedAt = bookmark.lastOpenedAt else { return nil }
+                    return HomeItem(bookmark: bookmark, lastOpenedAt: openedAt)
+                }
+                var snapshot = membership["jump-back-in"] ?? BookmarkMembershipSnapshot()
+                snapshot.includeReturned(returned.map(\.id))
+                membership["jump-back-in"] = snapshot
+                home = HomeResponse(
+                    recentBookmarks: current.recentBookmarks,
+                    jumpBackIn: Self.orderedOpenedItems(current.jumpBackIn + returned),
+                    byContentType: current.byContentType, customCollections: current.customCollections,
+                    sectionOrder: current.sectionOrder, requestId: current.requestId, traceId: current.traceId)
+                await saveCache()
+                guard !Task.isCancelled, generation == reloadGeneration else { return }
+                openedCursor = page.nextCursor
+                openedHistoryExhausted = page.nextCursor == nil
+                // A broken/repeated cursor must not spin forever or invent older data.
+                if let cursor = page.nextCursor,
+                   cursor == requestedCursor || !seenCursors.insert(cursor).inserted { return }
+            } catch {
+                // Keep cached candidates; retry from the same cursor on the next refill.
+                return
+            }
         }
     }
 
@@ -268,19 +354,21 @@ final class HomeStore {
         optimisticOpenedItems[id] = nil
     }
 
-    private func reconcileOptimisticOpenedItems() {
+    private func reconcileOptimisticOpenedItems(startedAt: Int) {
         guard let home else { return }
+        let retained = optimisticOpenedItems.filter { id, _ in
+            client.bookmarkState.shouldRetain(id: id, after: startedAt)
+        }
         optimisticOpenedItems = Self.reconciledOptimisticOpenedItems(
-            optimisticOpenedItems,
-            serverItems: home.jumpBackIn
-        )
+            optimisticOpenedItems, serverItems: home.jumpBackIn
+        ).merging(retained, uniquingKeysWith: { _, pending in pending })
     }
 
     static func reconciledOptimisticOpenedItems(
         _ optimisticItems: [String: HomeItem],
         serverItems: [HomeItem]
     ) -> [String: HomeItem] {
-        let serverItemsByID = Dictionary(uniqueKeysWithValues: serverItems.map { ($0.id, $0) })
+        let serverItemsByID = Dictionary(serverItems.map { ($0.id, $0) }, uniquingKeysWith: { previous, _ in previous })
 
         return optimisticItems.filter { id, optimistic in
             guard let server = serverItemsByID[id] else { return false }
@@ -292,7 +380,8 @@ final class HomeStore {
         home: HomeResponse?,
         inboxItems: [Bookmark],
         optimisticOpenedItems: [HomeItem] = [],
-        hiddenItemIDs: Set<String> = []
+        hiddenItemIDs: Set<String> = [],
+        jumpBackInHiddenIDs: Set<String> = []
     ) -> [HomeDashboardSection] {
         let inboxItems = inboxItems.filter { !hiddenItemIDs.contains($0.id) }
         let optimisticOpenedItems = optimisticOpenedItems.filter { !hiddenItemIDs.contains($0.id) }
@@ -301,18 +390,12 @@ final class HomeStore {
         }
         let home = APIClient.filterHome(sourceHome, hiding: hiddenItemIDs)
 
-        let jumpBackInCandidates: [HomeItem]
-        if optimisticOpenedItems.isEmpty {
-            jumpBackInCandidates = home.jumpBackIn
-        } else {
-            let optimisticIDs = Set(optimisticOpenedItems.map(\.id))
-            jumpBackInCandidates = (
-                optimisticOpenedItems + home.jumpBackIn.filter { !optimisticIDs.contains($0.id) }
-            )
-        }
-        let jumpBackIn = Array(jumpBackInCandidates.sorted {
-            ($0.lastOpenedAt ?? "") > ($1.lastOpenedAt ?? "")
-        }.prefix(7))
+        let jumpBackInCandidates = Self.orderedOpenedItems(
+            home.jumpBackIn + optimisticOpenedItems
+        ).filter { !jumpBackInHiddenIDs.contains($0.id) }
+        let compactCount = min(6, max(0, jumpBackInCandidates.count - 1)) / 2 * 2
+        let jumpBackIn = Array(jumpBackInCandidates.prefix(
+            jumpBackInCandidates.isEmpty ? 0 : 1 + compactCount))
         let jumpIDs = Set(jumpBackIn.map(\.id))
         let quickWins = Array(
             home.recentBookmarks
@@ -364,6 +447,26 @@ final class HomeStore {
         }
 
         return interleaveFeaturedArticle(featuredArticle, into: result)
+    }
+
+    private static func orderedOpenedItems(_ items: [HomeItem]) -> [HomeItem] {
+        // Parse dates to handle equivalent ISO timestamps with fractional seconds.
+        let formatter = ISO8601DateFormatter()
+        func timestamp(_ item: HomeItem) -> Date {
+            let value = item.lastOpenedAt ?? ""
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = formatter.date(from: value) { return date }
+            formatter.formatOptions = [.withInternetDateTime]
+            return formatter.date(from: value) ?? .distantPast
+        }
+        let dates = Dictionary(items.map { ($0.id, timestamp($0)) }, uniquingKeysWith: max)
+        let unique = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { previous, next in
+            timestamp(next) >= timestamp(previous) ? next : previous
+        })
+        return unique.values.sorted {
+            let lhs = dates[$0.id]!, rhs = dates[$1.id]!
+            return lhs == rhs ? $0.id > $1.id : lhs > rhs
+        }
     }
 
     static func interleaveFeaturedArticle(
