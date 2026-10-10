@@ -144,6 +144,9 @@ struct HomeView: View {
                 }
             }
             .zineScreenChrome()
+            .task(id: store.jumpBackInCandidateIDs) {
+                await store.refillJumpBackIn()
+            }
     }
 
     private var bookmarkTransition: Namespace.ID {
