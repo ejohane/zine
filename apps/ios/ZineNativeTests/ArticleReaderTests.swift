@@ -173,6 +173,12 @@ final class ArticleReaderTests: XCTestCase {
             try await Task.sleep(for: .milliseconds(50))
         }
         let webView = try XCTUnwrap(web)
+        for appearance: UIUserInterfaceStyle in [.light, .dark] {
+            window.overrideUserInterfaceStyle = appearance
+            host.view.layoutIfNeeded()
+            XCTAssertEqual(webView.scrollView.indicatorStyle, .white,
+                           "Contextual article backgrounds need a light indicator in either appearance")
+        }
         XCTAssertEqual(webView.scrollView.contentInset.top, 180, accuracy: 1)
         if resumesReading {
             XCTAssertGreaterThan(webView.scrollView.contentOffset.y, 0)

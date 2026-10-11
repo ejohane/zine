@@ -464,6 +464,9 @@ struct ArticleHTMLView: UIViewRepresentable {
         }
 
         func configureHeader(in view: WKWebView) {
+            // Contextual article surfaces remain dark in both app appearances.
+            // The default indicator follows appearance instead of that surface.
+            view.scrollView.indicatorStyle = parent.bookmarkHeader == nil ? .default : .white
             guard let view = view as? ArticleReaderWebView, let header = parent.bookmarkHeader else { return }
             view.minimumHeaderScrollTravel = header.minimumScrollTravel
             view.installHeader(header.content)
