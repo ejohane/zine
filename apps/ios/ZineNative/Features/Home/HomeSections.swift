@@ -441,7 +441,7 @@ private struct HomeJumpBackInSection: View {
             }
 
             if items.count > 1 {
-                ScrollView(.horizontal, showsIndicators: false) {
+                HomeHorizontalScrollView {
                     LazyHStack(spacing: 14) {
                         ForEach(items.dropFirst()) { item in
                             HomeNavigationLink(
@@ -604,7 +604,7 @@ private struct HomeLandscapeRail: View {
             HomeSectionHeader(title: title, subtitle: subtitle, route: sectionRoute)
                 .padding(.horizontal, 20)
 
-            ScrollView(.horizontal, showsIndicators: false) {
+            HomeHorizontalScrollView {
                 LazyHStack(alignment: .top, spacing: 14) {
                     ForEach(items) { item in
                         HomeNavigationLink(
@@ -633,7 +633,7 @@ private struct HomeCoverRail: View {
             HomeSectionHeader(title: title, route: sectionRoute)
                 .padding(.horizontal, 20)
 
-            ScrollView(.horizontal, showsIndicators: false) {
+            HomeHorizontalScrollView {
                 LazyHStack(alignment: .top, spacing: 14) {
                     ForEach(items) { item in
                         HomeNavigationLink(

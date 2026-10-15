@@ -219,7 +219,7 @@ private struct CondensedInboxSection: View {
             CondensedSectionHeader(title: "Fresh in Your Inbox", route: .inbox)
                 .padding(.horizontal, 16)
 
-            ScrollView(.horizontal, showsIndicators: false) {
+            HomeHorizontalScrollView {
                 LazyHStack(spacing: 14) {
                     ForEach(items) { bookmark in
                         HomeNavigationLink(
@@ -295,7 +295,7 @@ private struct CondensedLandscapeRail: View {
             CondensedSectionHeader(title: title, route: route)
                 .padding(.horizontal, 16)
 
-            ScrollView(.horizontal, showsIndicators: false) {
+            HomeHorizontalScrollView {
                 LazyHStack(alignment: .top, spacing: 10) {
                     ForEach(items) { item in
                         HomeNavigationLink(
@@ -324,7 +324,7 @@ private struct CondensedCoverRail: View {
             CondensedSectionHeader(title: title, route: route)
                 .padding(.horizontal, 16)
 
-            ScrollView(.horizontal, showsIndicators: false) {
+            HomeHorizontalScrollView {
                 LazyHStack(alignment: .top, spacing: 10) {
                     ForEach(items) { item in
                         HomeNavigationLink(

@@ -188,6 +188,7 @@ struct HomeView: View {
                         )
                     }
                 }
+                .environment(\.homeTabReselection, tabReselection)
                 .padding(.vertical, density == .compact ? 6 : 10)
                 .padding(.bottom, density == .compact ? 16 : 24)
             }
