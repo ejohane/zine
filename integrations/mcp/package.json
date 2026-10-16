@@ -1,0 +1,28 @@
+{
+  "name": "@zine/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "dev": "wrangler dev --local --config wrangler.local.toml --ip 127.0.0.1 --port 8798",
+    "build": "wrangler deploy --dry-run --config wrangler.local.toml --outdir dist"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "jose": "5.10.0",
+    "linkedom": "0.18.12",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.5.41",
+    "@cloudflare/workers-types": "4.20260303.0",
+    "@types/node": "22.19.11",
+    "esbuild": "0.24.2",
+    "typescript": "5.9.3",
+    "vitest": "2.1.9",
+    "wrangler": "3.114.17"
+  }
+}

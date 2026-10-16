@@ -1,0 +1,38 @@
+name: MCP
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: MCP Verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install repository dependencies
+        run: bun install --frozen-lockfile
+      - name: Install isolated MCP dependencies
+        run: bun install --cwd integrations/mcp --frozen-lockfile
+      - name: Typecheck and lint MCP
+        run: |
+          bun run --cwd integrations/mcp typecheck
+          bun run --cwd integrations/mcp lint
+          bunx eslint scripts/mcp-clerk-preflight.ts scripts/mcp-clerk-preflight.test.ts
+      - name: Verify read-only preflight
+        run: bun test scripts/mcp-clerk-preflight.test.ts
+      - name: Test isolated MCP workflows and OAuth fixtures
+        run: bun run --cwd integrations/mcp test
+      - name: Bundle local entry point without deploying
+        run: bun run --cwd integrations/mcp build

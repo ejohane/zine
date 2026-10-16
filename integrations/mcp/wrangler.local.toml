@@ -1,0 +1,21 @@
+# Local-only entry point. No production IDs, routes, queues, secrets, or schedules.
+name = "zine-mcp-local"
+main = "src/server.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "test"
+MCP_RESOURCE = "https://zine.example/mcp"
+MCP_OAUTH_ISSUER = "https://identity.example"
+MCP_OAUTH_JWKS_URL = "https://identity.example/jwks"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "zine-mcp-local"
+database_id = "local-only-not-a-cloud-resource"
+migrations_dir = "../../apps/worker/src/db/migrations"
+
+[[r2_buckets]]
+binding = "ARTICLE_CONTENT"
+bucket_name = "zine-mcp-local-content"
