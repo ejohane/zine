@@ -300,6 +300,19 @@ describe('account-scoped workflows on actual migrated D1 and R2', () => {
     expect(searchSchema.safeParse({ limit: 1.5 }).success).toBe(false);
     expect(searchSchema.safeParse({ userId: 'user_bob' }).success).toBe(false);
   });
+  it('paginates Unicode search queries without corrupting cursor context', async () => {
+    await seed('second');
+    await own('user_alice', 'second', 'z-second');
+    await bindings.DB.prepare('UPDATE items SET title=? WHERE id IN (?,?)')
+      .bind('研究 📚', 'public', 'second')
+      .run();
+    const alice = new McpLibrary(bindings, 'user_alice');
+    const first = await alice.search({ query: '研究 📚', limit: 1 });
+    expect(first.nextCursor).toBeTruthy();
+    const second = await alice.search({ query: '研究 📚', limit: 1, cursor: first.nextCursor! });
+    expect(second.items[0].bookmarkId).toBe('a-public');
+    expect(second.nextCursor).toBeNull();
+  });
   it('saves links idempotently, shares only public identity, never fetches', async () => {
     fetchMock.activate();
     fetchMock.disableNetConnect();

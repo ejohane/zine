@@ -111,8 +111,12 @@ Perform only after the user approves these concrete actions:
    collections"). Do not reuse `profile`, `email`, `public_metadata` or
    `private_metadata` as authorization for Zine library data.
 3. **Client:** create one OAuth application named "Zine MCP — ChatGPT". Mark it
-   Public, require PKCE, keep consent enabled, assign only the approved Zine
-   scopes, and add the exact callback from ChatGPT's UI. With the currently
+   Public, require PKCE, keep consent enabled, assign the approved Zine scopes
+   plus `openid email profile`, and add the exact callback from ChatGPT's UI.
+   OpenAI requests those OIDC scopes by default when the issuer advertises them,
+   as this Clerk instance does. This also shares the consenting account's identity
+   claims with ChatGPT; include that scope in the registration/consent approval.
+   Do not grant `public_metadata` or `private_metadata`. With the currently
    advertised issuer-response support, OpenAI documents the stable callback
    `https://chatgpt.com/connector_platform_oauth_redirect`; the management UI's
    exact value is authoritative. Record the returned `client_id`. Do not enable

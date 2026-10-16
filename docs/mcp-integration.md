@@ -204,20 +204,22 @@ native installation, login and UI smoke verification are not claimed.
 ### Local evidence
 
 - Worker typecheck, targeted MCP ESLint, Prettier and `git diff --check`: passed.
-- MCP workflow suite: 30 tests passed, including real SDK transport, signed-token
+- MCP workflow suite: 31 tests passed, including real SDK transport, signed-token
   JWKS validation, account isolation, Gmail provenance, v2 artifact identity,
   concurrent idempotent saves and collection adds. Clerk JWT/opaque adapter
   suite: 27 passed, including client/audience binding, one-day JWT compatibility,
   wrong token types, revoked/inactive results, redirects and provider outages.
 - Existing REST integration suite: 79 passed. Existing publication integration
-  suite: 19 passed. Combined run: 155 tests passed across four files. The separate
-  read-only preflight script suite passed two tests (157 total).
+  suite: 19 passed. Both are covered by the full Worker CI-parity gate, which
+  passed 2,305 tests. The isolated MCP suites passed 58 tests, and the separate
+  read-only preflight script suite passed two tests.
 - Real `wrangler dev --local` startup on `127.0.0.1:8798`: passed. HTTP initialize,
   six-tool discovery with OAuth descriptors, protected-resource discovery, and
   unauthenticated tool-call linking challenge all returned the expected responses.
   The server was stopped afterward and port 8798 was confirmed released.
-- Tests ran in workerd through the repo's Vitest pool, with host Bun 1.3.4 and
-  Node 25.6.0. The repo pins Node 22; a Node 22 host run is not claimed. The SDK
+- Tests ran in workerd through the repo's Vitest pool, with Bun 1.3.4. The initial
+  fixture run used Node 25.6.0; the final isolated MCP suite also passed on the
+  repository-pinned Node 22 (22.23.3). The SDK
   emits missing-source-map warnings in tests, without test failures. No native
   build, device install, live UI, real OAuth consent, or ChatGPT installation was
   performed. Only public production OAuth discovery/signing-key metadata was

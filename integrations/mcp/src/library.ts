@@ -70,14 +70,20 @@ function cursor(value: string | undefined, context: string): string | null {
     const parsed = z
       .object({ after: id, context: z.literal(context) })
       .strict()
-      .parse(JSON.parse(atob(value)));
+      .parse(
+        JSON.parse(
+          new TextDecoder('utf-8', { fatal: true }).decode(
+            Uint8Array.from(atob(value), (c) => c.charCodeAt(0))
+          )
+        )
+      );
     return parsed.after;
   } catch {
     throw new LibraryError('INVALID_INPUT');
   }
 }
 function next(after: string, context: string) {
-  return btoa(JSON.stringify({ after, context }));
+  return btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify({ after, context }))));
 }
 
 export function safeLink(value: string): string {
