@@ -1,0 +1,11 @@
+{
+  "extends": "../../apps/worker/tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@zine/shared": ["../../packages/shared/src"],
+      "@zine/shared/*": ["../../packages/shared/src/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "vitest.config.ts"]
+}

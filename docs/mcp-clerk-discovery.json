@@ -1,0 +1,19 @@
+{
+  "issuer": "https://clerk.myzine.app",
+  "authorization_endpoint": "https://clerk.myzine.app/oauth/authorize",
+  "token_endpoint": "https://clerk.myzine.app/oauth/token",
+  "jwks_uri": "https://clerk.myzine.app/.well-known/jwks.json",
+  "supported_scopes": [
+    "openid",
+    "profile",
+    "email",
+    "public_metadata",
+    "private_metadata",
+    "offline_access"
+  ],
+  "s256_advertised": true,
+  "issuer_response_advertised": true,
+  "cimd_advertised": false,
+  "dcr_advertised": false,
+  "private_settings": "NOT_INSPECTED_NO_APPROVED_SECRET"
+}
