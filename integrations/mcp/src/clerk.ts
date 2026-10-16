@@ -12,8 +12,11 @@ export class AuthenticationUnavailable extends Error {
 
 export function clerkClients(cfg: McpConfig): string[] {
   try {
+    // Clerk Dashboard can issue public client IDs without the API example's
+    // `client_` prefix. Treat IDs as bounded identifiers; admission still uses
+    // an exact comparison with this explicit allowlist.
     return z
-      .array(z.string().regex(/^client_[A-Za-z0-9]+$/))
+      .array(z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/))
       .min(1)
       .max(20)
       .parse(JSON.parse(cfg.MCP_CLERK_CLIENT_IDS ?? ''));

@@ -1,5 +1,14 @@
 # Zine MCP: concrete Clerk account-linking runbook
 
+For the now-registered public client, current administrative facts and the
+remaining unapplied activation proposal, see
+[production activation](mcp-production-activation.md). This original runbook
+records the pre-registration investigation and alternatives; its pending-client
+statements below are historical, not the current registration status.
+The current handoff requires user-only Clerk key entry: the agent must never
+read or transmit that key. The older optional private-preflight path below is
+not authorization to use it during this activation.
+
 This is an implementation and unapplied deployment plan, checked on
 2026-10-16. Nothing in this document has registered a client, issued a token,
 changed Clerk settings, installed a connector, bound production data or deployed.
