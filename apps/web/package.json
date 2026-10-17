@@ -17,8 +17,7 @@
     "storybook:build": "storybook build",
     "storybook:test": "bun run storybook:build && playwright test -c playwright.storybook.config.ts",
     "lint": "eslint src --ext .ts,.tsx --cache --cache-location .eslintcache",
-    "typecheck": "tsc --noEmit",
-    "test:publications": "bun run build && playwright test -c playwright.publications.config.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.3",

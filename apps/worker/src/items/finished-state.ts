@@ -2,7 +2,7 @@ import { type JsonObject, UserItemState } from '@zine/shared';
 import { and, eq, sql } from 'drizzle-orm';
 import type { Database } from '../db';
 import { userItems } from '../db/schema';
-import { savedEvidence, finishedEvidence } from '../weekly-recaps/evidence';
+import { savedEvidence, finishedEvidence } from './consumption-events';
 import { bookmarkEnrichmentIntent, dispatchBookmarkEnrichment } from '../enrichment/outbox';
 import { syncPeopleForUserItemBestEffort } from '../people/service';
 import type { Bindings } from '../types';

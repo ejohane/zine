@@ -1,4 +1,4 @@
-import { markOwnedItemOpened } from '../../weekly-recaps/evidence';
+import { markOwnedItemOpened } from '../../items/consumption-events';
 // apps/worker/src/trpc/routers/items.ts
 import { TRPCError } from '@trpc/server';
 import {

@@ -744,17 +744,7 @@ describe('apiV1Routes', () => {
   const protectedRoutes = Array.from(
     new Map(
       apiV1Routes.routes
-        .filter(
-          (route) =>
-            route.path !== '/openapi.json' &&
-            route.method !== 'ALL' &&
-            ![
-              '/publications/:id',
-              '/publications/:id/issues',
-              '/issues/:id',
-              '/publication-assets/:id',
-            ].includes(route.path)
-        )
+        .filter((route) => route.path !== '/openapi.json' && route.method !== 'ALL')
         .map(({ method, path }) => [`${method} ${path}`, { method, path }])
     ).values()
   );
@@ -2751,8 +2741,7 @@ describe('apiV1Routes', () => {
         updatedAt: expect.any(String),
       })
     );
-    // Evidence uses INSERT ... SELECT inside the atomic state batch; real-D1
-    // Wrapped tests assert the persisted event fields and rollback behavior.
+    // Evidence uses INSERT ... SELECT inside the atomic state batch.
     expect(mockConsumptionInsertValues).toHaveBeenCalledTimes(1);
     expect((await res.json()) as JsonBody).toMatchObject({
       bookmark: {

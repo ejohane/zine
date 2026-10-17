@@ -19,8 +19,6 @@ routes = [
 
 [vars]
 UPSTREAM_API_URL = "http://localhost:8787"
-# Set to the actual signed application's application-identifier before device verification.
-# APPLE_APPLICATION_IDENTIFIER = "TRA7965NM5.app.zine.native"
 
 [[services]]
 binding = "API"
@@ -28,7 +26,6 @@ service = "zine-worker"
 
 [env.production.vars]
 UPSTREAM_API_URL = "https://api.myzine.app"
-APPLE_APPLICATION_IDENTIFIER = "TRA7965NM5.app.zine.native"
 
 [[env.production.services]]
 binding = "API"

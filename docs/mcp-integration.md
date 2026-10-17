@@ -58,9 +58,8 @@ Real arbitrary private collections already exist (`collections` and
 `collection_item_overrides`), so this implementation does not substitute tags
 or public publications for collections.
 
-Screenshot storage is **not implemented**. The current upload path is publication
-cover media, with different ownership/publication and image-processing rules;
-it is unsuitable for private saved screenshots. The saved item content types
+Screenshot storage is **not implemented**. Your Zine publication covers and their
+upload path have been removed; private saved screenshots need their own storage. The saved item content types
 are ARTICLE, VIDEO, PODCAST and POST. Accepting a file URL as an article would
 misrepresent the product and expose an unsafe fetch surface. No screenshot-save
 tool is advertised.
@@ -74,15 +73,16 @@ and expiry checks; arbitrary remote file URLs must not be accepted. Standalone
 screenshots additionally need a saved-item type and native Library/reader support.
 Choose attachment-only versus standalone before implementing that increment.
 
-## Privacy finding: publication associations
+## Privacy finding: legacy publication associations
 
-Current `publications/attribution.ts` can save a public selection with the original
-Gmail item's identity after checking `raw_metadata.publicWebUrl`. A new
+The removed publication attribution path could save a public selection with the
+original Gmail item's identity after checking `raw_metadata.publicWebUrl`. A new
 `user_items` row therefore does not prove the new account received that email.
 The existing `items.getArticleContent` check only establishes a user-item
 association. Reusing it unmodified would risk exposing the original private
-email body and metadata. Publication snapshots themselves resolve public web
-metadata separately, which does not authorize access to the original item.
+email body and metadata. The former publication snapshots resolved public web metadata separately, which
+did not authorize access to the original item. Keep the authorization guard for
+any saved associations created before publications were removed.
 
 MCP search, read and collection-add paths share an additional authorization
 predicate. Gmail items require a matching `newsletter_feed_messages` delivery

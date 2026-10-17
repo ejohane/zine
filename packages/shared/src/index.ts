@@ -145,9 +145,3 @@ export {
   isAllowlistedQueryKey,
   shouldPersistQuery,
 } from './query-persistence';
-
-export * from './schemas/publications';
-
-export * from './schemas/publication-delivery';
-
-export * from './schemas/weekly-recaps';

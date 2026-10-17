@@ -1,4 +1,4 @@
-import { savedEvidence } from '../../weekly-recaps/evidence';
+import { savedEvidence } from '../../items/consumption-events';
 import { ulid } from 'ulid';
 import type { BatchItem } from 'drizzle-orm/batch';
 

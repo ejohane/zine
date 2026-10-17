@@ -37,7 +37,6 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 
 @main
 struct ZineNativeApp: App {
-    @UIApplicationDelegateAdaptor(PublicationAppDelegate.self) private var publicationDelegate
     private let configuration = AppConfiguration.current
     @AppStorage(AppAppearance.storageKey) private var storedAppearance = AppAppearance.system.rawValue
 
