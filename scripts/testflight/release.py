@@ -39,9 +39,24 @@ def require(condition, message):
         raise ReleaseError(message)
 
 
+AUTH_KEYS = ('ZINE_ASC_KEY_ID', 'ZINE_ASC_KEY_FILE', 'ZINE_ASC_ISSUER_ID')
+TOOL_ENV_PREFIXES = ('FASTLANE_', 'PILOT_', 'TESTFLIGHT_', 'SPACESHIP_',
+                     'DELIVER_', 'ITMSTRANSPORTER_')
+
+
+def child_environment(source=None, auth=False):
+    source = os.environ if source is None else source
+    env = {key: value for key, value in source.items()
+           if not key.startswith(TOOL_ENV_PREFIXES) and not key.startswith('ZINE_ASC_')}
+    if auth:
+        env.update({key: source[key] for key in AUTH_KEYS if key in source})
+    return env
+
+
 def run(args, cwd=ROOT, env=None):
-    result = subprocess.run(list(map(str, args)), cwd=cwd, env=env,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    result = subprocess.run(list(map(str, args)), cwd=cwd,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            env=child_environment(env))
     require(result.returncode == 0, f'{Path(args[0]).name} failed (output suppressed)')
     return result.stdout
 
@@ -51,12 +66,18 @@ def git(*args):
 
 
 def bridge(action, **args):
-    env = os.environ.copy()
+    authenticated = action in ('get', 'upload', 'assign')
+    if authenticated:
+        validate_credentials()
+    env = child_environment(auth=authenticated)
     env.update(BUNDLE_GEMFILE=str(ROOT / 'scripts/testflight/Gemfile'),
-               FASTLANE_SKIP_UPDATE_CHECK='1', FASTLANE_HIDE_CHANGELOG='1', CI='1')
-    result = subprocess.run(['bundle', 'exec', 'ruby', str(ROOT / 'scripts/testflight/bridge.rb')],
-                            input=json.dumps(dict(action=action, **args)).encode(),
-                            cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+               FASTLANE_SKIP_UPDATE_CHECK='1', FASTLANE_HIDE_CHANGELOG='1',
+               FASTLANE_OPT_OUT_USAGE='1', CI='1')
+    # A neutral cwd prevents Pilot's option defaults from evaluating a repo Appfile.
+    with tempfile.TemporaryDirectory(prefix='zine-testflight-adapter-') as directory:
+        result = subprocess.run(['bundle', 'exec', 'ruby', str(ROOT / 'scripts/testflight/bridge.rb')],
+                                input=json.dumps(dict(action=action, **args)).encode(),
+                                cwd=directory, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     require(result.returncode == 0, f'{action} failed; authentication/tool/server output suppressed')
     return json.loads(result.stdout)
 
@@ -88,6 +109,10 @@ def guard_audience():
             and attrs.get('isInternalGroup') is True
             and attrs.get('hasAccessToAllBuilds') is False
             and attrs.get('publicLinkEnabled') is False, 'Internal group settings changed')
+    all_groups = collection(f'/v1/apps/{APP}/betaGroups?limit=200')
+    require(GROUP in {group['id'] for group in all_groups}, 'Approved group missing from app')
+    require(all(group['attributes'].get('hasAccessToAllBuilds') is False
+                for group in all_groups), 'App has an automatic or unknown-access group; audience review required')
     owner = get(f'/v1/betaGroups/{GROUP}/app')['data']
     require(owner['id'] == APP, 'Group belongs to another app')
     testers = collection(f'/v1/betaGroups/{GROUP}/betaTesters?limit=200')
@@ -190,6 +215,18 @@ def profile_check(profile, bundle, uuid):
         require(ent.get('aps-environment') == 'production', 'Profile APNs mismatch')
 
 
+def validate_credentials():
+    key = os.environ.get('ZINE_ASC_KEY_FILE')
+    key_id = os.environ.get('ZINE_ASC_KEY_ID')
+    require(key and key_id, 'API key not configured; see docs/testflight-release.md')
+    require(re.fullmatch(r'[A-Za-z0-9]{1,64}', key_id), 'Invalid API key ID')
+    path = Path(key).expanduser().resolve()
+    require(Path(key).is_absolute() and path.is_file()
+            and not any((parent / '.git').exists() for parent in path.parents),
+            'API key must be an existing file outside the repository')
+    require(path.stat().st_mode & 0o077 == 0, 'API key must be owner-only (chmod 600)')
+
+
 def doctor(credentials=True):
     require(sys.platform == 'darwin', 'Releases require macOS')
     for tool in ['git', 'bundle', 'ruby', 'xcodebuild', 'security', 'codesign', 'node']:
@@ -205,13 +242,7 @@ def doctor(credentials=True):
         profile = plistlib.loads(run(['security', 'cms', '-D', '-i', profile_path(uuid)]))
         profile_check(profile, BUNDLE + ('.share' if name == 'ZineShareExtension' else ''), uuid)
     if credentials:
-        key = os.environ.get('ZINE_ASC_KEY_FILE')
-        require(key and os.environ.get('ZINE_ASC_KEY_ID'), 'API key not configured; see docs/testflight-release.md')
-        path = Path(key).expanduser().resolve()
-        require(Path(key).is_absolute() and path.is_file()
-                and not any((parent / '.git').exists() for parent in path.parents),
-                'API key must be an existing file outside the repository')
-        require(path.stat().st_mode & 0o077 == 0, 'API key must be owner-only (chmod 600)')
+        validate_credentials()
         guard_audience()
     return {'local': 'ready', 'credentials': 'verified' if credentials else 'not checked', 'version': version}
 
@@ -304,6 +335,7 @@ def archive(directory, manifest):
     require(project_info(checkout) == manifest['version'], 'Snapshot version mismatch')
     bridge('project', project=str(checkout / PROJECT), prepare=True,
            certificate=CERT, profiles=PROFILES, build=manifest['build'])
+    prepared_project_hash = hashlib.sha256((checkout / PROJECT / 'project.pbxproj').read_bytes()).hexdigest()
     archive_path = directory / 'Zine.xcarchive'
     # No provisioning updates: only the installed certificate and profiles can be used.
     run(['xcodebuild', '-project', PROJECT, '-scheme', 'ZineNative', '-configuration', 'Release',
@@ -311,6 +343,8 @@ def archive(directory, manifest):
          '-archivePath', archive_path, '-disableAutomaticPackageResolution',
          '-onlyUsePackageVersionsFromResolvedFile',
          'DEVELOPMENT_TEAM=' + TEAM, 'CURRENT_PROJECT_VERSION=' + manifest['build'], 'archive'], cwd=checkout)
+    require(hashlib.sha256((checkout / PROJECT / 'project.pbxproj').read_bytes()).hexdigest()
+            == prepared_project_hash, 'Prepared project changed during archive')
     git('-C', str(checkout), 'diff', '--exit-code', '--', '.',
         ':(exclude)' + PROJECT + '/project.pbxproj')
     require(not (checkout / 'apps/ios/Configuration/Local.xcconfig').exists(), 'Snapshot local override appeared')
@@ -341,6 +375,21 @@ def export_archive(directory, manifest):
                     ipa_sha256=hashlib.sha256(ipas[0].read_bytes()).hexdigest(), state='archived')
 
 
+def guard_build_groups(build_id):
+    groups = collection(f'/v1/builds/{build_id}/betaGroups?limit=200')
+    require(all(group['id'] == GROUP for group in groups),
+            'Exact build has unexpected testing groups; distribution stopped')
+
+
+def guard_unresolved_releases(exclude=None):
+    for path in STATE.glob('*/manifest.json'):
+        if exclude is not None and path.resolve() == exclude.resolve():
+            continue
+        prior = load(path)
+        require(prior['state'] in ('ready', 'rejected', 'expired') or prior['upload'] == 'not_attempted',
+                'Unresolved release exists; use status/resume before starting another upload')
+
+
 def reconcile(path, manifest, distribute=False):
     guard_audience()
     row = exact_build(manifest)
@@ -348,6 +397,9 @@ def reconcile(path, manifest, distribute=False):
         manifest['state'] = 'awaiting_apple' if manifest['upload'] != 'not_attempted' else manifest['state']
         save(path, manifest)
         return False
+    require(manifest['upload'] != 'not_attempted',
+            'Build collision before upload; status cannot adopt an unrelated build')
+    guard_build_groups(row['id'])
     attrs = row['attributes']
     manifest.update(asc_build_id=row['id'], upload='observed', processing=attrs['processingState'],
                     state='processing', assigned=False)
@@ -372,6 +424,7 @@ def reconcile(path, manifest, distribute=False):
         assigned = row['id'] in {b['id'] for b in members}
         require(assigned, 'Assignment outcome uncertain; resume to read back exact membership')
     guard_audience()
+    guard_build_groups(row['id'])
     final_beta = get(f"/v1/builds/{row['id']}/buildBetaDetail")['data']['attributes']
     require(final_beta['internalBuildState'] in ('READY_FOR_BETA_TESTING', 'IN_BETA_TESTING'),
             'Internal readiness changed during assignment')
@@ -389,6 +442,7 @@ def upload_once(path, manifest):
         return
     require(manifest['upload'] == 'not_attempted',
             'Prior upload may have reached Apple; never automatically re-upload. Check status later')
+    guard_unresolved_releases(exclude=path)
     ipa = Path(manifest['ipa'])
     require(hashlib.sha256(ipa.read_bytes()).hexdigest() == manifest['ipa_sha256'], 'IPA changed')
     manifest['upload'] = 'intent_recorded'
@@ -419,11 +473,7 @@ def publish(reviewed_sha, review_note, wait=1200):
                                               for b in [manifest['build'], *local_builds]])
         require(reviewed_sha == manifest['sha'] and review_note.strip(),
                 'Review must identify latest main SHA and a nonempty review note')
-        # Do not start another upload while a previous attempt is unresolved.
-        for previous in STATE.glob('*/manifest.json'):
-            prior = load(previous)
-            require(prior['state'] in ('ready', 'rejected', 'expired') or prior['upload'] == 'not_attempted',
-                    'Unresolved release exists; use status/resume before publishing another')
+        guard_unresolved_releases()
         directory = STATE / (manifest['sha'][:12] + '-' + manifest['build'])
         directory.mkdir(mode=0o700)
         path = directory / 'manifest.json'
@@ -479,7 +529,7 @@ def main():
                     reconcile(path, manifest)
                 result = manifest
         print(json.dumps(result, indent=2))
-    except (ReleaseError, OSError, ValueError, KeyError) as error:
+    except (ReleaseError, OSError, ValueError, KeyError, TypeError, AttributeError, IndexError) as error:
         # These messages are ours; upstream subprocess/server bodies never escape.
         message = str(error) if isinstance(error, ReleaseError) else type(error).__name__
         print('TestFlight stopped: ' + message, file=sys.stderr)

@@ -101,10 +101,13 @@ class ReleaseTests(unittest.TestCase):
 
     def test_audience_exact_membership_and_settings(self):
         tester = {'attributes': {'email': 'ejohane@gmail.com'}}
-        with patch.object(r, 'get', side_effect=self.audience_response), patch.object(r, 'collection', return_value=[tester]):
+        groups = [self.audience_response(f'/v1/betaGroups/{r.GROUP}')['data']]
+        def collection(audience):
+            return lambda path: groups if '/betaGroups?' in path else audience
+        with patch.object(r, 'get', side_effect=self.audience_response), patch.object(r, 'collection', side_effect=collection([tester])):
             r.guard_audience()
         for audience in [[], [tester, tester], [{'attributes': {'email': 'other@example.com'}}]]:
-            with patch.object(r, 'get', side_effect=self.audience_response), patch.object(r, 'collection', return_value=audience):
+            with patch.object(r, 'get', side_effect=self.audience_response), patch.object(r, 'collection', side_effect=collection(audience)):
                 with self.assertRaisesRegex(r.ReleaseError, 'audience changed'):
                     r.guard_audience()
         for field in ['isInternalGroup', 'hasAccessToAllBuilds', 'publicLinkEnabled']:
@@ -113,7 +116,7 @@ class ReleaseTests(unittest.TestCase):
                 if path == f'/v1/betaGroups/{r.GROUP}':
                     value['data']['attributes'][field] = not value['data']['attributes'][field]
                 return value
-            with patch.object(r, 'get', side_effect=response), patch.object(r, 'collection', return_value=[tester]):
+            with patch.object(r, 'get', side_effect=response), patch.object(r, 'collection', side_effect=collection([tester])):
                 with self.assertRaises(r.ReleaseError):
                     r.guard_audience()
 
@@ -121,19 +124,21 @@ class ReleaseTests(unittest.TestCase):
         return {'id': 'exact-build', 'attributes': {'version': self.m['build'], 'processingState': state, 'expired': False}}
 
     def test_status_is_read_only_and_assign_uses_exact_build(self):
-        with patch.object(r, 'guard_audience'), patch.object(r, 'exact_build', return_value=self.row()), patch.object(r, 'get', return_value={'data': {'attributes': {'internalBuildState': 'READY_FOR_BETA_TESTING'}}}), patch.object(r, 'collection', return_value=[]), patch.object(r, 'bridge') as external:
+        self.m['upload'] = 'returned'
+        with patch.object(r, 'guard_build_groups'), patch.object(r, 'guard_audience'), patch.object(r, 'exact_build', return_value=self.row()), patch.object(r, 'get', return_value={'data': {'attributes': {'internalBuildState': 'READY_FOR_BETA_TESTING'}}}), patch.object(r, 'collection', return_value=[]), patch.object(r, 'bridge') as external:
             self.assertFalse(r.reconcile(self.path, self.m))
             external.assert_not_called()
-        with patch.object(r, 'guard_audience') as guard, patch.object(r, 'exact_build', return_value=self.row()), patch.object(r, 'get', return_value={'data': {'attributes': {'internalBuildState': 'IN_BETA_TESTING'}}}), patch.object(r, 'collection', side_effect=[[], [{'id': 'exact-build'}]]), patch.object(r, 'bridge') as external:
+        with patch.object(r, 'guard_build_groups'), patch.object(r, 'guard_audience') as guard, patch.object(r, 'exact_build', return_value=self.row()), patch.object(r, 'get', return_value={'data': {'attributes': {'internalBuildState': 'IN_BETA_TESTING'}}}), patch.object(r, 'collection', side_effect=[[], [{'id': 'exact-build'}]]), patch.object(r, 'bridge') as external:
             self.assertTrue(r.reconcile(self.path, self.m, distribute=True))
             external.assert_called_once_with('assign', build_id='exact-build')
             self.assertEqual(guard.call_count, 3)
             self.assertEqual(r.load(self.path)['state'], 'ready')
 
     def test_processing_compliance_failed_and_absent_never_assign(self):
+        self.m['upload'] = 'returned'
         for state in ['PROCESSING', 'FAILED', 'INVALID', None, 'MISSING_COMPLIANCE']:
             row = None if state is None else self.row('VALID' if state == 'MISSING_COMPLIANCE' else state)
-            with patch.object(r, 'guard_audience'), patch.object(r, 'exact_build', return_value=row), patch.object(r, 'get', return_value={'data': {'attributes': {'internalBuildState': 'MISSING_EXPORT_COMPLIANCE'}}}), patch.object(r, 'bridge') as external:
+            with patch.object(r, 'guard_build_groups'), patch.object(r, 'guard_audience'), patch.object(r, 'exact_build', return_value=row), patch.object(r, 'get', return_value={'data': {'attributes': {'internalBuildState': 'MISSING_EXPORT_COMPLIANCE'}}}), patch.object(r, 'bridge') as external:
                 try:
                     self.assertFalse(r.reconcile(self.path, self.m, distribute=True))
                 except r.ReleaseError:
@@ -142,7 +147,7 @@ class ReleaseTests(unittest.TestCase):
 
     def test_assignment_uncertainty_recovers_by_readback(self):
         self.m['upload'] = 'observed'
-        with patch.object(r, 'guard_audience'), patch.object(r, 'exact_build', return_value=self.row()), patch.object(r, 'get', return_value={'data': {'attributes': {'internalBuildState': 'IN_BETA_TESTING'}}}), patch.object(r, 'collection', return_value=[{'id': 'exact-build'}]), patch.object(r, 'bridge') as external:
+        with patch.object(r, 'guard_build_groups'), patch.object(r, 'guard_audience'), patch.object(r, 'exact_build', return_value=self.row()), patch.object(r, 'get', return_value={'data': {'attributes': {'internalBuildState': 'IN_BETA_TESTING'}}}), patch.object(r, 'collection', return_value=[{'id': 'exact-build'}]), patch.object(r, 'bridge') as external:
             self.assertTrue(r.reconcile(self.path, self.m, distribute=True))
             external.assert_not_called()
 
@@ -201,6 +206,95 @@ class ReleaseTests(unittest.TestCase):
                 changed[key] = value
                 with self.assertRaises(r.ReleaseError):
                     r.profile_check(changed, r.BUNDLE, r.PROFILES['ZineNative'])
+
+    def test_status_cannot_adopt_a_build_without_upload_intent(self):
+        with patch.object(r, 'guard_audience'), patch.object(r, 'exact_build', return_value=self.row()), patch.object(r, 'bridge') as external:
+            with self.assertRaisesRegex(r.ReleaseError, 'cannot adopt'):
+                r.reconcile(self.path, self.m)
+            self.assertEqual(r.load(self.path)['upload'], 'not_attempted')
+            with self.assertRaisesRegex(r.ReleaseError, 'collision'):
+                r.upload_once(self.path, r.load(self.path))
+            external.assert_not_called()
+
+    def test_other_automatic_groups_prevent_upload(self):
+        approved = self.audience_response(f'/v1/betaGroups/{r.GROUP}')['data']
+        for automatic in (True, None):
+            other = {'id': 'other-group', 'attributes': {'hasAccessToAllBuilds': automatic}}
+            def collection(path):
+                if '/betaGroups?' in path:
+                    return [approved, other]
+                return [{'attributes': {'email': 'ejohane@gmail.com'}}]
+            with patch.object(r, 'get', side_effect=self.audience_response), patch.object(r, 'collection', side_effect=collection), patch.object(r, 'bridge') as external:
+                with self.assertRaisesRegex(r.ReleaseError, 'automatic or unknown'):
+                    r.upload_once(self.path, self.m)
+                external.assert_not_called()
+
+    def test_exact_build_group_scope_is_checked_before_assignment(self):
+        self.m['upload'] = 'intent_recorded'
+        for groups in ([{'id': 'external-group'}], [{'id': r.GROUP}, {'id': 'other-internal'}]):
+            with patch.object(r, 'guard_audience'), patch.object(r, 'exact_build', return_value=self.row()), patch.object(r, 'collection', return_value=groups), patch.object(r, 'bridge') as external:
+                with self.assertRaisesRegex(r.ReleaseError, 'unexpected testing groups'):
+                    r.reconcile(self.path, self.m, distribute=True)
+                external.assert_not_called()
+        with patch.object(r, 'collection', return_value=[{'id': r.GROUP}]):
+            r.guard_build_groups('exact-build')
+
+    def test_resume_archived_release_cannot_bypass_another_ambiguous_upload(self):
+        other = self.directory / 'other'
+        other.mkdir()
+        ambiguous = manifest()
+        ambiguous.update(upload='intent_recorded', state='awaiting_apple', build='2026101703')
+        r.save(other / 'manifest.json', ambiguous)
+        with patch.object(r, 'STATE', self.directory), patch.object(r, 'guard_audience'), patch.object(r, 'exact_build', return_value=None), patch.object(r, 'bridge') as external:
+            with self.assertRaisesRegex(r.ReleaseError, 'Unresolved release'):
+                r.upload_once(self.path, self.m)
+            external.assert_not_called()
+            self.assertEqual(r.load(self.path)['upload'], 'not_attempted')
+
+    def test_local_subprocesses_get_no_release_credentials_or_ambient_fastlane_options(self):
+        env = {'PATH': '/fixture/bin', 'ZINE_ASC_KEY_FILE': '/fixture/private.p8',
+               'ZINE_ASC_KEY_ID': 'FIXTURE', 'PILOT_CHANGELOG': 'surprise metadata',
+               'FASTLANE_ITUNES_TRANSPORTER_USE_SHELL_SCRIPT': '1',
+               'FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD': 'fixture-password'}
+        with patch.dict(r.os.environ, env, clear=True), patch.object(r.subprocess, 'run', return_value=type('Result', (), {'returncode': 0, 'stdout': b'ok'})()) as child:
+            r.run(['xcodebuild', '-version'])
+            actual = child.call_args.kwargs['env']
+            self.assertEqual(actual, {'PATH': '/fixture/bin'})
+
+    def test_authenticated_bridge_keeps_only_explicit_auth_and_uses_neutral_cwd(self):
+        env = {'PATH': '/fixture/bin', 'ZINE_ASC_KEY_ID': 'FIXTURE',
+               'ZINE_ASC_KEY_FILE': '/fixture/private.p8', 'ZINE_ASC_UNEXPECTED': 'discard',
+               'PILOT_CHANGELOG': 'surprise metadata', 'FASTLANE_ITUNES_TRANSPORTER_USE_SHELL_SCRIPT': '1'}
+        with patch.dict(r.os.environ, env, clear=True), patch.object(r, 'validate_credentials'), patch.object(r.subprocess, 'run', return_value=type('Result', (), {'returncode': 0, 'stdout': b'{}'})()) as child:
+            r.bridge('get', path='/v1/apps/' + r.APP)
+            actual = child.call_args.kwargs['env']
+            self.assertEqual(actual['ZINE_ASC_KEY_ID'], 'FIXTURE')
+            self.assertNotIn('ZINE_ASC_UNEXPECTED', actual)
+            self.assertNotIn('PILOT_CHANGELOG', actual)
+            self.assertNotIn('FASTLANE_ITUNES_TRANSPORTER_USE_SHELL_SCRIPT', actual)
+            self.assertNotEqual(Path(child.call_args.kwargs['cwd']), r.ROOT)
+
+    def test_online_plan_has_no_release_mutations(self):
+        with patch.object(r, 'source_sha', return_value='a' * 40), patch.object(r, 'git', return_value='MARKETING_VERSION = 0.1;'), patch.object(r, 'builds', return_value=[]), patch.object(r, 'save') as save, patch.object(r, 'archive') as archive, patch.object(r, 'bridge') as bridge:
+            planned = r.plan()
+            self.assertTrue(planned['build'].isdigit())
+            save.assert_not_called()
+            archive.assert_not_called()
+            bridge.assert_not_called()
+
+    def test_archive_rejects_project_changes_beyond_prepared_signing(self):
+        source = self.directory / 'source'
+        project = source / r.PROJECT
+        project.mkdir(parents=True)
+        project_file = project / 'project.pbxproj'
+        project_file.write_text('prepared project')
+        def build(*args, **kwargs):
+            project_file.write_text('unexpected project edit during build')
+            return b''
+        with patch.object(r, 'git', side_effect=['', self.m['sha']]), patch.object(r, 'project_info', return_value='0.1'), patch.object(r, 'bridge'), patch.object(r, 'run', side_effect=build), patch.object(r, 'export_archive') as export:
+            with self.assertRaisesRegex(r.ReleaseError, 'Prepared project changed'):
+                r.archive(self.directory, self.m)
+            export.assert_not_called()
 
     def test_pagination_rejects_foreign_origin(self):
         with patch.object(r, 'get', return_value={'data': [], 'links': {'next': 'https://evil.invalid/steal'}}):

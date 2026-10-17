@@ -21,7 +21,10 @@ revocation operation is implemented.
   `app.zine.native.share`, team `TRA7965NM5`. The only permitted group is
   `83615578-9adf-46d6-9ffd-a6b30d319160`, named Erik Internal, internal,
   public link disabled, automatic distribution (`hasAccessToAllBuilds`) off,
-  and exactly one tester: `ejohane@gmail.com`. Missing or changed fields fail closed.
+  and exactly one tester: `ejohane@gmail.com`. Every app group must report automatic
+  access disabled; another automatic or unknown-access group blocks upload. Exact
+  build group membership must remain limited to Erik Internal. Missing or changed
+  fields fail closed.
 
 Install the isolated Ruby bundle (this does not configure Apple credentials):
 
@@ -42,6 +45,11 @@ separate approval, the operator supplies `ZINE_ASC_KEY_ID`, an absolute
 and `ZINE_ASC_ISSUER_ID` for a team key. Omit the issuer for an individual key.
 Never put key material in CLI arguments, repository files, review notes or logs.
 The command suppresses upstream tool/server output and saves only release state.
+Local build/Git/project processes receive no ASC environment variables. Ambient
+Pilot/fastlane/Transporter settings are discarded; the adapter runs from a neutral
+directory and accepts only the pinned altool Transporter executor, whose temporary
+key directory is private. Shell Transporter mode is rejected before key preparation
+because its shared key-directory cleanup can affect other credentials.
 
 An individual key inherits its user's roles and app access; Erik's Account
 Holder individual key must **not** be described as Zine-scoped. Team keys apply
@@ -73,7 +81,8 @@ Doctor local checks no credentials and makes no Apple calls. Full doctor/plan
 require configured API access and verify the audience. Publish repeats checks,
 fetches latest main, requires the reviewed SHA to match, and takes a detached
 worktree at that immutable SHA. Source overrides are restricted to manual
-signing and synchronized app/extension build numbers in that snapshot.
+signing and synchronized app/extension build numbers in that snapshot. The prepared
+project hash is checked after archiving as well as tracked source changes.
 
 Before a release, review changes since the last release, native dependency pins,
 production endpoint/auth configuration, signing and entitlements. Changes to
@@ -115,7 +124,10 @@ Status makes no Apple mutations; it refreshes the local manifest. Resume may
 upload once if a completed archive has **never** had upload intent, then polls
 that exact build and assigns it only after Apple reports internal readiness.
 The default poll window is 20 minutes, at intervals up to 30 seconds; timeout is
-resumable. Membership and audience are read back after assignment. An
+resumable. Membership and audience are read back after assignment. Status refuses to adopt a matching Apple build when the manifest never recorded
+upload intent. This preserves the collision guard through status/resume. Before
+any first upload, including resume of an older archive, unresolved uploads from
+other manifests block progress. An
 interrupted assignment is recovered by checking exact membership first. A
 missing readiness/compliance state stops without attestation or distribution.
 A ready manifest confirms server availability, not invitation acceptance or

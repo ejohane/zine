@@ -18,7 +18,8 @@ end
 
 class FakeTransporter
   attr_reader :calls
-  def initialize
+  def initialize(executor = FastlaneCore::AltoolTransporterExecutor.new)
+    @transporter_executor = executor
     @calls = 0
   end
   def upload(**args)
@@ -80,13 +81,26 @@ Dir.mktmpdir do |directory|
   File.write(ipa, 'fixture-ipa')
   [nil, 'fixture-issuer'].each do |issuer|
     issuer ? ENV['ZINE_ASC_ISSUER_ID'] = issuer : ENV.delete('ZINE_ASC_ISSUER_ID')
+    ENV['PILOT_CHANGELOG'] = 'ambient metadata must be ignored'
+    ENV['FASTLANE_ITUNES_TRANSPORTER_USE_SHELL_SCRIPT'] = '1'
     $fake_transporter = FakeTransporter.new
     result = ZineTestFlight.run({'action' => 'upload', 'ipa' => ipa})
     assert(result[:uploaded], 'Missing upload result')
     assert($fake_transporter.calls == 1, 'Expected exactly one transport upload')
     assert($captured_options[:api_key][:issuer_id] == issuer, 'Issuer changed')
+    assert($captured_options[:changelog].nil?, 'Ambient changelog entered metadata path')
+    assert(!ENV.key?('FASTLANE_ITUNES_TRANSPORTER_USE_SHELL_SCRIPT'), 'Ambient shell transport retained')
     assert($captured_options[:skip_submission] && $captured_options[:skip_waiting_for_build_processing], 'Unsafe Pilot options')
     assert(!$captured_options[:distribute_external] && !$captured_options[:notify_external_testers], 'External distribution enabled')
+  end
+  # Even an unexpected executor selected by pinned Pilot must fail before upload/key preparation.
+  $fake_transporter = FakeTransporter.new(FastlaneCore::ShellScriptTransporterExecutor.new)
+  begin
+    ZineTestFlight.run({'action' => 'upload', 'ipa' => ipa})
+    raise 'Unsafe transport was accepted'
+  rescue RuntimeError => error
+    assert(error.message == 'Unsafe transporter executor', 'Unexpected rejection')
+    assert($fake_transporter.calls == 0, 'Unsafe executor reached upload')
   end
   # Verify per-target manual signing/build edits against a copy of the real project.
   source = File.expand_path('../../apps/ios/ZineNative.xcodeproj', __dir__)
@@ -106,4 +120,4 @@ Dir.mktmpdir do |directory|
     assert(settings['DEVELOPMENT_TEAM'] == 'TRA7965NM5', 'Team changed')
   end
 end
-puts 'PASS: pinned Pilot uploads once for individual/team keys, never uses Apple ID login or distributes; project signing synchronized'
+puts 'PASS: pinned Pilot uploads once for individual/team keys, never uses Apple ID login or distributes; ambient settings ignored; unsafe transport rejected; project signing synchronized'

@@ -6,10 +6,30 @@ require 'fastlane'
 require 'spaceship'
 require 'xcodeproj'
 require 'net/http'
+require 'pilot'
 
 module ZineTestFlight
   APP = '6823593368'
   GROUP = '83615578-9adf-46d6-9ffd-a6b30d319160'
+  class UploadOnlyManager < Pilot::BuildManager
+    def transporter_for_selected_team(options)
+      transporter = super
+      executor = transporter.instance_variable_get(:@transporter_executor)
+      raise 'Unsafe transporter executor' unless executor.is_a?(FastlaneCore::AltoolTransporterExecutor)
+      transporter
+    end
+  end
+
+  def self.isolate_environment!
+    ENV.keys.each do |name|
+      ENV.delete(name) if name.start_with?('FASTLANE_', 'PILOT_', 'TESTFLIGHT_', 'SPACESHIP_', 'DELIVER_', 'ITMSTRANSPORTER_')
+    end
+    ENV['FASTLANE_SKIP_UPDATE_CHECK'] = '1'
+    ENV['FASTLANE_HIDE_CHANGELOG'] = '1'
+    ENV['FASTLANE_OPT_OUT_USAGE'] = '1'
+    ENV['CI'] = '1'
+  end
+
   def self.api(method, path, body = nil)
     uri = URI.join('https://api.appstoreconnect.apple.com', path)
     raise 'Unexpected API origin' unless uri.scheme == 'https' && uri.host == 'api.appstoreconnect.apple.com'
@@ -26,6 +46,7 @@ module ZineTestFlight
     response.body.to_s.empty? ? {} : JSON.parse(response.body)
   end
   def self.run(input)
+    isolate_environment!
     case input.fetch('action')
     when 'project'
       project = Xcodeproj::Project.open(input.fetch('project'))
@@ -51,7 +72,6 @@ module ZineTestFlight
       raise 'Invalid build ID' unless id.match?(/\A[a-zA-Z0-9-]+\z/)
       api(:post, "/v1/betaGroups/#{GROUP}/relationships/builds", {data: [{type: 'builds', id: id}]})
     when 'upload'
-      require 'pilot'
       # Only the bytes are uploaded; metadata, compliance and distribution remain explicit.
       key = {key_id: ENV.fetch('ZINE_ASC_KEY_ID'), issuer_id: ENV['ZINE_ASC_ISSUER_ID'],
              key: File.binread(ENV.fetch('ZINE_ASC_KEY_FILE')), in_house: false}
@@ -61,7 +81,7 @@ module ZineTestFlight
         ipa: input.fetch('ipa'), apple_id: APP, app_identifier: 'app.zine.native',
         skip_submission: true, skip_waiting_for_build_processing: true,
         distribute_external: false, notify_external_testers: false)
-      Pilot::BuildManager.new.upload(options)
+      UploadOnlyManager.new.upload(options)
       {uploaded: true}
     else
       raise 'Unknown action'
