@@ -121,8 +121,11 @@ rejected/expired release and allows a fresh build allocation. There is deliberat
 no automatic or force-reupload flag.
 
 Status makes no Apple mutations; it refreshes the local manifest. Resume may
-upload once if a completed archive has **never** had upload intent, then polls
-that exact build and assigns it only after Apple reports internal readiness.
+upload once if a completed archive has **never** had upload intent; this still
+requires the full local signing/project doctor and verified IPA. Once upload
+intent exists, resume validates API credentials and reconciles that exact Apple
+build without requiring local signing assets, the IPA or the current project
+configuration. It assigns the build only after Apple reports internal readiness.
 The default poll window is 20 minutes, at intervals up to 30 seconds; timeout is
 resumable. Membership and audience are read back after assignment. Status refuses to adopt a matching Apple build when the manifest never recorded
 upload intent. This preserves the collision guard through status/resume. Before

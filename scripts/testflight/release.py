@@ -520,10 +520,14 @@ def main():
             with locked():
                 manifest = load(path)
                 if args.command == 'resume':
-                    doctor()
-                    require(manifest.get('ipa') and manifest.get('ipa_sha256'),
-                            'Archive incomplete; start a fresh publish after diagnosing the local failure')
-                    upload_once(path, manifest)
+                    if manifest['upload'] == 'not_attempted':
+                        doctor()
+                        require(manifest.get('ipa') and manifest.get('ipa_sha256'),
+                                'Archive incomplete; start a fresh publish after diagnosing the local failure')
+                        upload_once(path, manifest)
+                    else:
+                        # Apple owns the recorded attempt; local signing/artifacts are no longer needed.
+                        validate_credentials()
                     poll(path, manifest, args.wait)
                 else:
                     reconcile(path, manifest)
