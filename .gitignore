@@ -74,3 +74,6 @@ tmp/
 
 # Desktop native core build outputs
 apps/ios/.build/
+
+# Python release-command test caches
+__pycache__/
