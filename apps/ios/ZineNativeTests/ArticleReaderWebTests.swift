@@ -12,7 +12,7 @@ final class ArticleReaderWebTests: XCTestCase {
         super.tearDown()
     }
 
-    private func makeWebView() async throws -> (WKWebView, ReaderMessageRecorder) {
+    private func makeWebView(body: String? = nil, cover: String = "") async throws -> (WKWebView, ReaderMessageRecorder) {
         let recorder = ReaderMessageRecorder()
         let configuration = WKWebViewConfiguration()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = false
@@ -35,10 +35,10 @@ final class ArticleReaderWebTests: XCTestCase {
             "<p>Passage \($0). " + String(repeating: "A readable sentence with enough words to wrap across several lines. ", count: 8) + "</p>"
         }.joined()
         web.loadHTMLString("""
-            <html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+            <html><head><meta name="zine-cover-image" content="\(cover)"><meta name="viewport" content="width=device-width, initial-scale=1">
             <meta http-equiv="Content-Security-Policy" content="script-src 'none'">
             <style>body { padding: 24px; font-size: calc(17px * var(--reader-font-scale, 1)); font-family: var(--reader-font-family, Georgia); } p { margin-bottom: 30px; }</style>
-            </head><body><main><a href="https://example.com">Ordinary link</a>\(paragraphs)</main></body></html>
+            </head><body><main>\(body ?? "<a href=\"https://example.com\">Ordinary link</a>" + paragraphs)</main></body></html>
             """, baseURL: URL(string: "https://example.com/article"))
         for _ in 0..<100 {
             if let ready = try? await evaluate("Boolean(window.zineReader)", in: web) as? Bool, ready {
@@ -67,6 +67,38 @@ final class ArticleReaderWebTests: XCTestCase {
             if let displacement, displacement < 2 { return displacement }
         }
         return displacement
+    }
+
+    func testOpeningCoverDeduplicationPreservesArticleContent() async throws {
+        let cover = "https://images.example.com/cover.jpg?w=1200"
+        let ghostBase = "https://storage.ghost.io/c/89/e0/89e08557-681a-40be-8264-278bf46d6b25/content/images/"
+        let ghostImage = "2026/10/modo_de_volar_a_way_of_flying_1951.10.55-1.jpg"
+        let cases: [(String, String, Bool)] = [
+            ("<div><figure><img src='\(ghostBase)size/w2000/\(ghostImage)' srcset='\(ghostBase)size/w1000/\(ghostImage) 1000w'></figure><p>Article text</p></div>", "\(ghostBase)size/w1200/\(ghostImage)", true),
+            ("<figure><a href='/full'><picture><source srcset='https://images.example.com/cover.jpg?w=400'><img src='https://images.example.com/cover.jpg?w=800'></picture></a><figcaption>Original credit</figcaption></figure><p>Article text</p>", cover, true),
+            ("<div><p><img src='https://images.example.com/cover.jpg'></p></div><p>Article text</p>", cover, true),
+            ("<img src='https://substackcdn.com/image/fetch/w_800,c_limit/https%3A%2F%2Fimages.example.com%2Fcover.jpg'><p>Article text</p>", cover, true),
+            ("<img src='/cover.jpg'><p>Article text</p>", "https://example.com/cover.jpg", true),
+            ("<img src='https://images.example.com/different.jpg'><p>Article text</p>", cover, false),
+            ("<p>Opening text</p><img src='https://images.example.com/cover.jpg'><p>Article text</p>", cover, false),
+            ("<img src='https://other.example.com/cover.jpg'><p>Article text</p>", cover, false),
+            ("<img src='https://images.example.com/cover.jpg?id=other'><p>Article text</p>", cover, false),
+            ("<img src='https://images.example.com/cover.jpg'><p>Article text</p>", "", false),
+        ]
+        for (body, cover, hidden) in cases {
+            let (web, _) = try await makeWebView(body: body, cover: cover)
+            let isHidden = try await evaluate("Boolean(document.querySelector('main img').closest('[style*=\"display: none\"]'))", in: web) as? Bool
+            XCTAssertEqual(isHidden, hidden, body)
+            let text = try await evaluate("document.querySelector('main').innerText", in: web) as? String
+            XCTAssertTrue(text?.contains("Article text") == true)
+            if body.contains("Original credit") { XCTAssertTrue(text?.contains("Original credit") == true) }
+        }
+        let (web, _) = try await makeWebView(
+            body: "<img id='opening' src='https://images.example.com/cover.jpg'><p>Article text</p><img id='later' src='https://images.example.com/cover.jpg'>",
+            cover: cover
+        )
+        let laterVisible = try await evaluate("getComputedStyle(document.querySelector('#later')).display !== 'none'", in: web) as? Bool
+        XCTAssertEqual(laterVisible, true)
     }
 
     func testFontChangePreservesTextRangeWithoutReplacingDocument() async throws {

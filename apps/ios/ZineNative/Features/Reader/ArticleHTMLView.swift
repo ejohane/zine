@@ -35,6 +35,7 @@ struct ArticleBookmarkReaderHeader {
     let content: AnyView
     let palette: ZineTheme.ArtworkPalette
     let jumpRequest: Int
+    var coverImageURL: URL? = nil
     var resumesReading = false
     var minimumScrollTravel: CGFloat = 0
     let onScroll: (CGFloat, CGFloat) -> Void
@@ -143,7 +144,8 @@ enum ArticleHTMLDocumentBuilder {
         fontScale: Double = ArticleReaderFontSize.standard.scale,
         fontFamily: ArticleReaderFontFamily = .system,
         topContentInset: CGFloat = 0,
-        bookmarkPalette: ZineTheme.ArtworkPalette? = nil
+        bookmarkPalette: ZineTheme.ArtworkPalette? = nil,
+        coverImageURL: URL? = nil
     ) -> String {
         let metadata = document.metadata
         let readingTime = metadata.readingTimeMinutes.map { "\($0) min read" }
@@ -178,6 +180,7 @@ enum ArticleHTMLDocumentBuilder {
         <html lang="en">
         <head>
           <meta charset="utf-8">
+          <meta name="zine-cover-image" content="\(escape(coverImageURL?.absoluteString ?? ""))">
           <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
           <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: http: data:; style-src 'unsafe-inline'; script-src 'none'; connect-src 'none'; frame-src 'none'; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
           <style>
@@ -487,7 +490,7 @@ struct ArticleHTMLView: UIViewRepresentable {
             ready = false
             loadedHash = document.contentHash
             webView.loadHTMLString(
-                ArticleHTMLDocumentBuilder.makeHTML(for: document, fontScale: parent.fontScale, fontFamily: parent.fontFamily, topContentInset: parent.topContentInset, bookmarkPalette: parent.bookmarkHeader?.palette),
+                ArticleHTMLDocumentBuilder.makeHTML(for: document, fontScale: parent.fontScale, fontFamily: parent.fontFamily, topContentInset: parent.topContentInset, bookmarkPalette: parent.bookmarkHeader?.palette, coverImageURL: parent.bookmarkHeader?.coverImageURL),
                 baseURL: document.metadata.canonicalURL
             )
         }
@@ -495,10 +498,11 @@ struct ArticleHTMLView: UIViewRepresentable {
         func update(_ next: ArticleHTMLView, in webView: WKWebView) {
             let appearanceChanged = parent.fontScale != next.fontScale || parent.fontFamily != next.fontFamily
             let layoutChanged = parent.topContentInset != next.topContentInset
+            let coverChanged = parent.bookmarkHeader?.coverImageURL != next.bookmarkHeader?.coverImageURL
             let paletteChanged = parent.bookmarkHeader?.palette != next.bookmarkHeader?.palette
             parent = next
             configureHeader(in: webView)
-            if loadedHash != next.document.contentHash { load(next.document, in: webView); return }
+            if loadedHash != next.document.contentHash || coverChanged { load(next.document, in: webView); return }
             guard ready else { return }
             if let header = parent.bookmarkHeader {
                 if paletteChanged {

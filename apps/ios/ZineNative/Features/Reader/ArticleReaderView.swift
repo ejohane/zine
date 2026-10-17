@@ -452,6 +452,7 @@ struct ArticleReaderView: View {
             content: bookmarkHeader.content,
             palette: bookmarkHeader.palette,
             jumpRequest: bookmarkHeader.jumpRequest,
+            coverImageURL: bookmarkHeader.coverImageURL,
             resumesReading: bookmarkHeader.resumesReading,
             minimumScrollTravel: bookmarkHeader.minimumScrollTravel,
             onScroll: { offset, height in
