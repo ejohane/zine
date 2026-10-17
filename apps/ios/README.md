@@ -43,6 +43,15 @@ iOS 18 or newer simulator or device.
 
 All new iOS product work, verification, and deployment belongs in this project.
 
+After a Release build or archive, check its processed app configuration:
+
+```sh
+node scripts/check-ios-app-config.mjs '<built app>/Info.plist'
+```
+
+Run from the repository root. This catches missing iPad multitasking orientations
+while preserving the existing iPhone orientations and device support.
+
 ## Tests
 
 Select the `ZineNative` scheme in Xcode and use Product → Test to run
