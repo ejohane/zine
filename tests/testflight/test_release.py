@@ -1,6 +1,7 @@
 import contextlib
 import copy
 import importlib.util
+import io
 import json
 from pathlib import Path
 import tempfile
@@ -295,6 +296,57 @@ class ReleaseTests(unittest.TestCase):
             with self.assertRaisesRegex(r.ReleaseError, 'Prepared project changed'):
                 r.archive(self.directory, self.m)
             export.assert_not_called()
+
+    def test_uploaded_resume_reconciles_without_local_signing_or_artifacts(self):
+        for upload in ('intent_recorded', 'returned', 'observed'):
+            for reason in ('profile expired', 'certificate missing', 'checkout project changed'):
+                with self.subTest(upload=upload, unavailable=reason):
+                    m = manifest()
+                    m.update(upload=upload, state='awaiting_apple')
+                    # No local IPA/path/hash is required once upload intent exists.
+                    r.save(self.path, m)
+                    assigned = []
+                    def collection(path):
+                        if '/builds/exact-build/betaGroups?' in path:
+                            return [{'id': r.GROUP}] if assigned else []
+                        return [{'id': 'exact-build'}] if assigned else []
+                    def external(action, **kwargs):
+                        self.assertEqual(action, 'assign', 'Post-upload resume attempted an upload')
+                        self.assertEqual(kwargs, {'build_id': 'exact-build'})
+                        assigned.append(kwargs['build_id'])
+                        return {}
+                    with patch.object(r, 'STATE', self.directory), patch.object(r, 'locked', return_value=contextlib.nullcontext()), patch.object(r.sys, 'argv', ['release', 'resume', str(self.path), '--wait', '0']), patch.object(r, 'doctor', side_effect=r.ReleaseError(reason)) as signing, patch.object(r, 'validate_credentials') as auth, patch.object(r, 'guard_audience') as audience, patch.object(r, 'exact_build', return_value=self.row()) as exact, patch.object(r, 'get', return_value={'data': {'attributes': {'internalBuildState': 'IN_BETA_TESTING'}}}), patch.object(r, 'collection', side_effect=collection), patch.object(r, 'bridge', side_effect=external) as bridge, contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                        self.assertEqual(r.main(), 0)
+                        signing.assert_not_called()
+                        auth.assert_called_once_with()
+                        self.assertEqual(audience.call_count, 3)
+                        exact.assert_called_once()
+                        bridge.assert_called_once_with('assign', build_id='exact-build')
+                    ready = r.load(self.path)
+                    self.assertEqual(ready['state'], 'ready')
+                    self.assertEqual(ready['sha'], m['sha'])
+                    self.assertEqual(ready['build'], m['build'])
+                    self.assertEqual(ready['asc_build_id'], 'exact-build')
+
+    def test_first_upload_resume_still_requires_full_signing_doctor(self):
+        with patch.object(r, 'STATE', self.directory), patch.object(r, 'locked', return_value=contextlib.nullcontext()), patch.object(r.sys, 'argv', ['release', 'resume', str(self.path), '--wait', '0']), patch.object(r, 'doctor', side_effect=r.ReleaseError('profile expired')) as signing, patch.object(r, 'upload_once') as upload, patch.object(r, 'poll') as poll, contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(r.main(), 1)
+            signing.assert_called_once_with()
+            upload.assert_not_called()
+            poll.assert_not_called()
+            self.assertEqual(r.load(self.path)['upload'], 'not_attempted')
+
+    def test_ambiguous_resume_waits_for_exact_build_without_reupload(self):
+        self.m['upload'] = 'intent_recorded'
+        r.save(self.path, self.m)
+        with patch.object(r, 'STATE', self.directory), patch.object(r, 'locked', return_value=contextlib.nullcontext()), patch.object(r.sys, 'argv', ['release', 'resume', str(self.path), '--wait', '0']), patch.object(r, 'doctor', side_effect=r.ReleaseError('certificate missing')) as signing, patch.object(r, 'validate_credentials'), patch.object(r, 'guard_audience') as audience, patch.object(r, 'exact_build', return_value=None) as exact, patch.object(r, 'bridge') as external, contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(r.main(), 1)
+            signing.assert_not_called()
+            audience.assert_called_once_with()
+            exact.assert_called_once()
+            external.assert_not_called()
+        self.assertEqual(r.load(self.path)['state'], 'awaiting_apple')
+        self.assertEqual(r.load(self.path)['upload'], 'intent_recorded')
 
     def test_pagination_rejects_foreign_origin(self):
         with patch.object(r, 'get', return_value={'data': [], 'links': {'next': 'https://evil.invalid/steal'}}):
