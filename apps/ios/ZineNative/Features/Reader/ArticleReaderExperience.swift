@@ -104,6 +104,53 @@ enum ArticleReaderScript {
     static let world = WKContentWorld.world(name: "ZineReader")
     static let source = #"""
     (() => {
+      // Suppress only an opening duplicate. Keep the stored article and its text nodes intact
+      // so saved reading anchors and useful captions survive presentation changes.
+      const imageIdentity = value => {
+        try {
+          let url = new URL(value, document.baseURI);
+          if (!['https:', 'http:'].includes(url.protocol)) return null;
+          // Substack puts the original image URL after its resize settings.
+          if (url.hostname === 'substackcdn.com' && url.pathname.startsWith('/image/fetch/')) {
+            const original = decodeURIComponent(url.pathname).match(/https?:\/\/.+$/);
+            if (original) url = new URL(original[0]);
+          }
+          // Ghost serves the same upload under width-specific paths.
+          if (url.hostname === 'storage.ghost.io' || url.hostname.endsWith('.ghost.io')) {
+            url.pathname = url.pathname.replace(/(\/content\/images\/)size\/w\d+\//, '$1');
+          }
+          url.hash = '';
+          // Preserve identity-bearing query parameters (including signatures and image IDs).
+          for (const key of [...url.searchParams.keys()]) {
+            if (['w', 'h', 'width', 'height', 'fit', 'crop', 'quality', 'q', 'format', 'fm', 'auto', 'dpr'].includes(key.toLowerCase())) url.searchParams.delete(key);
+          }
+          url.searchParams.sort();
+          return url.href;
+        } catch { return null; }
+      };
+      const suppressOpeningCover = () => {
+        const cover = document.head.querySelector('meta[name="zine-cover-image"]')?.content;
+        if (!cover) return;
+        const identity = imageIdentity(cover);
+        const main = document.querySelector('main');
+        const image = main?.querySelector('img');
+        if (!identity || !image) return;
+        const before = document.createRange();
+        before.setStart(main, 0); before.setEndBefore(image);
+        if (before.toString().trim() || before.cloneContents().querySelector('video, audio, iframe, svg')) return;
+        const sources = [image.currentSrc, image.getAttribute('src'), ...(image.getAttribute('srcset') || '').split(',').map(item => item.trim().split(/\s+/)[0])].filter(Boolean);
+        if (!sources.some(source => imageIdentity(source) === identity)) return;
+        let container = image.closest('picture') || image;
+        container.style.setProperty('display', 'none', 'important');
+        // Collapse empty media wrappers without discarding captions, links with text, or prose.
+        while (container.parentElement && container.parentElement !== main) {
+          const parent = container.parentElement;
+          if (parent.textContent.trim() || parent.querySelector('video, audio, iframe, svg') || [...parent.querySelectorAll('img')].some(other => other !== image)) break;
+          parent.style.setProperty('display', 'none', 'important');
+          container = parent;
+        }
+      };
+      suppressOpeningCover();
       const send = value => window.webkit.messageHandlers.reader.postMessage(value);
       const nodes = [];
       const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);

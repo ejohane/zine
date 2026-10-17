@@ -339,6 +339,7 @@ struct BookmarkDetailView: View {
                         content: AnyView(articleBookmarkHeader(viewport: viewport.size)),
                         palette: activeArtworkPalette ?? .fallback,
                         jumpRequest: articleJumpRequest,
+                        coverImageURL: showsContextualArtwork ? content.thumbnailUrl : nil,
                         resumesReading: resumesArticleReading,
                         minimumScrollTravel: BookmarkDetailScrollExtent.collapseTravel(
                             actionTop: sourceActionTop, headerBottom: headerBottom, scrollOrigin: 0
