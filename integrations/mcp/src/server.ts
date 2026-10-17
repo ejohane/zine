@@ -16,6 +16,7 @@ import {
 } from './library';
 import { TRPCError } from '@trpc/server';
 import { AuthenticationUnavailable } from './clerk';
+import { throttleVerification, type VerificationLimits } from './throttle';
 
 export function createMcpServer(env: Bindings, principal: Principal | null, cfg: McpConfig) {
   const server = new McpServer(
@@ -129,7 +130,10 @@ export function createMcpServer(env: Bindings, principal: Principal | null, cfg:
   return server;
 }
 
-export async function handleMcp(request: Request, env: Bindings & Partial<McpConfig>) {
+export async function handleMcp(
+  request: Request,
+  env: Bindings & Partial<McpConfig> & VerificationLimits
+) {
   let cfg: McpConfig;
   try {
     cfg = config(env);
@@ -154,6 +158,10 @@ export async function handleMcp(request: Request, env: Bindings & Partial<McpCon
   if (url.search) return Response.json({ error: 'INVALID_REQUEST' }, { status: 400 });
   let principal: Principal | null = null;
   if (request.headers.has('authorization')) {
+    if (cfg.MCP_AUTH_MODE === 'clerk-opaque') {
+      const limited = await throttleVerification(request, env);
+      if (limited) return limited;
+    }
     try {
       principal = await authenticate(request.headers.get('authorization'), cfg);
       const user = await env.DB.prepare('SELECT id FROM users WHERE id=?')

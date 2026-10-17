@@ -1,9 +1,13 @@
 # Zine MCP local first version
 
-Status: local implementation, not deployed, registered, or linked to a real account.
-Based on remote `main` at `4578e5134a270ab9b052965bad7e8d522d160279`, fetched on
-2026-10-16. Branch: `feat/mcp-local-v1`. No production resources or credentials
-are present in the local configuration.
+Status: implementation merged in PR445; no MCP endpoint deployed or real account
+grant tested by this task. The parent reports a registered public Clerk client;
+see the [unapplied activation proposal](mcp-production-activation.md) for that
+registration, production config and user-only secret handoff. The follow-up
+branch `feat/mcp-production-plan` is based on remote main
+`3b33e1487062dca60cd35f99a924cba76fa32742`, fetched on 2026-10-16. Production
+resource identifiers in the proposed config are nonsecret metadata; no live
+resource or credential was accessed to prepare it.
 
 ## Implemented interface
 

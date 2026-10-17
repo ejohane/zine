@@ -29,10 +29,12 @@ jobs:
         run: |
           bun run --cwd integrations/mcp typecheck
           bun run --cwd integrations/mcp lint
-          bunx eslint scripts/mcp-clerk-preflight.ts scripts/mcp-clerk-preflight.test.ts
-      - name: Verify read-only preflight
-        run: bun test scripts/mcp-clerk-preflight.test.ts
+          bunx eslint scripts/mcp-clerk-preflight.ts scripts/mcp-clerk-preflight.test.ts scripts/mcp-production-config.test.ts
+      - name: Verify read-only preflight and production configuration
+        run: bun test scripts/mcp-clerk-preflight.test.ts scripts/mcp-production-config.test.ts
       - name: Test isolated MCP workflows and OAuth fixtures
         run: bun run --cwd integrations/mcp test
       - name: Bundle local entry point without deploying
         run: bun run --cwd integrations/mcp build
+      - name: Validate production bundle without secrets or deployment
+        run: bun run --cwd integrations/mcp build:production

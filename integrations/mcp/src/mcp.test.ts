@@ -92,6 +92,7 @@ beforeEach(async () => {
   keys = createLocalJWKSet({ keys: [jwk] });
 });
 afterEach(() => {
+  vi.restoreAllMocks();
   fetchMock.deactivate();
 });
 
@@ -394,6 +395,52 @@ describe('account-scoped workflows on actual migrated D1 and R2', () => {
 });
 
 describe('official MCP transport and discovery', () => {
+  it('keeps anonymous production discovery available while limiting before Clerk or D1', async () => {
+    const production = {
+      ...bindings,
+      ENVIRONMENT: 'production',
+      MCP_AUTH_MODE: 'clerk-opaque' as const,
+      MCP_OAUTH_ISSUER: 'https://clerk.myzine.app',
+      MCP_OAUTH_JWKS_URL: 'https://clerk.myzine.app/.well-known/jwks.json',
+      MCP_CLERK_CLIENT_IDS: '["fixturePublicClient5gNCO8"]',
+      MCP_CLERK_SECRET_KEY: 'fixture-only',
+      MCP_VERIFICATION_LIMITER: { limit: vi.fn().mockResolvedValue({ success: false }) },
+    };
+    const fetch = vi.spyOn(globalThis, 'fetch');
+    const prepare = vi.spyOn(production.DB, 'prepare');
+    const anonymous = await handleMcp(
+      new Request('https://zine.example/mcp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+      }),
+      production
+    );
+    expect(await anonymous.json()).toHaveProperty('result.tools.0.name', 'save_link');
+    expect(production.MCP_VERIFICATION_LIMITER.limit).not.toHaveBeenCalled();
+    const value = new Request('https://zine.example/mcp', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer oat_fixtureonlyabcdefghijklmnop',
+        'CF-Connecting-IP': '192.0.2.1',
+      },
+    });
+    const response = await handleMcp(value, production);
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({ error: 'RATE_LIMITED' });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(prepare).not.toHaveBeenCalled();
+    const unavailable = await handleMcp(value, {
+      ...production,
+      MCP_VERIFICATION_LIMITER: undefined,
+    });
+    expect(unavailable.status).toBe(503);
+    expect(await unavailable.json()).toEqual({ error: 'VERIFICATION_UNAVAILABLE' });
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it('uses Clerk opaque verification per request and fails closed on revocation or outage', async () => {
     const clerkBindings = {
       ...bindings,
@@ -402,6 +449,8 @@ describe('official MCP transport and discovery', () => {
       MCP_OAUTH_JWKS_URL: 'https://clerk.myzine.app/.well-known/jwks.json',
       MCP_CLERK_CLIENT_IDS: '["client_fixture"]',
       MCP_CLERK_SECRET_KEY: 'fixture-only',
+      ENVIRONMENT: 'production',
+      MCP_VERIFICATION_LIMITER: { limit: vi.fn().mockResolvedValue({ success: true }) },
     };
     fetchMock.activate();
     fetchMock.disableNetConnect();
@@ -422,6 +471,7 @@ describe('official MCP transport and discovery', () => {
           method: 'POST',
           headers: {
             Authorization: 'Bearer oat_fixtureonlyabcdefghijklmnop',
+            'CF-Connecting-IP': '192.0.2.1',
             'Content-Type': 'application/json',
             Accept: 'application/json, text/event-stream',
           },
@@ -451,6 +501,7 @@ describe('official MCP transport and discovery', () => {
     const outage = await request();
     expect(outage.status).toBe(503);
     expect(outage.headers.has('WWW-Authenticate')).toBe(false);
+    expect(clerkBindings.MCP_VERIFICATION_LIMITER.limit).toHaveBeenCalledTimes(3);
     fetchMock.assertNoPendingInterceptors();
   });
   async function rpc(method: string, params: unknown = {}, auth?: string) {

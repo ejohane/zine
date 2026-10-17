@@ -11,13 +11,13 @@ const cfg: McpConfig = {
   MCP_OAUTH_JWKS_URL: `${CLERK_ISSUER}/.well-known/jwks.json`,
   MCP_AUTH_MODE: 'clerk-opaque',
   MCP_CLERK_SECRET_KEY: 'fixture-only-not-a-real-secret',
-  MCP_CLERK_CLIENT_IDS: '["client_fixture"]',
+  MCP_CLERK_CLIENT_IDS: '["fixturePublicClient5gNCO8"]',
 };
 const bearer = 'Bearer oat_fixtureonlyabcdefghijklmnop';
 const valid = () => ({
   object: 'clerk_idp_oauth_access_token',
   subject: 'user_alice',
-  client_id: 'client_fixture',
+  client_id: 'fixturePublicClient5gNCO8',
   scopes: ['bookmarks:read'],
   aud: [cfg.MCP_RESOURCE],
   revoked: false,
@@ -97,6 +97,19 @@ describe('Clerk opaque OAuth adapter', () => {
       config({ ...cfg, MCP_AUTH_MODE: 'clerk-jwt', MCP_CLERK_SECRET_KEY: undefined })
     ).not.toThrow();
   });
+  it.each(['', ' client_fixture', 'client_fixture\n', 'https://client.example', 'x'.repeat(129)])(
+    'rejects malformed configured client ID %j',
+    (clientId) => {
+      expect(() => config({ ...cfg, MCP_CLERK_CLIENT_IDS: JSON.stringify([clientId]) })).toThrow(
+        'MCP_NOT_CONFIGURED'
+      );
+    }
+  );
+  it('accepts prefixed IDs but never aliases an unprefixed approved ID', async () => {
+    expect(() => config({ ...cfg, MCP_CLERK_CLIENT_IDS: '["client_fixture"]' })).not.toThrow();
+    reply({ ...valid(), client_id: 'client_fixturePublicClient5gNCO8' });
+    await expect(authenticate(bearer, cfg)).rejects.toThrow('UNAUTHORIZED');
+  });
   it('never follows a verification redirect or accepts an oversized response', async () => {
     reply({}, 302);
     await expect(authenticate(bearer, cfg)).rejects.toThrow('UNAUTHORIZED');
@@ -115,7 +128,7 @@ describe('Clerk JWT compatibility without a backend secret', () => {
     const pair = await generateKeyPair('RS256', { extractable: true });
     const jwt = await new SignJWT({
       sub: 'user_alice',
-      client_id: 'client_fixture',
+      client_id: 'fixturePublicClient5gNCO8',
       scp: ['bookmarks:read'],
       ...change,
     })
