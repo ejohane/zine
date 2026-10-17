@@ -1,4 +1,4 @@
-import { savedEvidence } from '../weekly-recaps/evidence';
+import { savedEvidence } from '../items/consumption-events';
 import { and, asc, eq, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import { Provider, UserItemState } from '@zine/shared';

@@ -11,7 +11,7 @@ import {
   UserItemState,
 } from '@zine/shared';
 import { items, userItems, users } from '../db/schema';
-import { savedEvidence } from '../weekly-recaps/evidence';
+import { savedEvidence } from '../items/consumption-events';
 import type { Database } from '../db';
 import type { Bindings } from '../types';
 import { extractArticle } from '../lib/article-extractor';

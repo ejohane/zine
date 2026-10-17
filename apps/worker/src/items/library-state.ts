@@ -1,5 +1,5 @@
 import { UserItemState } from '@zine/shared';
-import { savedEvidence } from '../weekly-recaps/evidence';
+import { savedEvidence } from './consumption-events';
 import { and, eq, ne } from 'drizzle-orm';
 import type { Database } from '../db';
 import { userItems } from '../db/schema';

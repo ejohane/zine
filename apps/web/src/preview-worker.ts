@@ -1,4 +1,4 @@
-import { publicWorkerFetch, isPublicPath } from './public-worker';
+import { publicWorkerFetch } from './public-worker';
 interface PreviewWorkerEnv {
   API: {
     fetch(request: Request): Promise<Response>;
@@ -6,7 +6,6 @@ interface PreviewWorkerEnv {
   ASSETS: {
     fetch(request: Request): Promise<Response>;
   };
-  APPLE_APPLICATION_IDENTIFIER?: string;
   PREVIEW_READ_ONLY?: string;
   PREVIEW_GIT_SHA?: string;
   PREVIEW_ID?: string;
@@ -91,7 +90,10 @@ export default {
       );
     }
 
-    if (isPublicPath(url.pathname) || url.pathname === '/.well-known/apple-app-site-association') {
+    if (
+      /^\/(p|i)(\/|$)/.test(url.pathname) ||
+      url.pathname === '/.well-known/apple-app-site-association'
+    ) {
       return withPreviewHeaders(await publicWorkerFetch(request, env), previewId);
     }
     if (isPreviewApiPath(url.pathname)) {

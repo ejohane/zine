@@ -1,5 +1,3 @@
-import { cleanupWeeklyRecaps } from '../weekly-recaps/service';
-import { cleanupPublicationDelivery } from '../publications/delivery/cleanup';
 /**
  * Authentication routes
  *
@@ -12,7 +10,6 @@ import { cleanupPublicationDelivery } from '../publications/delivery/cleanup';
  */
 
 import { Hono } from 'hono';
-import { deletePublicationOwner } from '../publications/cleanup';
 import { Webhook } from 'svix';
 import { eq } from 'drizzle-orm';
 import type { Env, Bindings } from '../types';
@@ -84,9 +81,6 @@ async function deleteArtifactPrefix(bucket: R2Bucket, prefix: string): Promise<v
 }
 
 async function deleteUserData(env: Bindings, userId: string): Promise<void> {
-  await cleanupPublicationDelivery(env.DB, userId);
-  await cleanupWeeklyRecaps(env.DB, userId);
-  await deletePublicationOwner(env, userId);
   const safeUserId = encodeURIComponent(userId);
   await deleteArtifactPrefix(env.ARTICLE_CONTENT, `editorial/users/${safeUserId}/`);
   await deleteArtifactPrefix(env.ARTICLE_CONTENT, `people-daily/users/${safeUserId}/`);

@@ -77,9 +77,7 @@ export default defineConfig({
               runtimeCaching: [
                 {
                   urlPattern: ({ request, url }) =>
-                    request.destination === 'image' &&
-                    !url.pathname.startsWith('/api/') &&
-                    !url.pathname.startsWith('/publication-'),
+                    request.destination === 'image' && !url.pathname.startsWith('/api/'),
                   handler: 'StaleWhileRevalidate',
                   options: {
                     cacheName: 'zine-images',

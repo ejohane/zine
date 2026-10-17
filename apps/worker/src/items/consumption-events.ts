@@ -29,7 +29,7 @@ export function savedEvidence(
     .onConflictDoNothing();
 }
 
-/** Snapshots are private: source metadata never enters a published issue automatically. */
+/** Capture the item metadata as it appeared at the time of the interaction. */
 export function evidenceSnapshotSql() {
   return sql`json_object('version',1,'title',i.title,'creatorName',c.name,
     'contentType',i.content_type,'provider',i.provider,'artworkUrl',i.thumbnail_url)`;
@@ -54,39 +54,6 @@ export function finishedEvidence(
     WHERE ui.id=${input.userItemId} AND ui.user_id=${input.userId}
       AND ui.is_finished<>${input.isFinished ? 1 : 0}
   `);
-}
-
-/** Delivery's trusted canonical save adapter can batch this raw D1 statement BEFORE its update. */
-export function savedEvidenceStatement(
-  db: D1Database,
-  input: {
-    userId: string;
-    userItemId: string;
-    occurredAt: number;
-    source: string;
-    newlyCreated?: boolean;
-    mutationGuard?: string;
-  }
-) {
-  return db
-    .prepare(
-      `INSERT OR IGNORE INTO user_item_consumption_events
-    (id,user_id,user_item_id,item_id,event_type,occurred_at,source,metadata)
-    SELECT ?,ui.user_id,ui.id,ui.item_id,'SAVED',?,?,
-      json_object('version',1,'title',i.title,'creatorName',c.name,'contentType',i.content_type,
-        'provider',i.provider,'artworkUrl',i.thumbnail_url)
-    FROM user_items ui JOIN items i ON i.id=ui.item_id LEFT JOIN creators c ON c.id=i.creator_id
-    WHERE ui.id=? AND ui.user_id=? AND ui.state ${input.newlyCreated ? '=' : '<>'} 'BOOKMARKED'
-      ${input.mutationGuard ? 'AND EXISTS(SELECT 1 FROM personal_publication_mutations WHERE id=?)' : ''}`
-    )
-    .bind(
-      input.newlyCreated ? `saved:${input.userItemId}` : ulid(),
-      input.occurredAt,
-      input.source,
-      input.userItemId,
-      input.userId,
-      ...(input.mutationGuard ? [input.mutationGuard] : [])
-    );
 }
 
 /** One identity per actual open; retries retain its timestamp and cannot create extra evidence. */

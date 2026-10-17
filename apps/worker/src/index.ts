@@ -1,5 +1,3 @@
-import { processWeeklyRecapCatchup } from './weekly-recaps/service';
-import { runPublicationDelivery } from './publications/delivery/service';
 import { backfillPodcastDestinations } from './rss/saved-player-destinations';
 import { retryBookmarkEnrichment } from './enrichment/outbox';
 /**
@@ -411,8 +409,6 @@ export default {
    */
   async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext): Promise<void> {
     if (event.cron === '*/5 * * * *') {
-      ctx.waitUntil(runPublicationDelivery(env));
-      ctx.waitUntil(processWeeklyRecapCatchup(env.DB));
       ctx.waitUntil(retryBookmarkEnrichment(env));
       ctx.waitUntil(backfillPodcastDestinations(env));
       return;

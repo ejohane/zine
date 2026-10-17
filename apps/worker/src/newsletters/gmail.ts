@@ -1,4 +1,4 @@
-import { savedEvidence } from '../weekly-recaps/evidence';
+import { savedEvidence } from '../items/consumption-events';
 import { and, eq } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import {
