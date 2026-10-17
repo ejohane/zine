@@ -174,3 +174,7 @@
 - When you need to observe or diagnose application behavior, prefer the local Codex skill at `.codex/skills/zine-observability/SKILL.md`.
 - Use that skill for worker health regressions, request/trace correlation, sync failures, queue or DLQ triage, and release-scoped incident diagnosis.
 - Prefer the repo-owned diagnostics commands (`bun run diag:health`, `bun run diag:incident`, `bun run diag:cf:logs`, `bun run diag:release`, `bun run diag:queue:dlq`) over ad hoc dashboard browsing so evidence stays reproducible.
+
+## Internal TestFlight releases
+
+- Use `.agents/skills/zine-testflight/SKILL.md` and `scripts/testflight-release` for planning, publishing or resuming an internal TestFlight release. The command owns signing, manifests and exact-build recovery. Key creation/configuration and encryption classification require separate review; implementing tooling does not authorize a live upload.

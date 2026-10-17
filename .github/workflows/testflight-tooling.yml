@@ -1,0 +1,38 @@
+name: TestFlight tooling
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/testflight/**'
+      - 'scripts/testflight-release'
+      - 'tests/testflight/**'
+      - '.github/workflows/testflight-tooling.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/testflight/**'
+      - 'scripts/testflight-release'
+      - 'tests/testflight/**'
+      - '.github/workflows/testflight-tooling.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  offline-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0'
+          bundler: '2.7.2'
+          bundler-cache: true
+          working-directory: scripts/testflight
+      - name: State machine and target guards (no Apple access)
+        run: python3 -m unittest discover -s tests/testflight -v
+      - name: Real Pilot with fake Transporter (network forbidden)
+        run: BUNDLE_GEMFILE=scripts/testflight/Gemfile bundle exec ruby tests/testflight/bridge_test.rb
