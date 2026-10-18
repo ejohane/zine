@@ -30,6 +30,19 @@ performed during this acceptance. The ChatGPT development surface displayed
 “CSP off”; this trial establishes rendering and bridge behavior, not host CSP
 enforcement. The resource still declares its explicit CSP.
 
+## Horizontal rail release
+
+Deployed on 2026-10-18 from `442d70e9` to the existing MCP Worker.
+Cloudflare version: `ae7f8486-9508-472c-835d-161b6eba92eb`.
+Previous version for rollback: `ac8ff46c-c448-4950-8828-9c890a7a8838`.
+
+The release passed 79 MCP tests, typecheck, lint, formatting and the production
+bundle dry run. Local browser interaction confirmed card-detail expansion.
+Production resource readback confirmed v4 HTML, horizontal rail, detail panel,
+hidden search form and `prefersBorder: false`. ChatGPT controls whether to honor
+that outer-border preference. Existing rendered messages retain their old UI;
+request a fresh card response after refreshing tools.
+
 ## Tool flow
 
 1. Call `search_saved` with a title/description/URL query (empty means browse).
