@@ -19,7 +19,16 @@ bindings. Never print remote variable values when checking deployment metadata.
 Production readback confirmed seven tools, the v2 MCP Apps HTML resource/MIME/CSP,
 anonymous linking challenges, and authenticated search with covers/creator/time
 metadata through the existing ChatGPT connection. ChatGPT's Refresh tools action
-was run after deployment. Live rendered interaction is a separate acceptance step.
+was run after deployment.
+
+Direct computer-use acceptance in an actual ChatGPT Chat conversation observed
+the inline component with six owned saved items and real YouTube cover images.
+Opening a saved article loaded stored text in the inline reader; searching from
+the component returned 20 results for a query. This was the deployed Worker and
+existing linked OAuth account, not the sample host. Collection writes were not
+performed during this acceptance. The ChatGPT development surface displayed
+“CSP off”; this trial establishes rendering and bridge behavior, not host CSP
+enforcement. The resource still declares its explicit CSP.
 
 ## Tool flow
 
