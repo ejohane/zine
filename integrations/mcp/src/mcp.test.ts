@@ -158,6 +158,19 @@ describe('OAuth resource authentication with synthetic signed tokens', () => {
 });
 
 describe('account-scoped workflows on actual migrated D1 and R2', () => {
+  it('returns Zine destinations alongside the original source for owned bookmarks', async () => {
+    const result = await new McpLibrary(bindings, 'user_alice').search({});
+    const card = result.items.find((item) => item.bookmarkId === 'a-public')!;
+    expect(card.zineUrl).toBe('https://myzine.app/item/a-public');
+    expect(card.nativeUrl).toBe('zine://item/a-public');
+    expect(card.originalUrl).toBe(card.url);
+    const read = await new McpLibrary(bindings, 'user_alice').read({ bookmarkId: 'a-public' });
+    expect(read.zineUrl).toBe(card.zineUrl);
+    expect(read.nativeUrl).toBe(card.nativeUrl);
+    await expect(
+      new McpLibrary(bindings, 'user_bob').show({ bookmarkIds: ['a-public'] })
+    ).rejects.toThrow('NOT_FOUND');
+  });
   it('hides completed bookmarks by default and supports explicit completed-only and all searches', async () => {
     await seed('done');
     await own('user_alice', 'done', 'z-done');
@@ -474,6 +487,8 @@ describe('account-scoped workflows on actual migrated D1 and R2', () => {
     const first = await alice.save({ url: 'https://example.com/new#fragment' });
     const repeated = await alice.save({ url: 'https://example.com/new' });
     expect(repeated.userItemId).toBe(first.userItemId);
+    expect(first.zineUrl).toBe(`https://myzine.app/item/${first.userItemId}`);
+    expect(first.nativeUrl).toBe(`zine://item/${first.userItemId}`);
     expect(repeated.status).toBe('already_bookmarked');
     const bob = await new McpLibrary(bindings, 'user_bob').save({ url: 'https://example.com/new' });
     expect(bob.itemId).toBe(first.itemId);

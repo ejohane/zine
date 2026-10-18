@@ -117,7 +117,7 @@ export function createMcpServer(env: Bindings, principal: Principal | null, cfg:
   tool(
     'search_saved',
     'Search saved items',
-    'Search titles, descriptions and URLs of saved bookmarks. By default only incomplete bookmarks are returned, matching the app. Set completion to completed (completed only) or all (both) only when the user explicitly asks. Preserve completion and query with nextCursor on every page. For visual results, call show_saved with the selected bookmarkIds and the returned query, completion and nextCursor.',
+    'Search titles, descriptions and URLs of saved bookmarks. By default only incomplete bookmarks are returned, matching the app. Set completion to completed (completed only) or all (both) only when the user explicitly asks. Preserve completion and query with nextCursor on every page. Use zineUrl to open a bookmark inside Zine, nativeUrl for its custom-scheme link, and originalUrl for the original source. For visual results, call show_saved with the selected bookmarkIds and the returned query, completion and nextCursor.',
     searchSchema,
     false,
     (s, p) => s.search(p),

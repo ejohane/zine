@@ -17,9 +17,20 @@ export async function publicWorkerFetch(request: Request, env: PublicWorkerEnv):
   const url = new URL(request.url);
   const noStore = { 'Cache-Control': 'no-store' };
   if (
-    /^\/(p|i)(\/|$)/.test(url.pathname) ||
-    url.pathname === '/.well-known/apple-app-site-association'
+    ['/.well-known/apple-app-site-association', '/apple-app-site-association'].includes(
+      url.pathname
+    )
   ) {
+    return Response.json(
+      {
+        applinks: {
+          details: [{ appIDs: ['TRA7965NM5.app.zine.native'], components: [{ '/': '/item/*' }] }],
+        },
+      },
+      { headers: { 'Cache-Control': 'public, max-age=3600' } }
+    );
+  }
+  if (/^\/(p|i)(\/|$)/.test(url.pathname)) {
     return new Response(null, { status: 404, headers: noStore });
   }
   const upstream = env.UPSTREAM_API_URL;

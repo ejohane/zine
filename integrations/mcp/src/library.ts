@@ -1,3 +1,4 @@
+import { bookmarkLinks } from '../../../packages/shared/src/bookmark-links';
 import { z } from 'zod';
 import { parseHTML } from 'linkedom';
 import { createDb } from '../../../apps/worker/src/db';
@@ -173,6 +174,8 @@ export class McpLibrary {
       bookmarkId: r.id,
       title: r.title.slice(0, 500),
       url: r.url.slice(0, 2048),
+      originalUrl: r.url.slice(0, 2048),
+      ...bookmarkLinks(r.id),
       provider: r.provider,
       contentType: r.contentType,
       summary: r.summary?.slice(0, 600) ?? null,
@@ -257,6 +260,8 @@ export class McpLibrary {
       bookmarkId: row.id,
       title: row.title.slice(0, 500),
       url: row.url.slice(0, 2048),
+      originalUrl: row.url.slice(0, 2048),
+      ...bookmarkLinks(row.id),
       available,
       content,
       nextOffset:
@@ -306,7 +311,8 @@ export class McpLibrary {
     // user-item creation. Re-read through the shared service after each conflict.
     for (let attempt = 0; ; attempt++) {
       try {
-        return await operation();
+        const saved = await operation();
+        return { ...saved, ...bookmarkLinks(saved.userItemId), originalUrl: url };
       } catch (e) {
         if (
           attempt >= 3 ||

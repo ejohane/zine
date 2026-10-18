@@ -42,11 +42,13 @@ struct AppRootView: View {
     let configuration: AppConfiguration
 
     @Environment(Clerk.self) private var clerk
+    @State private var pendingBookmarkLink: BookmarkLinkRequest?
     var body: some View {
         Group {
             if let user = clerk.user {
                 AuthenticatedAppView(
                     configuration: configuration,
+                    pendingBookmarkLink: $pendingBookmarkLink,
                     userID: user.id,
                     userCreatedAt: user.createdAt,
                     userEmail: user.primaryEmailAddress?.emailAddress
@@ -56,8 +58,17 @@ struct AppRootView: View {
                 ZineAuthEntryView()
             }
         }
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+            if let url = activity.webpageURL, let bookmarkID = BookmarkLink.bookmarkID(from: url) {
+                pendingBookmarkLink = BookmarkLinkRequest(bookmarkID: bookmarkID)
+            }
+        }
         .onOpenURL { url in
-            Task { try? await Clerk.shared.handle(url) }
+            if let bookmarkID = BookmarkLink.bookmarkID(from: url) {
+                pendingBookmarkLink = BookmarkLinkRequest(bookmarkID: bookmarkID)
+            } else {
+                Task { try? await Clerk.shared.handle(url) }
+            }
         }
     }
 }
@@ -78,6 +89,9 @@ struct AuthenticatedAppView: View {
     private enum SettingsEntryRoute: Hashable {
         case root
     }
+
+    @Binding var pendingBookmarkLink: BookmarkLinkRequest?
+    @State private var bookmarkLinkError: String?
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -109,8 +123,9 @@ struct AuthenticatedAppView: View {
     @State private var externalOpenError: String?
     @Namespace private var navigationTransition
 
-    init(configuration: AppConfiguration, userID: String, userCreatedAt: Date, userEmail: String?, initialSession: AuthenticatedAppSession? = nil) {
+    init(configuration: AppConfiguration, pendingBookmarkLink: Binding<BookmarkLinkRequest?> = .constant(nil), userID: String, userCreatedAt: Date, userEmail: String?, initialSession: AuthenticatedAppSession? = nil) {
         self.configuration = configuration
+        self._pendingBookmarkLink = pendingBookmarkLink
         self.userID = userID
         let replayRequested = SourcesOnboardingReplayAccess.consumePreviewRequest(
             verifiedEmail: userEmail
@@ -295,6 +310,23 @@ struct AuthenticatedAppView: View {
             }
         }
         .environment(\.nativeCommandSession, commandSession)
+        .task(id: pendingBookmarkLink?.id) {
+            guard let request = pendingBookmarkLink else { return }
+            do {
+                // Resolve through the signed-in API; links never bypass ownership checks.
+                let bookmark = try await client.getBookmark(id: request.bookmarkID)
+                try Task.checkCancellation()
+                guard pendingBookmarkLink?.id == request.id else { return }
+                navigationPath = NavigationPath()
+                selectedTab = .library
+                navigationPath.append(bookmark)
+                pendingBookmarkLink = nil
+            } catch {
+                guard !Task.isCancelled, pendingBookmarkLink?.id == request.id else { return }
+                pendingBookmarkLink = nil
+                bookmarkLinkError = "This bookmark couldn’t be opened. Check your connection and that it belongs to the signed-in Zine account."
+            }
+        }
         .task {
             commandSession.navigate = navigateCommand
             commandSession.queryLibrary = { query in
@@ -346,13 +378,13 @@ struct AuthenticatedAppView: View {
                 offlineSyncRevision += 1
             }
         }
-        .alert("Couldn’t update Jump Back In", isPresented: Binding(
-            get: { externalOpenError != nil },
-            set: { if !$0 { externalOpenError = nil } }
+        .alert(bookmarkLinkError != nil ? "Couldn’t open bookmark" : "Couldn’t update Jump Back In", isPresented: Binding(
+            get: { bookmarkLinkError != nil || externalOpenError != nil },
+            set: { if !$0 { bookmarkLinkError = nil; externalOpenError = nil } }
         )) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(externalOpenError ?? "Please try again.")
+            Text(bookmarkLinkError ?? externalOpenError ?? "Please try again.")
         }
     }
 
