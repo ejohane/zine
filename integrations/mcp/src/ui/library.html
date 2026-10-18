@@ -35,59 +35,10 @@
       [hidden] {
         display: none !important;
       }
-      h1,
       h2,
       h3,
       p {
         margin: 0;
-      }
-      h1 {
-        font-size: 1.5rem;
-        letter-spacing: -0.03em;
-        font-weight: 650;
-      }
-      h2 {
-        font-size: 1.35rem;
-        letter-spacing: -0.02em;
-        text-wrap: balance;
-      }
-      button,
-      input,
-      select {
-        font: inherit;
-      }
-      button,
-      .source {
-        min-height: 40px;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        background: var(--surface);
-        color: var(--primaryText);
-        padding: 8px 12px;
-        cursor: pointer;
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 7px;
-        font-size: 0.875rem;
-        font-weight: 550;
-      }
-      button:hover,
-      .source:hover {
-        background: var(--raised);
-      }
-      button:disabled {
-        opacity: 0.55;
-        cursor: wait;
-      }
-      button.primary {
-        background: var(--brandAccent);
-        color: var(--onAccent);
-        border-color: var(--brandAccent);
-      }
-      button.primary:hover {
-        filter: brightness(0.94);
       }
       :focus-visible {
         outline: 2px solid var(--brandAccent);
@@ -96,49 +47,6 @@
       ::selection {
         background: var(--brandAccent);
         color: var(--onAccent);
-      }
-      input {
-        caret-color: var(--brandAccent);
-      }
-      input::placeholder {
-        color: var(--secondaryText);
-        opacity: 1;
-      }
-      svg {
-        width: 17px;
-        height: 17px;
-        flex: none;
-      }
-      header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        margin-bottom: 20px;
-      }
-      header p {
-        font-size: 0.875rem;
-        color: var(--secondaryText);
-        margin-top: 5px;
-      }
-      form.search {
-        display: flex;
-        gap: 8px;
-        margin-bottom: 16px;
-      }
-      input,
-      select {
-        min-width: 0;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        background: var(--surface);
-        color: var(--primaryText);
-        padding: 10px 12px;
-        min-height: 44px;
-      }
-      input {
-        flex: 1;
-        width: 100%;
       }
       .sr-only {
         position: absolute;
@@ -151,15 +59,8 @@
         white-space: nowrap;
         border: 0;
       }
-      #status {
-        color: var(--secondaryText);
-        font-size: 0.875rem;
-        margin-bottom: 16px;
-        min-height: 20px;
-      }
       #error {
-        padding: 12px 0;
-        margin-bottom: 12px;
+        margin-bottom: 16px;
         line-height: 1.5;
       }
       #cards {
@@ -179,50 +80,19 @@
       .card {
         scroll-snap-align: start;
       }
-      .card[data-selected='true'] .cover {
-        outline: 2px solid var(--brandAccent);
-        outline-offset: 3px;
-      }
-      .rail-controls {
+      .card-link {
         display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        margin-top: 8px;
-      }
-      .rail-controls p {
-        font-size: 0.75rem;
-        color: var(--secondaryText);
-      }
-      .rail-controls div {
-        display: flex;
-        gap: 6px;
-      }
-      .rail-controls button {
-        min-width: 40px;
-      }
-      #item-details {
-        padding-top: 20px;
-        margin-top: 16px;
-      }
-      #details-meta {
-        margin-top: 8px;
-      }
-      #details-summary {
-        font-size: 0.9375rem;
-        line-height: 1.65;
-        max-width: 65ch;
-        white-space: pre-wrap;
-        overflow-wrap: anywhere;
-      }
-      #details-tags {
-        margin-top: 14px;
-      }
-      #details-actions {
-        margin-top: 18px;
-        display: flex;
-        flex-wrap: wrap;
+        flex-direction: column;
         gap: 8px;
+        height: 100%;
+        color: inherit;
+        text-decoration: none;
+        border-radius: 14px;
+      }
+      svg {
+        width: 17px;
+        height: 17px;
+        flex: none;
       }
       .card {
         min-width: 0;
@@ -268,7 +138,7 @@
         flex: 1;
         min-width: 0;
       }
-      .title-button {
+      .card-title {
         display: -webkit-box;
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
@@ -285,7 +155,7 @@
         letter-spacing: -0.01em;
         overflow-wrap: anywhere;
       }
-      .title-button:hover {
+      .card-link:hover .card-title {
         background: transparent;
         text-decoration: underline;
         text-underline-offset: 3px;
@@ -328,30 +198,7 @@
         overflow-wrap: anywhere;
         max-width: 100%;
       }
-      .actions {
-        display: flex;
-        gap: 4px;
-        margin-top: auto;
-      }
-      .actions button,
-      .actions .source {
-        min-height: 40px;
-        padding: 4px 6px;
-        border: 0;
-        background: transparent;
-        color: var(--secondaryText);
-        font-size: 0.75rem;
-        font-weight: 500;
-      }
-      .actions button:hover,
-      .actions .source:hover {
-        background: var(--raised);
-        color: var(--primaryText);
-      }
-      .actions .source {
-        margin-left: auto;
-        width: 32px;
-      }
+
       .empty {
         padding: 40px 0;
         max-width: 44ch;
@@ -361,181 +208,31 @@
         color: var(--secondaryText);
         margin-top: 8px;
       }
-      #more {
-        display: flex;
-        margin: 20px auto 0;
-      }
-      .panel {
-        border-top: 1px solid var(--border);
-        margin-top: 24px;
-        padding-top: 20px;
-        scroll-margin-top: 12px;
-      }
-      .panel-head {
-        display: flex;
-        gap: 16px;
-        align-items: start;
-        justify-content: space-between;
-        margin-bottom: 16px;
-      }
-      .panel h2 {
-        overflow-wrap: anywhere;
-      }
-      #reader-meta {
-        margin-top: 8px;
-      }
-      #reader-content {
-        white-space: pre-wrap;
-        overflow-wrap: anywhere;
-        font-family: Georgia, 'Times New Roman', serif;
-        font-size: 1.0625rem;
-        line-height: 1.8;
-        max-width: 70ch;
-      }
-      .reader-actions {
-        margin-top: 20px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-      #collection-form {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        align-items: end;
-      }
-      #collection-form label {
-        flex: 1;
-        min-width: 150px;
-        font-size: 0.875rem;
-      }
-      select {
-        display: block;
-        width: 100%;
-        margin-top: 8px;
-      }
-      #collection-status {
-        margin-top: 12px;
-        line-height: 1.5;
-        font-size: 0.875rem;
-      }
       @media (max-width: 520px) {
         main {
           padding: 16px;
         }
-        .cover {
+        .cover,
+        .card-link {
           border-radius: 12px;
-        }
-      }
-      @media (prefers-reduced-motion: no-preference) {
-        .panel {
-          animation: reveal 180ms ease-out;
-        }
-        @keyframes reveal {
-          from {
-            opacity: 0.7;
-            transform: translateY(4px);
-          }
         }
       }
     </style>
   </head>
   <body>
     <main aria-label="Zine saved library">
-      <header hidden>
-        <div>
-          <h1>Your saved library</h1>
-          <p>Find a good read. Keep the conversation going.</p>
-        </div>
-      </header>
-      <form class="search" id="search-form" role="search" hidden>
-        <input
-          id="query"
-          type="search"
-          aria-label="Search your saved library"
-          placeholder="Search titles, descriptions, or links"
-          maxlength="200"
-        />
-        <button class="primary" type="submit" id="search-button">Search</button>
-      </form>
       <p id="status" class="sr-only" role="status" aria-live="polite">Connecting to Zine…</p>
       <p id="error" role="alert" hidden></p>
       <ul id="cards" aria-label="Saved items, horizontally scrollable" tabindex="0"></ul>
-      <nav id="rail-controls" class="rail-controls" aria-label="Browse saved items" hidden>
-        <p id="rail-position" aria-live="polite"></p>
-        <div>
-          <button id="rail-previous" aria-label="Previous saved items"></button
-          ><button id="rail-next" aria-label="Next saved items"></button>
-        </div>
-      </nav>
-      <section id="item-details" class="panel" aria-labelledby="details-title" hidden>
-        <div class="panel-head">
-          <div>
-            <h2 id="details-title" tabindex="-1"></h2>
-            <p id="details-meta" class="meta"></p>
-          </div>
-          <button id="close-details" aria-label="Close item details">Close</button>
-        </div>
-        <p id="details-summary"></p>
-        <div id="details-tags" class="tags"></div>
-        <div id="details-actions"></div>
-      </section>
       <div class="empty" id="empty" hidden>
         <h2>No saved items found</h2>
         <p>Ask ChatGPT to try a different search or show more of your library.</p>
       </div>
-      <button id="more" hidden>Show more</button>
-      <section id="reader" class="panel" aria-labelledby="reader-title" hidden>
-        <div class="panel-head">
-          <div>
-            <h2 id="reader-title" tabindex="-1"></h2>
-            <p class="meta" id="reader-meta"></p>
-          </div>
-          <button id="close-reader" aria-label="Close reader">Close</button>
-        </div>
-        <div id="reader-content"></div>
-        <div class="reader-actions">
-          <button id="read-more" hidden>Continue reading</button
-          ><a id="reader-source" class="source" target="_blank" rel="noopener noreferrer" hidden
-            >Open original</a
-          >
-        </div>
-      </section>
-      <section id="collection-panel" class="panel" aria-labelledby="collection-title" hidden>
-        <div class="panel-head">
-          <h2 id="collection-title" tabindex="-1">Add to collection</h2>
-          <button id="close-collection" aria-label="Close collection picker">Close</button>
-        </div>
-        <form id="collection-form">
-          <label>Collection<select id="collection-select" required></select></label
-          ><button id="add-button" class="primary" type="submit">Add to collection</button
-          ><button type="button" id="more-collections" hidden>More collections</button>
-        </form>
-        <p id="collection-status" role="status" aria-live="polite"></p>
-      </section>
     </main>
     <script type="module">
       const $ = (id) => document.getElementById(id);
       const artworkOrigins = /* ARTWORK_ORIGINS */ [];
-      const state = {
-        items: [],
-        query: '',
-        completion: 'incomplete',
-        nextCursor: null,
-        searching: false,
-        selectedId: null,
-        readerId: null,
-        readerOffset: null,
-        readerBusy: false,
-        collectionId: null,
-        collectionCursor: null,
-        collectionBusy: false,
-        collections: [],
-        ready: false,
-      };
-      let sequence = 0;
-      let readerSequence = 0;
-      let collectionSequence = 0;
+      const state = { items: [], query: '', ready: false };
       let rpcId = 0;
       const pending = new Map();
       const notify = (method, params) =>
@@ -560,15 +257,6 @@
         if (code === 'CONTENT_UNAVAILABLE')
           return 'Saved text is unavailable. You can open the original instead.';
         return 'Zine could not complete that action. Please try again.';
-      }
-      async function call(name, args) {
-        if (!state.ready)
-          throw new Error('Zine is still connecting. Please try again in a moment.');
-        const result = await request('tools/call', { name, arguments: args });
-        if (result?.isError) throw new Error(messageFor(result));
-        if (!result?.structuredContent?.data)
-          throw new Error('Zine returned an incomplete result. Please try again.');
-        return result.structuredContent.data;
       }
       function showError(error) {
         $('error').textContent =
@@ -603,15 +291,6 @@
           return null;
         }
       }
-      function sourceLink(item) {
-        const url = safeUrl(item.url);
-        if (!url) return null;
-        const link = node('a', 'Open original', 'source');
-        link.href = url.href;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        return link;
-      }
       function icon(kind) {
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.setAttribute('viewBox', '0 0 24 24');
@@ -626,9 +305,6 @@
           VIDEO: ['M4 5h16v14H4z', 'm10 9 5 3-5 3z'],
           PODCAST: ['M5 13v-2a7 7 0 0 1 14 0v2', 'M5 12H3v6h4v-6zM19 12h2v6h-4v-6z'],
           POST: ['M5 4h14v12H9l-4 4z', 'M8 8h8M8 12h5'],
-          previous: ['m14 6-6 6 6 6'],
-          next: ['m10 6 6 6-6 6'],
-          external: ['M14 4h6v6', 'm20 4-9 9', 'M10 4H4v16h16v-6'],
         };
         for (const d of paths[kind] || paths.ARTICLE) {
           const path = document.createElementNS(svg.namespaceURI, 'path');
@@ -645,106 +321,15 @@
           ? `${minutes} min`
           : `${Math.floor(minutes / 60)} hr ${minutes % 60} min`;
       }
-      function updateRail() {
-        const rail = $('cards');
-        const maximum = rail.scrollWidth - rail.clientWidth;
-        $('rail-controls').hidden = state.items.length < 1;
-        $('rail-previous').disabled = rail.scrollLeft <= 6;
-        $('rail-next').disabled = rail.scrollLeft >= maximum - 2;
-        const cards = [...rail.children];
-        const bounds = rail.getBoundingClientRect();
-        const visible = cards
-          .map((card, i) => ({ i, rect: card.getBoundingClientRect() }))
-          .filter(({ rect }) => rect.right > bounds.left + 8 && rect.left < bounds.right - 8);
-        $('rail-position').textContent = visible.length
-          ? `${visible[0].i + 1}–${visible.at(-1).i + 1} of ${cards.length}`
-          : '';
-      }
-      function selectedButton() {
-        return [...$('cards').children]
-          .find((card) => card.dataset.id === state.selectedId)
-          ?.querySelector('.cover');
-      }
-      function updateSelection() {
-        for (const card of $('cards').children) {
-          const selected = card.dataset.id === state.selectedId;
-          card.dataset.selected = String(selected);
-          for (const control of card.querySelectorAll('.cover,.title-button'))
-            control.setAttribute('aria-expanded', String(selected));
-        }
-      }
-      function renderDetails(item) {
-        $('item-details').hidden = false;
-        $('details-title').textContent = item.title;
-        $('details-meta').textContent = [
-          item.creator || safeUrl(item.url)?.hostname || item.provider,
-          consumption(item),
-        ]
-          .filter(Boolean)
-          .join(' · ');
-        $('details-summary').textContent = item.summary
-          ? item.summary.length >= 600
-            ? item.summary.replace(/\s+\S*$/, '') + '…'
-            : item.summary
-          : 'No description is available for this saved item.';
-        $('details-tags').replaceChildren(
-          ...(item.tags || []).map((tag) => node('span', tag, 'tag'))
-        );
-        const read = node('button', 'Read saved text');
-        read.type = 'button';
-        read.onclick = () => readItem(item);
-        const collect = node('button', 'Collect');
-        collect.type = 'button';
-        collect.onclick = () => chooseCollection(item);
-        $('details-actions').replaceChildren(read, collect);
-        const source = sourceLink(item);
-        if (source) $('details-actions').append(source);
-      }
-      function selectItem(item) {
-        const closing = state.selectedId === item.bookmarkId;
-        state.selectedId = closing ? null : item.bookmarkId;
-        ++readerSequence;
-        ++collectionSequence;
-        state.readerId = null;
-        state.collectionId = null;
-        $('reader').hidden = true;
-        $('collection-panel').hidden = true;
-        if (closing) $('item-details').hidden = true;
-        else {
-          renderDetails(item);
-          $('details-title').focus({ preventScroll: true });
-        }
-        updateSelection();
-        resize();
-      }
-      function moveRail(direction) {
-        $('cards').scrollBy({
-          left: direction * 260,
-          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
-            ? 'instant'
-            : 'smooth',
-        });
-      }
-      $('rail-previous').append(icon('previous'));
-      $('rail-next').append(icon('next'));
-      $('rail-previous').onclick = () => moveRail(-1);
-      $('rail-next').onclick = () => moveRail(1);
-      $('cards').addEventListener('scroll', updateRail, { passive: true });
-      new ResizeObserver(updateRail).observe($('cards'));
       $('cards').onkeydown = (event) => {
         if (event.target !== $('cards')) return;
         if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
           event.preventDefault();
-          moveRail(event.key === 'ArrowRight' ? 1 : -1);
+          $('cards').scrollBy({
+            left: event.key === 'ArrowRight' ? 260 : -260,
+            behavior: 'instant',
+          });
         }
-      };
-      $('close-details').onclick = () => {
-        const target = selectedButton();
-        state.selectedId = null;
-        $('item-details').hidden = true;
-        updateSelection();
-        target?.focus({ preventScroll: true });
-        resize();
       };
       function render() {
         const scrollPosition = $('cards').scrollLeft;
@@ -753,11 +338,15 @@
           const card = node('li', null, 'card');
           card.dataset.id = item.bookmarkId;
           card.dataset.type = item.contentType || 'ARTICLE';
-          const cover = node('button', null, 'cover');
-          cover.type = 'button';
-          cover.setAttribute('aria-label', `Show details for ${item.title}`);
-          cover.setAttribute('aria-controls', 'item-details');
-          cover.onclick = () => selectItem(item);
+          const url = safeUrl(item.url);
+          const link = node(url ? 'a' : 'div', null, 'card-link');
+          if (url) {
+            link.href = url.href;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.setAttribute('aria-label', `Open original: ${item.title}`);
+          }
+          const cover = node('div', null, 'cover');
           cover.append(icon(item.contentType));
           const candidates = [item.thumbnailUrl, item.creatorImageUrl]
             .map(safeUrl)
@@ -781,16 +370,12 @@
             cover.append(image);
           }
           loadArtwork();
-          card.append(cover);
+          link.append(cover);
           const body = node('div', null, 'card-body');
           const heading = node('h3');
-          const title = node('button', item.title, 'title-button');
-          title.type = 'button';
-          title.setAttribute('aria-controls', 'item-details');
-          title.onclick = () => selectItem(item);
+          const title = node('span', item.title, 'card-title');
           heading.append(title);
           body.append(heading);
-          const url = safeUrl(item.url);
           const metadata = node('p', null, 'meta');
           metadata.append(
             node(
@@ -807,237 +392,16 @@
             for (const tag of item.tags.slice(0, 2)) tags.append(node('span', tag, 'tag'));
             body.append(tags);
           }
-          const actions = node('div', null, 'actions');
-          const read = node('button', 'Read');
-          read.type = 'button';
-          read.setAttribute('aria-label', `Read ${item.title}`);
-          read.onclick = () => readItem(item);
-          const collect = node('button', 'Collect');
-          collect.type = 'button';
-          collect.setAttribute('aria-label', `Add ${item.title} to a collection`);
-          collect.onclick = () => chooseCollection(item);
-          actions.append(read, collect);
-          const link = sourceLink(item);
-          if (link) {
-            link.replaceChildren(icon('external'));
-            link.setAttribute('aria-label', `Open original: ${item.title}`);
-            link.title = 'Open original';
-            actions.append(link);
-          }
-          body.append(actions);
-          card.append(body);
+          link.append(body);
+          card.append(link);
           $('cards').append(card);
         }
         $('cards').scrollLeft = scrollPosition;
-        updateRail();
-        updateSelection();
-        const selected = state.items.find((item) => item.bookmarkId === state.selectedId);
-        if (selected) renderDetails(selected);
-        else {
-          state.selectedId = null;
-          $('item-details').hidden = true;
-        }
-        $('empty').hidden = state.items.length > 0 || state.searching;
-        $('more').hidden = !state.nextCursor;
-        $('more').disabled = state.searching;
-        $('search-button').disabled = state.searching || !state.ready;
-        $('status').textContent = state.searching
-          ? 'Searching your library…'
-          : `${state.items.length} saved ${state.items.length === 1 ? 'item' : 'items'}${state.query ? ` matching “${state.query}”` : ''}`;
-        $('cards').setAttribute('aria-busy', String(state.searching));
+        $('empty').hidden = state.items.length > 0;
+        $('status').textContent =
+          `${state.items.length} saved ${state.items.length === 1 ? 'item' : 'items'}${state.query ? ` matching “${state.query}”` : ''}`;
         resize();
       }
-      function applySearch(data, append = false) {
-        state.items = append
-          ? [...new Map([...state.items, ...data.items].map((i) => [i.bookmarkId, i])).values()]
-          : data.items;
-        state.query = data.query ?? state.query;
-        state.completion = data.completion ?? 'incomplete';
-        state.nextCursor = data.nextCursor ?? null;
-        $('query').value = state.query;
-        render();
-      }
-      async function search(append = false) {
-        if (state.searching || !state.ready) return;
-        const current = ++sequence;
-        state.searching = true;
-        $('error').hidden = true;
-        if (!append) {
-          ++readerSequence;
-          ++collectionSequence;
-          state.readerId = null;
-          state.collectionId = null;
-          $('reader').hidden = true;
-          $('collection-panel').hidden = true;
-        }
-        render();
-        try {
-          const data = await call('search_saved', {
-            query: append ? state.query : $('query').value.trim(),
-            completion: state.completion,
-            limit: 20,
-            ...(append && state.nextCursor ? { cursor: state.nextCursor } : {}),
-          });
-          if (current === sequence) applySearch(data, append);
-        } catch (error) {
-          if (current === sequence) showError(error);
-        } finally {
-          if (current === sequence) {
-            state.searching = false;
-            render();
-          }
-        }
-      }
-      async function readItem(item, append = false) {
-        if (append && state.readerBusy) return;
-        const current = ++readerSequence;
-        state.readerId = item.bookmarkId;
-        state.readerBusy = true;
-        $('reader').hidden = false;
-        $('reader-title').textContent = item.title;
-        $('reader-meta').textContent = 'Loading saved text…';
-        $('read-more').hidden = true;
-        const link = sourceLink(item);
-        $('reader-source').hidden = !link;
-        if (link) $('reader-source').href = link.href;
-        if (!append) {
-          $('reader-content').textContent = '';
-          state.readerOffset = null;
-          $('reader-title').focus();
-          $('reader').scrollIntoView({ behavior: 'instant', block: 'start' });
-        }
-        resize();
-        try {
-          const data = await call('read_saved', {
-            bookmarkId: item.bookmarkId,
-            offset: append ? state.readerOffset : 0,
-          });
-          if (current !== readerSequence) return;
-          $('reader-content').textContent += data.content;
-          $('reader-meta').textContent = data.available
-            ? 'Saved text · Original formatting simplified'
-            : 'No saved text yet. Open the original to read this item.';
-          state.readerOffset = data.nextOffset;
-        } catch (error) {
-          if (current === readerSequence) $('reader-meta').textContent = error.message;
-        } finally {
-          if (current === readerSequence) {
-            state.readerBusy = false;
-            $('read-more').hidden = state.readerOffset == null;
-            resize();
-          }
-        }
-      }
-      async function chooseCollection(item, append = false) {
-        if (append && state.collectionBusy) return;
-        const current = ++collectionSequence;
-        state.collectionId = item.bookmarkId;
-        state.collectionBusy = true;
-        $('collection-panel').hidden = false;
-        $('collection-title').textContent = `Collect “${item.title}”`;
-        $('collection-status').textContent = 'Loading collections…';
-        $('add-button').disabled = true;
-        $('more-collections').disabled = true;
-        if (!append) {
-          state.collections = [];
-          state.collectionCursor = null;
-          $('collection-select').replaceChildren();
-          $('collection-title').focus();
-          $('collection-panel').scrollIntoView({ behavior: 'instant', block: 'start' });
-        }
-        resize();
-        try {
-          const data = await call('list_collections', {
-            limit: 50,
-            ...(append && state.collectionCursor ? { cursor: state.collectionCursor } : {}),
-          });
-          if (current !== collectionSequence) return;
-          state.collections = append
-            ? [...state.collections, ...data.collections]
-            : data.collections;
-          state.collectionCursor = data.nextCursor;
-          const selected = $('collection-select').value;
-          $('collection-select').replaceChildren(
-            ...state.collections.map((c) => {
-              const option = node('option', c.name);
-              option.value = c.id;
-              return option;
-            })
-          );
-          if (selected) $('collection-select').value = selected;
-          $('collection-status').textContent = state.collections.length
-            ? 'Choose a private collection for this saved item.'
-            : 'You have no collections yet. Ask ChatGPT to create one, then choose Collect again.';
-        } catch (error) {
-          if (current === collectionSequence) $('collection-status').textContent = error.message;
-        } finally {
-          if (current === collectionSequence) {
-            state.collectionBusy = false;
-            $('add-button').disabled = !state.collections.length;
-            $('more-collections').disabled = false;
-            $('more-collections').hidden = !state.collectionCursor;
-            resize();
-          }
-        }
-      }
-      $('collection-form').onsubmit = async (event) => {
-        event.preventDefault();
-        if (state.collectionBusy || !state.collectionId || !$('collection-select').value) return;
-        const current = collectionSequence;
-        state.collectionBusy = true;
-        $('add-button').disabled = true;
-        $('collection-select').disabled = true;
-        $('more-collections').disabled = true;
-        $('collection-status').textContent = 'Adding…';
-        const collectionId = $('collection-select').value;
-        const collection = state.collections.find((c) => c.id === collectionId);
-        try {
-          const data = await call('add_to_collection', {
-            bookmarkId: state.collectionId,
-            collectionId,
-          });
-          if (!data.added) throw new Error('Zine did not confirm the addition. Please try again.');
-          if (current === collectionSequence)
-            $('collection-status').textContent = `Added to ${collection.name}.`;
-        } catch (error) {
-          if (current === collectionSequence) $('collection-status').textContent = error.message;
-        } finally {
-          // Picker can be replaced while a previous request is in flight.
-          $('collection-select').disabled = false;
-          if (current === collectionSequence) {
-            state.collectionBusy = false;
-            $('add-button').disabled = false;
-            $('more-collections').disabled = false;
-          }
-        }
-      };
-      $('search-form').onsubmit = (event) => {
-        event.preventDefault();
-        search();
-      };
-      $('more').onclick = () => search(true);
-      $('read-more').onclick = () => {
-        const item = state.items.find((i) => i.bookmarkId === state.readerId);
-        if (item) readItem(item, true);
-      };
-      $('more-collections').onclick = () => {
-        const item = state.items.find((i) => i.bookmarkId === state.collectionId);
-        if (item) chooseCollection(item, true);
-      };
-      $('close-reader').onclick = () => {
-        ++readerSequence;
-        state.readerId = null;
-        $('reader').hidden = true;
-        ($('item-details').hidden ? $('cards') : $('details-title')).focus({ preventScroll: true });
-        resize();
-      };
-      $('close-collection').onclick = () => {
-        ++collectionSequence;
-        state.collectionId = null;
-        $('collection-panel').hidden = true;
-        ($('item-details').hidden ? $('cards') : $('details-title')).focus({ preventScroll: true });
-        resize();
-      };
       function resize() {
         if (state.ready)
           notify('ui/notifications/size-changed', {
@@ -1068,14 +432,13 @@
           }
           const data = message.params?.structuredContent?.data;
           if (Array.isArray(data?.items)) {
-            ++sequence;
-            state.searching = false;
-            applySearch(data);
+            state.items = data.items;
+            state.query = data.query ?? '';
+            $('error').hidden = true;
+            render();
           }
         }
         if (message.method === 'ui/notifications/tool-cancelled') {
-          ++sequence;
-          state.searching = false;
           render();
           showError(new Error('Search cancelled. You can try again.'));
         }
@@ -1088,7 +451,6 @@
           window.parent.postMessage({ jsonrpc: '2.0', id: message.id, result: {} }, '*');
         }
       });
-      $('search-button').disabled = true;
       try {
         const initialized = await request('ui/initialize', {
           appInfo: { name: 'zine-saved-library', version: '0.1.0' },
@@ -1098,10 +460,9 @@
         theme(initialized?.hostContext);
         state.ready = true;
         notify('ui/notifications/initialized', {});
-        $('search-button').disabled = false;
         $('status').textContent = state.items.length
           ? `${state.items.length} saved items`
-          : 'Ready to search your saved library.';
+          : 'Waiting for saved items.';
         new ResizeObserver(resize).observe(document.body);
         resize();
       } catch {

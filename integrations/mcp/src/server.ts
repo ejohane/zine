@@ -46,8 +46,7 @@ export function createMcpServer(env: Bindings, principal: Principal | null, cfg:
               prefersBorder: false,
               csp: { connectDomains: [], resourceDomains: ARTWORK_ORIGINS },
             },
-            'openai/widgetDescription':
-              'Browse saved Zine cards, read stored text, and add items to private collections.',
+            'openai/widgetDescription': 'Browse saved Zine cards and open their original sources.',
           },
         },
       ],
@@ -127,7 +126,7 @@ export function createMcpServer(env: Bindings, principal: Principal | null, cfg:
   tool(
     'show_saved',
     'Show saved items',
-    'Display interactive Zine article cards. First call search_saved, then pass the selected bookmarkIds and its query/completion/nextCursor. Keep the completion mode from the search result for pagination. Rechecks ownership and reads current metadata; never pass fabricated article data. Users can search, read stored content, open sources and add to collections in the component.',
+    'Display interactive Zine article cards. First call search_saved, then pass the selected bookmarkIds and its query/completion/nextCursor. Keep the completion mode from the search result for pagination. Rechecks ownership and reads current metadata; never pass fabricated article data. The component shows a scrollable rail of cards; clicking a card opens its original source. Use the separate tools for further searches, stored-text reading and collection actions.',
     showSchema,
     false,
     (s, p) => s.show(p),

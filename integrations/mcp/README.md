@@ -37,8 +37,8 @@ Screenshots remain pending; see [the private attachment increment](../../docs/mc
 ## Interactive saved library
 
 `search_saved` returns card metadata; `show_saved` renders selected results as an
-MCP Apps component with search, stored-text reading, source links and private
-collection actions. See [the UI implementation and verification guide](../../docs/mcp-ui.md).
+MCP Apps card rail with original-source links. Search, stored-text reading and
+collection actions remain available through the separate tools. See [the UI implementation and verification guide](../../docs/mcp-ui.md).
 
 ```sh
 bun run --cwd integrations/mcp preview:ui
@@ -52,5 +52,5 @@ The simulated host performs no production reads, writes, or OAuth login.
 
 Use the width selector and appearance button to compare chat, phone and wide
 layouts. **Reload design** rebuilds the current component source without
-restarting the server. Collection actions remain simulated; article bodies are
-not loaded from a card snapshot. Stop with Ctrl-C when finished.
+restarting the server. Cards open their original source in a separate tab.
+Article bodies are not loaded from a card snapshot. Stop with Ctrl-C when finished.

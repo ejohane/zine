@@ -48,13 +48,13 @@ request a fresh card response after refreshing tools.
 1. Call `search_saved` with a title/description/URL query (empty means browse).
 2. Call `show_saved` with the selected `bookmarkIds`, the returned `query`, and
    `nextCursor` when preserving pagination. Only this tool declares a UI resource.
-3. ChatGPT reads `ui://zine/saved-library-v4.html`, served as
+3. ChatGPT reads `ui://zine/saved-library-v5.html`, served as
    `text/html;profile=mcp-app`. The model still receives the structured results
    and text in clients without component support.
 4. The component initializes the MCP Apps bridge and renders the tool result.
-   Search and pagination call `search_saved`; Read calls `read_saved`; Collect
-   calls `list_collections`, then `add_to_collection` after the user chooses.
-   Calls go through the host with the existing OAuth authorization.
+   Cards open original source links. Further searches, pagination, saved-text
+   reading and collection actions use separate conversation tools with the
+   existing OAuth authorization.
 
 `show_saved` accepts only IDs and search context, then rechecks every ID against
 the linked account and current bookmarked state. It uses the same Gmail/private
@@ -91,29 +91,28 @@ No bookmark completion state is changed by these queries.
 
 ## Component behavior
 
-- Native Home-style cards: rounded landscape artwork, two-line semibold titles,
-  creator and reading/listening time, and quiet actions underneath. A horizontal
-  scroll rail includes previous/next controls and expands selected card details
-  underneath. The search bar and library header are hidden; requests come from
-  the conversation. The resource requests `prefersBorder: false`; the host
-  controls the final outer frame. Light/dark
-  follows host context, falling back to the operating-system preference.
+The current local refinement is a borderless horizontal rail of native Home-style
+cards: rounded landscape artwork, two-line semibold titles, creator and duration,
+and existing tags. Each whole card is one accessible link to its original source.
+There are no expanded detail panels, action rows, arrows or visible result counts.
+Users can scroll horizontally or focus the rail and use keyboard arrow keys.
+Further searches, pagination, saved-text reading and collection actions are
+handled through conversation tools rather than controls inside the component.
+
+The refinement uses the v5 resource URI for the next deployment; the live v4
+release above still has the expandable details and controls until deployed again.
+
 - Existing shared Zine semantic color roles are injected at bundle time.
-- Titles, creator names, tags and stored article content use DOM text nodes, never
-  source HTML. Read supports stored-text pagination and unavailable-content copy.
+- Light/dark follows host context, falling back to the operating-system preference.
+- Titles, creator names and tags use DOM text nodes, never source HTML.
 - Original links require public-shaped HTTPS URLs without credentials or known
   secret-bearing query parameters. They open separately with `noopener noreferrer`.
-- Existing artwork loads only from the explicit CDN origins in `src/ui.ts`, with
-  no referrer. Missing or broken covers try the saved creator image, then the
-  native-style neutral content icon. Podcast images fit without cropping. There is no
-  image proxy, arbitrary fetch, provider ingestion, or new screenshot support.
-- Resource CSP permits no direct fetch/XHR connections and only the declared
-  static artwork origins. No credentials enter the component or its resources.
-- Busy states, errors, empty results and missing permission responses are visible.
-  Collection success appears only after the tool confirms `added: true`.
-- The component retains only temporary view state. Collection writes remain in
-  the server-owned account data. A timed-out write may have completed; collection
-  addition is idempotent, so retrying is safe.
+- Artwork loads only from the explicit CDN origins in `src/ui.ts`, with no referrer.
+  Missing covers try the creator image, then the neutral content icon.
+  Podcast images fit without cropping. There is no image proxy or arbitrary fetch.
+- Resource CSP permits no direct fetch/XHR connections. No credentials enter the
+  component or its resources. Errors and empty results remain visible.
+- The component retains only temporary view state and performs no library writes.
 
 ## Local evidence and live acceptance
 
