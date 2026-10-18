@@ -51,6 +51,19 @@ and query. Tags are fetched only for the authorized rows and account.
 
 ## Completion filtering
 
+Deployed on 2026-10-18 from `2281b4926e2fef0062d8ffe08320567537e0ae7e`.
+Cloudflare version: `ac8ff46c-c448-4950-8828-9c890a7a8838`.
+Previous version for rollback: `13d2ebb0-c215-44ce-bb0a-db69fd1a2b97`.
+The exact exported release passed 79 tests, typecheck, lint and the production
+bundle dry run on Node 22. It includes the query fix and completion-aware
+pagination in the existing grid component; in-progress rail/border playground
+changes were excluded from this release.
+
+Authenticated live checks confirmed default results all had `isFinished: false`,
+completed-only results all had `isFinished: true`, and all-mode results contained
+both states. Live all-mode pagination succeeded and rejected reuse of the same
+cursor under incomplete mode. ChatGPT's tools were refreshed after deployment.
+
 `search_saved` defaults to `completion: "incomplete"`, matching the app's
 `user_items.is_finished = 0` behavior. Explicit requests can use
 `completion: "completed"` for completed bookmarks only or `completion: "all"`
