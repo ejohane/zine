@@ -1,0 +1,924 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Zine saved library</title>
+    <style>
+      /* THEME_TOKENS */
+      :root {
+        color-scheme: light dark;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        color: var(--primaryText);
+        background: var(--canvas);
+      }
+      :root[data-theme='light'] {
+        color-scheme: light;
+      }
+      :root[data-theme='dark'] {
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      main {
+        padding: 24px;
+        max-width: 900px;
+        margin: auto;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      h1 {
+        font-size: 1.5rem;
+        letter-spacing: -0.03em;
+        font-weight: 650;
+      }
+      h2 {
+        font-size: 1.35rem;
+        letter-spacing: -0.02em;
+        text-wrap: balance;
+      }
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+      button,
+      .source {
+        min-height: 40px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        color: var(--primaryText);
+        padding: 8px 12px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        font-size: 0.875rem;
+        font-weight: 550;
+      }
+      button:hover,
+      .source:hover {
+        background: var(--raised);
+      }
+      button:disabled {
+        opacity: 0.55;
+        cursor: wait;
+      }
+      button.primary {
+        background: var(--brandAccent);
+        color: var(--onAccent);
+        border-color: var(--brandAccent);
+      }
+      button.primary:hover {
+        filter: brightness(0.94);
+      }
+      :focus-visible {
+        outline: 2px solid var(--brandAccent);
+        outline-offset: 3px;
+      }
+      ::selection {
+        background: var(--brandAccent);
+        color: var(--onAccent);
+      }
+      input {
+        caret-color: var(--brandAccent);
+      }
+      input::placeholder {
+        color: var(--secondaryText);
+        opacity: 1;
+      }
+      svg {
+        width: 17px;
+        height: 17px;
+        flex: none;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+      header p {
+        font-size: 0.875rem;
+        color: var(--secondaryText);
+        margin-top: 5px;
+      }
+      form.search {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      input,
+      select {
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        color: var(--primaryText);
+        padding: 10px 12px;
+        min-height: 44px;
+      }
+      input {
+        flex: 1;
+        width: 100%;
+      }
+      #status {
+        color: var(--secondaryText);
+        font-size: 0.875rem;
+        margin-bottom: 16px;
+        min-height: 20px;
+      }
+      #error {
+        padding: 12px 0;
+        margin-bottom: 12px;
+        line-height: 1.5;
+      }
+      #cards {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 28px 16px;
+        padding: 0;
+        margin: 0;
+        list-style: none;
+      }
+      .card {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .cover {
+        display: grid;
+        place-items: center;
+        position: relative;
+        overflow: hidden;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        min-height: 0;
+        padding: 0;
+        border: 0;
+        border-radius: 14px;
+        background: var(--raised);
+        color: var(--secondaryText);
+      }
+      .cover:hover {
+        background: var(--raised);
+      }
+      .cover > svg {
+        width: 28px;
+        height: 28px;
+      }
+      .artwork {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .card[data-type='PODCAST'] .artwork {
+        object-fit: contain;
+      }
+      .card-body {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        flex: 1;
+        min-width: 0;
+      }
+      .title-button {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        padding: 0;
+        border: 0;
+        border-radius: 2px;
+        min-height: 0;
+        background: transparent;
+        text-align: left;
+        font-size: 0.9375rem;
+        line-height: 1.4;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        overflow-wrap: anywhere;
+      }
+      .title-button:hover {
+        background: transparent;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+      .card h3 {
+        font: inherit;
+        min-height: 2.625rem;
+      }
+      .meta {
+        color: var(--secondaryText);
+        font-size: 0.75rem;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+      }
+      .card .meta {
+        display: flex;
+        gap: 4px;
+        align-items: baseline;
+      }
+      .creator {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        min-width: 0;
+      }
+      .consumption {
+        flex: none;
+        white-space: nowrap;
+      }
+      .tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      .tag {
+        padding: 2px 5px;
+        background: var(--raised);
+        border-radius: 4px;
+        font-size: 0.6875rem;
+        overflow-wrap: anywhere;
+        max-width: 100%;
+      }
+      .actions {
+        display: flex;
+        gap: 4px;
+        margin-top: auto;
+      }
+      .actions button,
+      .actions .source {
+        min-height: 40px;
+        padding: 4px 6px;
+        border: 0;
+        background: transparent;
+        color: var(--secondaryText);
+        font-size: 0.75rem;
+        font-weight: 500;
+      }
+      .actions button:hover,
+      .actions .source:hover {
+        background: var(--raised);
+        color: var(--primaryText);
+      }
+      .actions .source {
+        margin-left: auto;
+        width: 32px;
+      }
+      .empty {
+        padding: 40px 0;
+        max-width: 44ch;
+        line-height: 1.6;
+      }
+      .empty p {
+        color: var(--secondaryText);
+        margin-top: 8px;
+      }
+      #more {
+        display: flex;
+        margin: 20px auto 0;
+      }
+      .panel {
+        border-top: 1px solid var(--border);
+        margin-top: 24px;
+        padding-top: 20px;
+        scroll-margin-top: 12px;
+      }
+      .panel-head {
+        display: flex;
+        gap: 16px;
+        align-items: start;
+        justify-content: space-between;
+        margin-bottom: 16px;
+      }
+      .panel h2 {
+        overflow-wrap: anywhere;
+      }
+      #reader-meta {
+        margin-top: 8px;
+      }
+      #reader-content {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: 1.0625rem;
+        line-height: 1.8;
+        max-width: 70ch;
+      }
+      .reader-actions {
+        margin-top: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      #collection-form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: end;
+      }
+      #collection-form label {
+        flex: 1;
+        min-width: 150px;
+        font-size: 0.875rem;
+      }
+      select {
+        display: block;
+        width: 100%;
+        margin-top: 8px;
+      }
+      #collection-status {
+        margin-top: 12px;
+        line-height: 1.5;
+        font-size: 0.875rem;
+      }
+      @media (max-width: 720px) {
+        #cards {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      @media (max-width: 520px) {
+        main {
+          padding: 16px;
+        }
+        #cards {
+          gap: 24px 12px;
+        }
+        .cover {
+          border-radius: 12px;
+        }
+      }
+      @media (max-width: 320px) {
+        #cards {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        .panel {
+          animation: reveal 180ms ease-out;
+        }
+        @keyframes reveal {
+          from {
+            opacity: 0.7;
+            transform: translateY(4px);
+          }
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main aria-label="Zine saved library">
+      <header>
+        <div>
+          <h1>Your saved library</h1>
+          <p>Find a good read. Keep the conversation going.</p>
+        </div>
+      </header>
+      <form class="search" id="search-form" role="search">
+        <input
+          id="query"
+          type="search"
+          aria-label="Search your saved library"
+          placeholder="Search titles, descriptions, or links"
+          maxlength="200"
+        />
+        <button class="primary" type="submit" id="search-button">Search</button>
+      </form>
+      <p id="status" role="status" aria-live="polite">Connecting to Zine…</p>
+      <p id="error" role="alert" hidden></p>
+      <ul id="cards" aria-label="Saved items"></ul>
+      <div class="empty" id="empty" hidden>
+        <h2>No saved items found</h2>
+        <p>Try a shorter phrase or search with an empty field to browse your library.</p>
+      </div>
+      <button id="more" hidden>Show more</button>
+      <section id="reader" class="panel" aria-labelledby="reader-title" hidden>
+        <div class="panel-head">
+          <div>
+            <h2 id="reader-title" tabindex="-1"></h2>
+            <p class="meta" id="reader-meta"></p>
+          </div>
+          <button id="close-reader" aria-label="Close reader">Close</button>
+        </div>
+        <div id="reader-content"></div>
+        <div class="reader-actions">
+          <button id="read-more" hidden>Continue reading</button
+          ><a id="reader-source" class="source" target="_blank" rel="noopener noreferrer" hidden
+            >Open original</a
+          >
+        </div>
+      </section>
+      <section id="collection-panel" class="panel" aria-labelledby="collection-title" hidden>
+        <div class="panel-head">
+          <h2 id="collection-title" tabindex="-1">Add to collection</h2>
+          <button id="close-collection" aria-label="Close collection picker">Close</button>
+        </div>
+        <form id="collection-form">
+          <label>Collection<select id="collection-select" required></select></label
+          ><button id="add-button" class="primary" type="submit">Add to collection</button
+          ><button type="button" id="more-collections" hidden>More collections</button>
+        </form>
+        <p id="collection-status" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+    <script type="module">
+      const $ = (id) => document.getElementById(id);
+      const artworkOrigins = /* ARTWORK_ORIGINS */ [];
+      const state = {
+        items: [],
+        query: '',
+        nextCursor: null,
+        searching: false,
+        readerId: null,
+        readerOffset: null,
+        readerBusy: false,
+        collectionId: null,
+        collectionCursor: null,
+        collectionBusy: false,
+        collections: [],
+        ready: false,
+      };
+      let sequence = 0;
+      let readerSequence = 0;
+      let collectionSequence = 0;
+      let rpcId = 0;
+      const pending = new Map();
+      const notify = (method, params) =>
+        window.parent.postMessage({ jsonrpc: '2.0', method, params }, '*');
+      function request(method, params) {
+        return new Promise((resolve, reject) => {
+          const id = ++rpcId;
+          const timer = setTimeout(() => {
+            pending.delete(id);
+            reject(new Error('TIMEOUT'));
+          }, 45000);
+          pending.set(id, { resolve, reject, timer });
+          window.parent.postMessage({ jsonrpc: '2.0', id, method, params }, '*');
+        });
+      }
+      function messageFor(result) {
+        if (result?._meta?.['mcp/www_authenticate'])
+          return 'Link Zine with the required permission, then try again.';
+        const code = result?.content?.find((part) => part.type === 'text')?.text;
+        if (code === 'NOT_FOUND')
+          return 'This saved item or collection is no longer available. Search again to refresh.';
+        if (code === 'CONTENT_UNAVAILABLE')
+          return 'Saved text is unavailable. You can open the original instead.';
+        return 'Zine could not complete that action. Please try again.';
+      }
+      async function call(name, args) {
+        if (!state.ready)
+          throw new Error('Zine is still connecting. Please try again in a moment.');
+        const result = await request('tools/call', { name, arguments: args });
+        if (result?.isError) throw new Error(messageFor(result));
+        if (!result?.structuredContent?.data)
+          throw new Error('Zine returned an incomplete result. Please try again.');
+        return result.structuredContent.data;
+      }
+      function showError(error) {
+        $('error').textContent =
+          error?.message === 'TIMEOUT'
+            ? 'Zine took too long to respond. Please try again.'
+            : error?.message || 'Zine could not connect. Please try again.';
+        $('error').hidden = false;
+      }
+      function node(tag, text, className) {
+        const element = document.createElement(tag);
+        if (text != null) element.textContent = text;
+        if (className) element.className = className;
+        return element;
+      }
+      function safeUrl(value) {
+        try {
+          const url = new URL(value);
+          return url.protocol === 'https:' &&
+            !url.username &&
+            !url.password &&
+            !url.port &&
+            url.hostname.includes('.') &&
+            !/^[\d.]+$/.test(url.hostname) &&
+            !/[[\]:]/.test(url.hostname) &&
+            !/\.(localhost|local|internal|test|invalid)$/.test(url.hostname) &&
+            !/(?:token|secret|signature|password|auth|key|credential|email|subscriber|jwt)/i.test(
+              url.search
+            )
+            ? url
+            : null;
+        } catch {
+          return null;
+        }
+      }
+      function sourceLink(item) {
+        const url = safeUrl(item.url);
+        if (!url) return null;
+        const link = node('a', 'Open original', 'source');
+        link.href = url.href;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        return link;
+      }
+      function icon(kind) {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('fill', 'none');
+        svg.setAttribute('stroke', 'currentColor');
+        svg.setAttribute('stroke-width', '1.6');
+        svg.setAttribute('stroke-linecap', 'round');
+        svg.setAttribute('stroke-linejoin', 'round');
+        svg.setAttribute('aria-hidden', 'true');
+        const paths = {
+          ARTICLE: ['M6 3h9l4 4v14H5V3h1', 'M14 3v5h5', 'M8 12h8M8 16h6'],
+          VIDEO: ['M4 5h16v14H4z', 'm10 9 5 3-5 3z'],
+          PODCAST: ['M5 13v-2a7 7 0 0 1 14 0v2', 'M5 12H3v6h4v-6zM19 12h2v6h-4v-6z'],
+          POST: ['M5 4h14v12H9l-4 4z', 'M8 8h8M8 12h5'],
+          external: ['M14 4h6v6', 'm20 4-9 9', 'M10 4H4v16h16v-6'],
+        };
+        for (const d of paths[kind] || paths.ARTICLE) {
+          const path = document.createElementNS(svg.namespaceURI, 'path');
+          path.setAttribute('d', d);
+          svg.append(path);
+        }
+        return svg;
+      }
+      function consumption(item) {
+        if (item.readingTimeMinutes > 0) return `${item.readingTimeMinutes} min read`;
+        if (!(item.duration > 0)) return '';
+        const minutes = Math.max(1, Math.floor(item.duration / 60));
+        return minutes < 60
+          ? `${minutes} min`
+          : `${Math.floor(minutes / 60)} hr ${minutes % 60} min`;
+      }
+      function render() {
+        $('cards').replaceChildren();
+        for (const item of state.items) {
+          const card = node('li', null, 'card');
+          card.dataset.type = item.contentType || 'ARTICLE';
+          const cover = node('button', null, 'cover');
+          cover.type = 'button';
+          cover.setAttribute('aria-label', `Read ${item.title} from cover`);
+          cover.onclick = () => readItem(item);
+          cover.append(icon(item.contentType));
+          const candidates = [item.thumbnailUrl, item.creatorImageUrl]
+            .map(safeUrl)
+            .filter((url) => url && artworkOrigins.includes(url.origin));
+          function loadArtwork() {
+            const artwork = candidates.shift();
+            if (!artwork) {
+              resize();
+              return;
+            }
+            const image = node('img', null, 'artwork');
+            image.alt = '';
+            image.loading = 'lazy';
+            image.referrerPolicy = 'no-referrer';
+            image.addEventListener('load', resize);
+            image.addEventListener('error', () => {
+              image.remove();
+              loadArtwork();
+            });
+            image.src = artwork.href;
+            cover.append(image);
+          }
+          loadArtwork();
+          card.append(cover);
+          const body = node('div', null, 'card-body');
+          const heading = node('h3');
+          const title = node('button', item.title, 'title-button');
+          title.type = 'button';
+          title.onclick = () => readItem(item);
+          heading.append(title);
+          body.append(heading);
+          const url = safeUrl(item.url);
+          const metadata = node('p', null, 'meta');
+          metadata.append(
+            node(
+              'span',
+              item.creator || url?.hostname.replace(/^www\./, '') || item.provider,
+              'creator'
+            )
+          );
+          const label = consumption(item);
+          if (label) metadata.append(node('span', `· ${label}`, 'consumption'));
+          body.append(metadata);
+          if (item.tags?.length) {
+            const tags = node('div', null, 'tags');
+            for (const tag of item.tags.slice(0, 2)) tags.append(node('span', tag, 'tag'));
+            body.append(tags);
+          }
+          const actions = node('div', null, 'actions');
+          const read = node('button', 'Read');
+          read.type = 'button';
+          read.setAttribute('aria-label', `Read ${item.title}`);
+          read.onclick = () => readItem(item);
+          const collect = node('button', 'Collect');
+          collect.type = 'button';
+          collect.setAttribute('aria-label', `Add ${item.title} to a collection`);
+          collect.onclick = () => chooseCollection(item);
+          actions.append(read, collect);
+          const link = sourceLink(item);
+          if (link) {
+            link.replaceChildren(icon('external'));
+            link.setAttribute('aria-label', `Open original: ${item.title}`);
+            link.title = 'Open original';
+            actions.append(link);
+          }
+          body.append(actions);
+          card.append(body);
+          $('cards').append(card);
+        }
+        $('empty').hidden = state.items.length > 0 || state.searching;
+        $('more').hidden = !state.nextCursor;
+        $('more').disabled = state.searching;
+        $('search-button').disabled = state.searching || !state.ready;
+        $('status').textContent = state.searching
+          ? 'Searching your library…'
+          : `${state.items.length} saved ${state.items.length === 1 ? 'item' : 'items'}${state.query ? ` matching “${state.query}”` : ''}`;
+        $('cards').setAttribute('aria-busy', String(state.searching));
+        resize();
+      }
+      function applySearch(data, append = false) {
+        state.items = append
+          ? [...new Map([...state.items, ...data.items].map((i) => [i.bookmarkId, i])).values()]
+          : data.items;
+        state.query = data.query ?? state.query;
+        state.nextCursor = data.nextCursor ?? null;
+        $('query').value = state.query;
+        render();
+      }
+      async function search(append = false) {
+        if (state.searching || !state.ready) return;
+        const current = ++sequence;
+        state.searching = true;
+        $('error').hidden = true;
+        if (!append) {
+          ++readerSequence;
+          ++collectionSequence;
+          state.readerId = null;
+          state.collectionId = null;
+          $('reader').hidden = true;
+          $('collection-panel').hidden = true;
+        }
+        render();
+        try {
+          const data = await call('search_saved', {
+            query: append ? state.query : $('query').value.trim(),
+            limit: 20,
+            ...(append && state.nextCursor ? { cursor: state.nextCursor } : {}),
+          });
+          if (current === sequence) applySearch(data, append);
+        } catch (error) {
+          if (current === sequence) showError(error);
+        } finally {
+          if (current === sequence) {
+            state.searching = false;
+            render();
+          }
+        }
+      }
+      async function readItem(item, append = false) {
+        if (append && state.readerBusy) return;
+        const current = ++readerSequence;
+        state.readerId = item.bookmarkId;
+        state.readerBusy = true;
+        $('reader').hidden = false;
+        $('reader-title').textContent = item.title;
+        $('reader-meta').textContent = 'Loading saved text…';
+        $('read-more').hidden = true;
+        const link = sourceLink(item);
+        $('reader-source').hidden = !link;
+        if (link) $('reader-source').href = link.href;
+        if (!append) {
+          $('reader-content').textContent = '';
+          state.readerOffset = null;
+          $('reader-title').focus();
+          $('reader').scrollIntoView({ behavior: 'instant', block: 'start' });
+        }
+        resize();
+        try {
+          const data = await call('read_saved', {
+            bookmarkId: item.bookmarkId,
+            offset: append ? state.readerOffset : 0,
+          });
+          if (current !== readerSequence) return;
+          $('reader-content').textContent += data.content;
+          $('reader-meta').textContent = data.available
+            ? 'Saved text · Original formatting simplified'
+            : 'No saved text yet. Open the original to read this item.';
+          state.readerOffset = data.nextOffset;
+        } catch (error) {
+          if (current === readerSequence) $('reader-meta').textContent = error.message;
+        } finally {
+          if (current === readerSequence) {
+            state.readerBusy = false;
+            $('read-more').hidden = state.readerOffset == null;
+            resize();
+          }
+        }
+      }
+      async function chooseCollection(item, append = false) {
+        if (append && state.collectionBusy) return;
+        const current = ++collectionSequence;
+        state.collectionId = item.bookmarkId;
+        state.collectionBusy = true;
+        $('collection-panel').hidden = false;
+        $('collection-title').textContent = `Collect “${item.title}”`;
+        $('collection-status').textContent = 'Loading collections…';
+        $('add-button').disabled = true;
+        $('more-collections').disabled = true;
+        if (!append) {
+          state.collections = [];
+          state.collectionCursor = null;
+          $('collection-select').replaceChildren();
+          $('collection-title').focus();
+          $('collection-panel').scrollIntoView({ behavior: 'instant', block: 'start' });
+        }
+        resize();
+        try {
+          const data = await call('list_collections', {
+            limit: 50,
+            ...(append && state.collectionCursor ? { cursor: state.collectionCursor } : {}),
+          });
+          if (current !== collectionSequence) return;
+          state.collections = append
+            ? [...state.collections, ...data.collections]
+            : data.collections;
+          state.collectionCursor = data.nextCursor;
+          const selected = $('collection-select').value;
+          $('collection-select').replaceChildren(
+            ...state.collections.map((c) => {
+              const option = node('option', c.name);
+              option.value = c.id;
+              return option;
+            })
+          );
+          if (selected) $('collection-select').value = selected;
+          $('collection-status').textContent = state.collections.length
+            ? 'Choose a private collection for this saved item.'
+            : 'You have no collections yet. Ask ChatGPT to create one, then choose Collect again.';
+        } catch (error) {
+          if (current === collectionSequence) $('collection-status').textContent = error.message;
+        } finally {
+          if (current === collectionSequence) {
+            state.collectionBusy = false;
+            $('add-button').disabled = !state.collections.length;
+            $('more-collections').disabled = false;
+            $('more-collections').hidden = !state.collectionCursor;
+            resize();
+          }
+        }
+      }
+      $('collection-form').onsubmit = async (event) => {
+        event.preventDefault();
+        if (state.collectionBusy || !state.collectionId || !$('collection-select').value) return;
+        const current = collectionSequence;
+        state.collectionBusy = true;
+        $('add-button').disabled = true;
+        $('collection-select').disabled = true;
+        $('more-collections').disabled = true;
+        $('collection-status').textContent = 'Adding…';
+        const collectionId = $('collection-select').value;
+        const collection = state.collections.find((c) => c.id === collectionId);
+        try {
+          const data = await call('add_to_collection', {
+            bookmarkId: state.collectionId,
+            collectionId,
+          });
+          if (!data.added) throw new Error('Zine did not confirm the addition. Please try again.');
+          if (current === collectionSequence)
+            $('collection-status').textContent = `Added to ${collection.name}.`;
+        } catch (error) {
+          if (current === collectionSequence) $('collection-status').textContent = error.message;
+        } finally {
+          // Picker can be replaced while a previous request is in flight.
+          $('collection-select').disabled = false;
+          if (current === collectionSequence) {
+            state.collectionBusy = false;
+            $('add-button').disabled = false;
+            $('more-collections').disabled = false;
+          }
+        }
+      };
+      $('search-form').onsubmit = (event) => {
+        event.preventDefault();
+        search();
+      };
+      $('more').onclick = () => search(true);
+      $('read-more').onclick = () => {
+        const item = state.items.find((i) => i.bookmarkId === state.readerId);
+        if (item) readItem(item, true);
+      };
+      $('more-collections').onclick = () => {
+        const item = state.items.find((i) => i.bookmarkId === state.collectionId);
+        if (item) chooseCollection(item, true);
+      };
+      $('close-reader').onclick = () => {
+        ++readerSequence;
+        state.readerId = null;
+        $('reader').hidden = true;
+        $('query').focus();
+        resize();
+      };
+      $('close-collection').onclick = () => {
+        ++collectionSequence;
+        state.collectionId = null;
+        $('collection-panel').hidden = true;
+        $('query').focus();
+        resize();
+      };
+      function resize() {
+        if (state.ready)
+          notify('ui/notifications/size-changed', {
+            height: Math.ceil(document.documentElement.getBoundingClientRect().height),
+          });
+      }
+      function theme(context) {
+        if (context?.theme === 'dark' || context?.theme === 'light')
+          document.documentElement.dataset.theme = context.theme;
+      }
+      window.addEventListener('message', (event) => {
+        if (event.source !== window.parent || !event.data || event.data.jsonrpc !== '2.0') return;
+        const message = event.data;
+        if (message.id != null && pending.has(message.id)) {
+          const p = pending.get(message.id);
+          clearTimeout(p.timer);
+          pending.delete(message.id);
+          if (message.error)
+            p.reject(new Error('Zine could not complete that action. Please try again.'));
+          else p.resolve(message.result);
+          return;
+        }
+        if (message.method === 'ui/notifications/host-context-changed') theme(message.params);
+        if (message.method === 'ui/notifications/tool-result') {
+          if (message.params?.isError) {
+            showError(new Error(messageFor(message.params)));
+            return;
+          }
+          const data = message.params?.structuredContent?.data;
+          if (Array.isArray(data?.items)) {
+            ++sequence;
+            state.searching = false;
+            applySearch(data);
+          }
+        }
+        if (message.method === 'ui/notifications/tool-cancelled') {
+          ++sequence;
+          state.searching = false;
+          render();
+          showError(new Error('Search cancelled. You can try again.'));
+        }
+        if (message.method === 'ui/resource-teardown' && message.id != null) {
+          for (const p of pending.values()) {
+            clearTimeout(p.timer);
+            p.reject(new Error('Component closed.'));
+          }
+          pending.clear();
+          window.parent.postMessage({ jsonrpc: '2.0', id: message.id, result: {} }, '*');
+        }
+      });
+      $('search-button').disabled = true;
+      try {
+        const initialized = await request('ui/initialize', {
+          appInfo: { name: 'zine-saved-library', version: '0.1.0' },
+          appCapabilities: {},
+          protocolVersion: '2026-01-26',
+        });
+        theme(initialized?.hostContext);
+        state.ready = true;
+        notify('ui/notifications/initialized', {});
+        $('search-button').disabled = false;
+        $('status').textContent = state.items.length
+          ? `${state.items.length} saved items`
+          : 'Ready to search your saved library.';
+        new ResizeObserver(resize).observe(document.body);
+        resize();
+      } catch {
+        showError(
+          new Error('Could not connect to ChatGPT. Reopen the Zine component to try again.')
+        );
+        $('status').textContent = 'Connection unavailable';
+      }
+    </script>
+  </body>
+</html>

@@ -1,6 +1,6 @@
 # Zine MCP
 
-An isolated, currently undeployed Cloudflare Worker that reuses Zine's existing
+An isolated Cloudflare Worker that reuses Zine's existing
 backend services and account model. See [the integration overview](../../docs/mcp-integration.md)
 and [the Clerk linking checklist](../../docs/mcp-account-linking.md).
 The [production activation proposal](../../docs/mcp-production-activation.md)
@@ -33,3 +33,18 @@ access. Production opaque-token verification fails closed without the configured
 limiter or a Cloudflare source IP; limits are per IP and Cloudflare location.
 
 Screenshots remain pending; see [the private attachment increment](../../docs/mcp-screenshots-plan.md).
+
+## Interactive saved library
+
+`search_saved` returns card metadata; `show_saved` renders selected results as an
+MCP Apps component with search, stored-text reading, source links and private
+collection actions. See [the UI implementation and verification guide](../../docs/mcp-ui.md).
+
+```sh
+bun run --cwd integrations/mcp preview:ui
+```
+
+Open `http://127.0.0.1:8797`. This labeled sample-data harness simulates the
+MCP Apps host; it performs no production reads, writes, or OAuth login. The
+component is the same HTML served by `resources/read`. Use the preview controls
+to check light/dark mode and a 390px-wide iframe. Stop with Ctrl-C when finished.

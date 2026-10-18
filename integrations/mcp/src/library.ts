@@ -26,6 +26,13 @@ export const collectionSchema = z
   .strict();
 export const addSchema = z.object({ collectionId: id, bookmarkId: id }).strict();
 export const listSchema = z.object(page).strict();
+export const showSchema = z
+  .object({
+    bookmarkIds: z.array(id).max(50),
+    query: searchSchema.shape.query,
+    nextCursor: z.string().max(2048).nullable().optional(),
+  })
+  .strict();
 
 // A publication-derived user_item is not proof of mailbox ownership (PR440).
 // Only actual newsletter delivery provenance authorizes private Gmail metadata/body.
@@ -54,9 +61,15 @@ type SavedRow = {
   provider: string;
   summary: string | null;
   articleKey: string | null;
+  thumbnailUrl: string | null;
+  contentType: string;
+  creator: string | null;
+  creatorImageUrl: string | null;
+  duration: number | null;
+  readingTimeMinutes: number | null;
 };
 const fields =
-  'ui.id,i.id AS itemId,i.title,i.canonical_url AS url,i.provider,i.summary,i.article_content_key AS articleKey';
+  'ui.id,i.id AS itemId,i.title,i.canonical_url AS url,i.provider,i.summary,i.article_content_key AS articleKey,i.thumbnail_url AS thumbnailUrl,i.content_type AS contentType,i.duration,i.reading_time_minutes AS readingTimeMinutes,(SELECT c.name FROM creators c WHERE c.id=i.creator_id) AS creator,(SELECT c.image_url FROM creators c WHERE c.id=i.creator_id) AS creatorImageUrl';
 
 export class LibraryError extends Error {
   constructor(public code: 'NOT_FOUND' | 'INVALID_INPUT' | 'CONTENT_UNAVAILABLE') {
@@ -136,6 +149,45 @@ export class McpLibrary {
     return row;
   }
 
+  private async cards(rows: SavedRow[]) {
+    const assignments = rows.length
+      ? (
+          await this.env.DB.prepare(
+            `SELECT uit.user_item_id AS bookmarkId,t.name FROM user_item_tags uit
+           JOIN tags t ON t.id=uit.tag_id WHERE t.user_id=?
+           AND uit.user_item_id IN (${rows.map(() => '?').join(',')}) ORDER BY t.name`
+          )
+            .bind(this.userId, ...rows.map((r) => r.id))
+            .all<{ bookmarkId: string; name: string }>()
+        ).results
+      : [];
+    return rows.map((r) => ({
+      bookmarkId: r.id,
+      title: r.title.slice(0, 500),
+      url: r.url.slice(0, 2048),
+      provider: r.provider,
+      contentType: r.contentType,
+      summary: r.summary?.slice(0, 600) ?? null,
+      thumbnailUrl: r.thumbnailUrl?.slice(0, 2048) ?? null,
+      creator: r.creator?.slice(0, 200) ?? null,
+      creatorImageUrl: r.creatorImageUrl?.slice(0, 2048) ?? null,
+      duration: r.duration,
+      readingTimeMinutes: r.readingTimeMinutes,
+      tags: assignments
+        .filter((t) => t.bookmarkId === r.id)
+        .slice(0, 12)
+        .map((t) => t.name.slice(0, 80)),
+    }));
+  }
+
+  async show(input: z.input<typeof showSchema>) {
+    const p = showSchema.parse(input);
+    // Reauthorize IDs instead of accepting model-supplied titles, URLs or article text.
+    const rows = await Promise.all([...new Set(p.bookmarkIds)].map((id) => this.owned(id)));
+    if (p.nextCursor) cursor(p.nextCursor, JSON.stringify([this.userId, p.query]));
+    return { items: await this.cards(rows), query: p.query, nextCursor: p.nextCursor ?? null };
+  }
+
   async search(input: z.input<typeof searchSchema>) {
     const p = searchSchema.parse(input),
       context = JSON.stringify([this.userId, p.query]);
@@ -150,12 +202,8 @@ export class McpLibrary {
       .all<SavedRow>();
     const rows = result.results.slice(0, p.limit);
     return {
-      items: rows.map((r) => ({
-        bookmarkId: r.id,
-        title: r.title.slice(0, 500),
-        url: r.url.slice(0, 2048),
-        provider: r.provider,
-      })),
+      items: await this.cards(rows),
+      query: p.query,
       nextCursor: result.results.length > p.limit ? next(rows[rows.length - 1].id, context) : null,
     };
   }

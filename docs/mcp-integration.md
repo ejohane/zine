@@ -26,6 +26,7 @@ path filters. No deployment workflow is disabled or weakened.
 | ------------------- | ----------------- | -------------------------------------------------------------------------------------------------------- |
 | `save_link`         | `bookmarks:write` | Save a public HTTPS link using existing provider identity/canonicalization and bookmark retry semantics. |
 | `search_saved`      | `bookmarks:read`  | Search saved titles, descriptions and URLs; return bookmark IDs and cursor pages.                        |
+| `show_saved`        | `bookmarks:read`  | Render selected, reauthorized saved IDs as interactive library cards in MCP Apps hosts.                  |
 | `read_saved`        | `bookmarks:read`  | Return already stored text, availability and the next text offset.                                       |
 | `list_collections`  | `bookmarks:read`  | Find private collections with cursor pagination.                                                         |
 | `create_collection` | `bookmarks:write` | Find/create by normalized name; optionally add a saved bookmark.                                         |
@@ -115,7 +116,8 @@ maintenance window. This first increment deliberately uses the maintained v1
 line, compatible with Zine's Zod 3 stack and OpenAI's linked quickstart, locked
 to SDK 1.32.1. It negotiates up to MCP 2025-11-25. It does not claim every
 2026-07-28 protocol feature; plan a v2/Zod migration before v1 support ends.
-No ext-apps dependency or rich UI is needed.
+The optional [saved-library component](mcp-ui.md) uses the standard MCP Apps
+bridge directly, without adding an ext-apps dependency.
 
 **Standard OAuth account linking is required.** The local code implements the
 resource-server side, not an authorization/consent/token server. It publishes

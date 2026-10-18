@@ -18,7 +18,11 @@ import {
   newsletterFeedMessages,
   articleBodyStates,
   articleBodyVersions,
+  tags,
+  userItemTags,
+  creators,
 } from '../../../apps/worker/src/db/schema';
+import { LIBRARY_UI_URI, ARTWORK_ORIGINS } from './ui';
 
 vi.mock('googleapis', () => ({ google: {} }));
 const cfg: McpConfig = {
@@ -154,6 +158,93 @@ describe('OAuth resource authentication with synthetic signed tokens', () => {
 });
 
 describe('account-scoped workflows on actual migrated D1 and R2', () => {
+  it('presents only reauthorized IDs with current card metadata and account-owned tags', async () => {
+    await db.insert(creators).values({
+      id: 'card-creator',
+      provider: 'WEB',
+      providerCreatorId: 'card-creator',
+      name: 'Sample author',
+      normalizedName: 'sample author',
+      imageUrl: 'https://substackcdn.com/avatar.jpg',
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    await bindings.DB.prepare(
+      'UPDATE items SET creator_id=?,reading_time_minutes=?,duration=? WHERE id=?'
+    )
+      .bind('card-creator', 8, 480, 'public')
+      .run();
+    await bindings.DB.prepare('UPDATE items SET summary=?,thumbnail_url=? WHERE id=?')
+      .bind('A saved summary', 'https://i.ytimg.com/vi/fixture/hqdefault.jpg', 'public')
+      .run();
+    await db.insert(tags).values([
+      {
+        id: 'alice-tag',
+        userId: 'user_alice',
+        name: 'Research',
+        normalizedName: 'research',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      {
+        id: 'bob-tag',
+        userId: 'user_bob',
+        name: 'Private tag',
+        normalizedName: 'private tag',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ]);
+    await db.insert(userItemTags).values([
+      { id: 'assignment', userItemId: 'a-public', tagId: 'alice-tag', createdAt: 1 },
+      { id: 'foreign-assignment', userItemId: 'a-public', tagId: 'bob-tag', createdAt: 1 },
+    ]);
+    const alice = new McpLibrary(bindings, 'user_alice');
+    expect((await alice.show({ bookmarkIds: ['a-public', 'a-public'] })).items).toEqual([
+      expect.objectContaining({
+        bookmarkId: 'a-public',
+        summary: 'A saved summary',
+        thumbnailUrl: 'https://i.ytimg.com/vi/fixture/hqdefault.jpg',
+        contentType: 'ARTICLE',
+        creator: 'Sample author',
+        creatorImageUrl: 'https://substackcdn.com/avatar.jpg',
+        readingTimeMinutes: 8,
+        duration: 480,
+        tags: ['Research'],
+      }),
+    ]);
+    expect((await alice.search({})).items[0].tags).toEqual(['Research']);
+    await expect(alice.show({ bookmarkIds: ['b-bob'] })).rejects.toThrow('NOT_FOUND');
+    await expect(
+      new McpLibrary(bindings, 'user_bob').show({ bookmarkIds: ['b-mail-from-publication'] })
+    ).rejects.toThrow('NOT_FOUND');
+    await expect(
+      new McpLibrary(bindings, 'user_bob').show({ bookmarkIds: ['b-private'] })
+    ).rejects.toThrow('NOT_FOUND');
+    await bindings.DB.prepare("UPDATE user_items SET state='ARCHIVED' WHERE id='a-public'").run();
+    await expect(alice.show({ bookmarkIds: ['a-public'] })).rejects.toThrow('NOT_FOUND');
+  });
+  it('keeps visual pagination bound to the search query and account', async () => {
+    await seed('second');
+    await own('user_alice', 'second', 'z-second');
+    const alice = new McpLibrary(bindings, 'user_alice');
+    const first = await alice.search({ limit: 1 });
+    const input = {
+      bookmarkIds: first.items.map((i) => i.bookmarkId),
+      query: first.query,
+      nextCursor: first.nextCursor,
+    };
+    expect(await alice.show(input)).toEqual(first);
+    await expect(alice.show({ ...input, query: 'different' })).rejects.toThrow('INVALID_INPUT');
+    await expect(
+      new McpLibrary(bindings, 'user_bob').show({ ...input, bookmarkIds: [] })
+    ).rejects.toThrow('INVALID_INPUT');
+    expect(await alice.show({ bookmarkIds: [] })).toEqual({
+      items: [],
+      query: '',
+      nextCursor: null,
+    });
+  });
   it('isolates search and read, including publication-derived Gmail associations', async () => {
     const alice = new McpLibrary(bindings, 'user_alice'),
       bob = new McpLibrary(bindings, 'user_bob');
@@ -522,7 +613,14 @@ describe('official MCP transport and discovery', () => {
     const list = (await (await rpc('tools/list')).json()) as {
       result: { tools: Array<{ name: string; _meta: unknown }> };
     };
-    expect(list.result.tools).toHaveLength(6);
+    expect(list.result.tools).toHaveLength(7);
+    expect(list.result.tools.find((t) => t.name === 'show_saved')).toHaveProperty(
+      '_meta.ui.resourceUri',
+      LIBRARY_UI_URI
+    );
+    expect(list.result.tools.find((t) => t.name === 'search_saved')).not.toHaveProperty(
+      '_meta.ui.resourceUri'
+    );
     expect(list.result.tools[0]).toHaveProperty('securitySchemes');
     expect(list.result.tools[0]._meta).toHaveProperty('securitySchemes');
     const result = (await (
@@ -539,6 +637,29 @@ describe('official MCP transport and discovery', () => {
       authorization_servers: [cfg.MCP_OAUTH_ISSUER],
     });
   });
+  it('serves a static MCP Apps resource without private content or direct network access', async () => {
+    const resources = await (await rpc('resources/list')).json();
+    expect(resources).toHaveProperty('result.resources.0.uri', LIBRARY_UI_URI);
+    const response = await rpc('resources/read', { uri: LIBRARY_UI_URI });
+    const payload = (await response.json()) as {
+      result: { contents: Array<{ text: string; mimeType: string; _meta: unknown }> };
+    };
+    const resource = payload.result.contents[0];
+    expect(resource.mimeType).toBe('text/html;profile=mcp-app');
+    expect(resource._meta).toHaveProperty('ui.csp', {
+      connectDomains: [],
+      resourceDomains: ARTWORK_ORIGINS,
+    });
+    expect(resource.text).toContain('ui/initialize');
+    expect(resource.text).toContain('var(--brandAccent)');
+    expect(resource.text).not.toContain('THEME_TOKENS');
+    expect(resource.text).not.toContain('PRIVATE EMAIL BODY');
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    const denied = await (
+      await rpc('tools/call', { name: 'show_saved', arguments: { bookmarkIds: ['a-public'] } })
+    ).json();
+    expect(denied).toHaveProperty('result._meta.mcp/www_authenticate');
+  });
   it('verifies fixture JWT via JWKS and enforces scope on actual HTTP tool calls', async () => {
     fetchMock.activate();
     fetchMock.disableNetConnect();
@@ -548,6 +669,18 @@ describe('official MCP transport and discovery', () => {
       .reply(200, JSON.stringify({ keys: [jwk] }))
       .persist();
     const signed = await token();
+    const cards = await (
+      await rpc(
+        'tools/call',
+        { name: 'show_saved', arguments: { bookmarkIds: ['a-public'] } },
+        signed
+      )
+    ).json();
+    expect(cards).toHaveProperty('result.structuredContent.data.items.0.bookmarkId', 'a-public');
+    const foreign = await (
+      await rpc('tools/call', { name: 'show_saved', arguments: { bookmarkIds: ['b-bob'] } }, signed)
+    ).json();
+    expect(foreign).toHaveProperty('result.isError', true);
     const result = (await (
       await rpc('tools/call', { name: 'search_saved', arguments: {} }, signed)
     ).json()) as { result: { structuredContent: { data: { items: unknown[] } } } };
