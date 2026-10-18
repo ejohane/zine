@@ -4,6 +4,44 @@ import XCTest
 
 final class HomeJumpBackInTests: XCTestCase {
     @MainActor
+    func testWidgetMirrorsHomeAfterCompletionArchiveRollbackAndReopen() async throws {
+        let fixture = try HomeGridFixture(count: 9)
+        defer { fixture.close() }
+        XCTAssertNil(fixture.store.widgetItems, "Loading must not replace a valid widget snapshot with an empty one")
+        await fixture.store.reload()
+        func assertMirror(file: StaticString = #filePath, line: UInt = #line) {
+            XCTAssertEqual(fixture.store.widgetItems?.map(\.id), Array(fixture.ids.prefix(6)), file: file, line: line)
+        }
+        assertMirror()
+        for finished in [true, false] {
+            let transaction = try fixture.client.bookmarkState.begin(
+                fixture.bookmarks[0], finished: finished ? true : nil, state: finished ? nil : "ARCHIVED")
+            assertMirror()
+            XCTAssertFalse(fixture.store.widgetItems!.contains { $0.id == fixture.bookmarks[0].id })
+            fixture.client.bookmarkState.rollback(transaction)
+            assertMirror()
+            XCTAssertEqual(fixture.store.widgetItems?.first?.id, fixture.bookmarks[0].id)
+        }
+        let reopenedAt = Date(timeIntervalSince1970: 1_900_000_000)
+        fixture.store.promoteOpened(fixture.bookmarks[8], at: reopenedAt)
+        assertMirror()
+        XCTAssertEqual(fixture.store.widgetItems?.first?.id, fixture.bookmarks[8].id)
+        fixture.store.rollbackOpened(id: fixture.bookmarks[8].id, openedAt: reopenedAt)
+        assertMirror()
+        XCTAssertEqual(fixture.store.widgetItems?.first?.id, fixture.bookmarks[0].id)
+    }
+
+    @MainActor
+    func testWidgetMirrorsSparseRowsAndEmptyHistory() async throws {
+        for count in 0...7 {
+            let fixture = try HomeGridFixture(count: count)
+            defer { fixture.close() }
+            await fixture.store.reload()
+            XCTAssertEqual(fixture.store.widgetItems?.map(\.id), Array(fixture.ids.prefix(6)))
+        }
+    }
+
+    @MainActor
     func testZeroThroughEightCandidatesUseOnlyCompleteCompactRows() async throws {
         for count in 0...8 {
             let fixture = try HomeGridFixture(count: count)

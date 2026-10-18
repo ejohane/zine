@@ -469,6 +469,22 @@ struct AppearanceSettingsView: View {
                     }
                     .buttonStyle(.plain)
                 }
+
+                NavigationLink {
+                    WidgetAppearanceSettingsView()
+                        .zinePushedDestinationChrome()
+                } label: {
+                    HStack {
+                        Label("Widget backgrounds", systemImage: "rectangle.grid.2x2")
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                    }
+                    .foregroundStyle(ZineTheme.primaryText)
+                    .padding(16)
+                    .background(ZineTheme.surface, in: .rect(cornerRadius: 18))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("settings-widget-backgrounds")
             }
             .padding(18)
         }

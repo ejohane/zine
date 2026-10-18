@@ -62,6 +62,16 @@ final class HomeStore {
         }
     }
 
+    // The widget consumes this projection, so filtering, rollback and row refill
+    // remain owned by the same store as the in-app Jump Back In section.
+    var widgetItems: [HomeItem]? {
+        guard home != nil else { return nil }
+        for section in sections {
+            if case .jumpBackIn(let items) = section { return Array(items.prefix(6)) }
+        }
+        return []
+    }
+
     private var effectiveHiddenItemIDs: Set<String> {
         hiddenItemIDs.subtracting(client.bookmarkState.changedIDs)
             .union(client.bookmarkState.hiddenUnfinishedIDs)

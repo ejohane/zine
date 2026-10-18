@@ -162,3 +162,15 @@ extension View {
         toolbarBackground(.hidden, for: .navigationBar)
     }
 }
+
+
+extension ZineTheme {
+    /// User-selected widget backgrounds are resolved separately from the app palette.
+    /// Black or white is selected by WCAG contrast; metadata keeps that same contrast.
+    struct WidgetPalette {
+        let rgb: WidgetRGB
+        var background: Color { Color(.sRGB, red: rgb.red, green: rgb.green, blue: rgb.blue, opacity: 1) }
+        var text: Color { rgb.usesDarkText ? .black : .white }
+        var placeholder: Color { text.opacity(0.08) }
+    }
+}
