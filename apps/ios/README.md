@@ -193,3 +193,59 @@ and a fixture-only URLSession transport. Use **Rebuild shell**, open Inbox, arch
 an item, and return Home to exercise shared session lifetime and preview membership.
 The fixture makes no Clerk or production requests and is not authenticated runtime
 verification. Restart the fixture app to reset its synthetic archive state.
+
+## Jump Back In widget
+
+`ZineWidgetExtension` provides medium and large Home Screen widgets with recently
+opened bookmarks in condensed horizontal cards. Medium shows up to four entries
+in two rows; large shows up to six in three rows, both in two columns. Its items are a projection of `HomeStore`'s
+Jump Back In section, including its ordering, complete-row cropping, optimistic
+updates, completion/archive/removal exclusions, rollback, and older-history refill.
+Accessibility text sizes use one column with up to two or three entries respectively.
+The header has no disclosure icon. Zine supplies a clear container background;
+iOS still controls the outer container in Default/Dark appearances. Home Screen
+Clear/Tinted appearances use the system glass and omit solid card fills.
+
+The authenticated app writes presentation metadata and small cached thumbnails
+into the `group.app.zine.native` App Group and requests a WidgetKit reload when
+the snapshot changes. The extension makes no authenticated API requests and
+receives no Clerk tokens. iOS schedules widget rendering; it may delay a requested
+refresh. Changes on another device appear after this app refreshes. Sign-out and
+account/API-environment switches clear the shared snapshot.
+
+Each tile has a scoped `zine://widget/bookmark` link. The app waits for sign-in,
+checks the account and API environment, then fetches that bookmark through the
+existing REST client. Articles resume in the normal bookmark reader. Unavailable
+bookmarks show a recoverable error. The widget header opens Home.
+
+For device signing, enable the App Group for both `app.zine.native` and
+`app.zine.native.widgets` in the Apple developer account and regenerate their
+provisioning profiles. The share extension does not use this group. The widget
+is embedded by the canonical app target; no separate installation is required.
+After installation, open Zine, then add **Zine → Jump Back In** from the Home
+Screen widget gallery.
+
+Focused widget checks:
+
+```sh
+bun run test:native:core
+xcodebuild -project apps/ios/ZineNative.xcodeproj -scheme ZineNative \
+  -destination 'platform=iOS Simulator,name=iPhone 17 — Zine Widgets' \
+  -only-testing:ZineNativeTests/JumpBackInWidgetPublisherTests test
+```
+
+### Custom widget backgrounds
+
+In Zine, open **Settings → Appearance → Widget backgrounds**, add a named color
+with the system color picker (including its sRGB hex input), and Save. Touch and
+hold a widget, choose **Edit Widget → Background**, then choose Clear, Automatic,
+or a saved color. Each widget stores its own selection. Editing a saved color
+updates widgets using that color; deleting it falls back to Automatic. Saved
+colors are device preferences shared through the App Group, separate from the
+account-scoped bookmark snapshot, and remain available after sign-out.
+
+Custom backgrounds use an opaque sRGB fill with black or white foreground text,
+chosen for at least 4.5:1 WCAG contrast. Solid card fills are removed on custom
+backgrounds so all labels use that contrast. Clear/Tinted Home Screen appearances
+use iOS's own rendering; use Default to display your custom background color.
+The `zine://widget/appearance` link also opens these device-only preferences.

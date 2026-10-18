@@ -20,7 +20,7 @@ let package = Package(
                 "App", "Core/ContentTypeFilterBar.swift", "Core/FilteredListTabAction.swift", "Core/Images",
                 "Core/Persistence/EditorialIssueCache.swift",
                 "Core/Persistence/InboxCache.swift", "Core/Persistence/OfflineLibrarySynchronizer.swift",
-                "Core/Persistence/PeopleDailyCache.swift", "Core/Share", "Core/ZineTheme.swift",
+                "Core/Persistence/PeopleDailyCache.swift", "Core/Share", "Core/ZineTheme.swift", "Core/Widgets/JumpBackInWidgetPublisher.swift",
                 "Features/Creators", "Features/Inbox",
                 "Features/Library/ActionRowHaptic.swift", "Features/Library/BookmarkDescription.swift",
                 "Features/Library/BookmarkDetailView.swift", "Features/Library/BookmarkRow.swift",
@@ -40,7 +40,7 @@ let package = Package(
                 "Features/Subscriptions/XSubscriptionsView.swift", "Features/Today", "Resources",
             ],
             sources: [
-                "Features/Home/HomeStore.swift", "Core/Persistence/HomeCache.swift", "Core/API", "Core/Automation", "Core/Models", "Core/Persistence/ArticleBodyCache.swift",
+                "Features/Home/HomeStore.swift", "Core/Widgets/JumpBackInWidgetSnapshot.swift", "Core/Persistence/HomeCache.swift", "Core/API", "Core/Automation", "Core/Models", "Core/Persistence/ArticleBodyCache.swift",
                 "Core/Persistence/LibraryCache.swift", "Core/Persistence/OfflineBookmarkMutationOutbox.swift",
                 "Features/Library/LibraryStore.swift", "Features/Reader/ArticleReaderStore.swift",
                 "Features/Subscriptions/SubscriptionModels.swift",

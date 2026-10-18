@@ -162,3 +162,10 @@ When changing a semantic role or applying the palette to a new screen:
    both light and dark mode.
 4. For changes that affect reading or saved content, verify Library, bookmark
    detail, and the article reader rather than checking navigation chrome alone.
+
+Widget background customization is a user-controlled color exception. Saved
+opaque sRGB colors are resolved through `ZineTheme.WidgetPalette`, with black or
+white labels chosen by WCAG contrast. Custom-background cards inherit that
+surface and foreground. Native settings retain the standard semantic app roles;
+Clear/Tinted widget appearances defer to system rendering. Core widget color
+tests cover contrast across a sampled sRGB cube and stable saved-color identities.
