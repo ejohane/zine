@@ -3,6 +3,24 @@
 The optional MCP Apps component adds visual browsing to the existing MCP server.
 It changes no native app, REST endpoint, database schema, OAuth client or scope.
 
+## v0.1 deployment
+
+Deployed on 2026-10-18 from `fa070ac8cb8f5d96fef665c0d5f32c2c3cd27fc8`
+to the existing `zine-mcp-production` Worker at `https://mcp.myzine.app/mcp`.
+Cloudflare version: `13d2ebb0-c215-44ce-bb0a-db69fd1a2b97` (100%).
+Previous version for rollback: `c0e60f70-dc5a-42c4-b0d1-316d799c7a2c`.
+
+The live deployment has existing Dashboard-managed authentication variables.
+Preserve those with `wrangler deploy --config wrangler.production.toml
+--env-file /dev/null --keep-vars`; do not replace variables using only the
+checked-in manifest. The release changed no credentials, OAuth scopes or data
+bindings. Never print remote variable values when checking deployment metadata.
+
+Production readback confirmed seven tools, the v2 MCP Apps HTML resource/MIME/CSP,
+anonymous linking challenges, and authenticated search with covers/creator/time
+metadata through the existing ChatGPT connection. ChatGPT's Refresh tools action
+was run after deployment. Live rendered interaction is a separate acceptance step.
+
 ## Tool flow
 
 1. Call `search_saved` with a title/description/URL query (empty means browse).
