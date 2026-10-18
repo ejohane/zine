@@ -91,16 +91,20 @@ No bookmark completion state is changed by these queries.
 
 ## Component behavior
 
-The current local refinement is a borderless horizontal rail of native Home-style
-cards: rounded landscape artwork, two-line semibold titles, creator and duration,
+The simplified rail was deployed on 2026-10-18 from `beee7922`.
+Cloudflare version: `117a4a24-29cd-4144-871c-633a7e79b61f`.
+Previous version for rollback: `ae7f8486-9508-472c-835d-161b6eba92eb`.
+Production v5 resource readback confirmed the rail, whole-card source links,
+removed panels/actions/navigation controls and borderless preference.
+The source passed 79 tests, typecheck, lint, formatting and production dry run.
+
+The component is a borderless horizontal rail of native Home-style cards:
+rounded landscape artwork, two-line semibold titles, creator and duration,
 and existing tags. Each whole card is one accessible link to its original source.
 There are no expanded detail panels, action rows, arrows or visible result counts.
 Users can scroll horizontally or focus the rail and use keyboard arrow keys.
 Further searches, pagination, saved-text reading and collection actions are
 handled through conversation tools rather than controls inside the component.
-
-The refinement uses the v5 resource URI for the next deployment; the live v4
-release above still has the expandable details and controls until deployed again.
 
 - Existing shared Zine semantic color roles are injected at bundle time.
 - Light/dark follows host context, falling back to the operating-system preference.
