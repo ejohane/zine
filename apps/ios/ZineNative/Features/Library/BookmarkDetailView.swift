@@ -166,12 +166,14 @@ struct BookmarkDetailView: View {
     init(
         bookmark: Bookmark,
         client: APIClient,
+        resumesArticleReading: Bool = false,
         onUpdate: @escaping (Bookmark) -> Void,
         onBookmarkChange: @escaping (Bookmark, Bool, BookmarkChangePhase) -> Void = { _, _, _ in },
         onBookmarkCommit: @escaping (Bookmark, Bool) -> Void = { _, _ in },
         onExternalOpen: @escaping (Bookmark) -> Void = { _ in }
     ) {
         initialContent = BookmarkDetailContent(bookmark: bookmark)
+        self.resumesArticleReading = resumesArticleReading
         _bookmark = State(initialValue: .some(bookmark))
         _isBookmarked = State(initialValue: bookmark.state == "BOOKMARKED")
         _finishedState = State(initialValue: OptimisticFinishedState(

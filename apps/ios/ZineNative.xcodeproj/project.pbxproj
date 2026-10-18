@@ -16,6 +16,11 @@
 		B20000000000000000000003 /* BookmarkShareModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000A /* BookmarkShareModels.swift */; };
 		B20000000000000000000004 /* BookmarkShareClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000B /* BookmarkShareClient.swift */; };
 		B20000000000000000000005 /* BookmarkShareStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000C /* BookmarkShareStore.swift */; };
+
+        C30000000000000000000001 /* ZineWidgetExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = C30000000000000000000002; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+        C30000000000000000000003 /* JumpBackInWidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000000000000000000004; };
+        C30000000000000000000005 /* ZineTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000000000000000000006; };
+
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -33,6 +38,9 @@
 			remoteGlobalIDString = B20000000000000000000011;
 			remoteInfo = ZineShareExtension;
 		};
+
+        C30000000000000000000007 = {isa = PBXContainerItemProxy; containerPortal = A10000000000000000000010; proxyType = 1; remoteGlobalIDString = C30000000000000000000008; remoteInfo = ZineWidgetExtension; };
+
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -43,6 +51,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				B20000000000000000000002 /* ZineShareExtension.appex in Embed App Extensions */,
+                C30000000000000000000001 /* ZineWidgetExtension.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -62,6 +71,11 @@
 		B2000000000000000000000A /* BookmarkShareModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZineNative/Core/Share/BookmarkShareModels.swift; sourceTree = SOURCE_ROOT; };
 		B2000000000000000000000B /* BookmarkShareClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZineNative/Core/Share/BookmarkShareClient.swift; sourceTree = SOURCE_ROOT; };
 		B2000000000000000000000C /* BookmarkShareStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZineNative/Core/Share/BookmarkShareStore.swift; sourceTree = SOURCE_ROOT; };
+
+        C30000000000000000000002 /* ZineWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ZineWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+        C30000000000000000000004 /* JumpBackInWidgetSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZineNative/Core/Widgets/JumpBackInWidgetSnapshot.swift; sourceTree = SOURCE_ROOT; };
+        C30000000000000000000006 /* ZineTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZineNative/Core/ZineTheme.swift; sourceTree = SOURCE_ROOT; };
+
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -80,6 +94,9 @@
 			path = ZineShareExtension;
 			sourceTree = "<group>";
 		};
+
+        C30000000000000000000009 /* ZineWidgetExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; path = ZineWidgetExtension; sourceTree = "<group>"; };
+
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -109,6 +126,9 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+
+        C30000000000000000000012 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -116,6 +136,9 @@
 			isa = PBXGroup;
 			children = (
 				A1000000000000000000000A /* ZineNative */,
+                C30000000000000000000009 /* ZineWidgetExtension */,
+                C30000000000000000000004 /* JumpBackInWidgetSnapshot.swift */,
+                C30000000000000000000006 /* ZineTheme.swift */,
 				A1000000000000000000000B /* ZineNativeTests */,
 				B2000000000000000000000D /* ZineShareExtension */,
 				B2000000000000000000000F /* Shared Extension Sources */,
@@ -143,6 +166,7 @@
 				A10000000000000000000004 /* ZineNative.app */,
 				A10000000000000000000005 /* ZineNativeTests.xctest */,
 				B20000000000000000000007 /* ZineShareExtension.appex */,
+                C30000000000000000000002 /* ZineWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -173,6 +197,7 @@
 			);
 			dependencies = (
 				B20000000000000000000014 /* PBXTargetDependency */,
+                C30000000000000000000014 /* Widget dependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				A1000000000000000000000A /* ZineNative */,
@@ -232,6 +257,20 @@
 			productReference = A10000000000000000000005 /* ZineNativeTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+
+        C30000000000000000000008 /* ZineWidgetExtension */ = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = C30000000000000000000010;
+            buildPhases = (C30000000000000000000011, C30000000000000000000012, C30000000000000000000013);
+            buildRules = ();
+            dependencies = ();
+            fileSystemSynchronizedGroups = (C30000000000000000000009);
+            name = ZineWidgetExtension;
+            productName = ZineWidgetExtension;
+            productReference = C30000000000000000000002;
+            productType = "com.apple.product-type.app-extension";
+        };
+
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -263,6 +302,7 @@
 			projectRoot = "";
 			targets = (
 				A10000000000000000000011 /* ZineNative */,
+                C30000000000000000000008 /* ZineWidgetExtension */,
 				B20000000000000000000011 /* ZineShareExtension */,
 				A10000000000000000000015 /* ZineNativeTests */,
 			);
@@ -273,6 +313,9 @@
 		A10000000000000000000014 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		A10000000000000000000017 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		B20000000000000000000012 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+
+        C30000000000000000000013 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -288,11 +331,17 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+
+        C30000000000000000000011 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (C30000000000000000000003, C30000000000000000000005); runOnlyForDeploymentPostprocessing = 0; };
+
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
 		A10000000000000000000018 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = A10000000000000000000011 /* ZineNative */; targetProxy = A10000000000000000000003 /* PBXContainerItemProxy */; };
 		B20000000000000000000014 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = B20000000000000000000011 /* ZineShareExtension */; targetProxy = B20000000000000000000006 /* PBXContainerItemProxy */; };
+
+        C30000000000000000000014 = {isa = PBXTargetDependency; target = C30000000000000000000008; targetProxy = C30000000000000000000007; };
+
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -476,6 +525,56 @@
 			};
 			name = Release;
 		};
+
+        C30000000000000000000015 /* Debug */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                APPLICATION_EXTENSION_API_ONLY = YES;
+                CODE_SIGN_ENTITLEMENTS = Configuration/ZineWidgetExtension.entitlements;
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                DEVELOPMENT_TEAM = TRA7965NM5;
+                GENERATE_INFOPLIST_FILE = NO;
+                INFOPLIST_FILE = Configuration/WidgetExtension-Info.plist;
+                IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+                MARKETING_VERSION = 0.1;
+                PRODUCT_BUNDLE_IDENTIFIER = app.zine.native.widgets;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SDKROOT = iphoneos;
+                SKIP_INSTALL = YES;
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+                SWIFT_EMIT_LOC_STRINGS = YES;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2";
+            };
+            name = Debug;
+        };
+
+
+        C30000000000000000000016 /* Release */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                APPLICATION_EXTENSION_API_ONLY = YES;
+                CODE_SIGN_ENTITLEMENTS = Configuration/ZineWidgetExtension.entitlements;
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                DEVELOPMENT_TEAM = TRA7965NM5;
+                GENERATE_INFOPLIST_FILE = NO;
+                INFOPLIST_FILE = Configuration/WidgetExtension-Info.plist;
+                IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+                MARKETING_VERSION = 0.1;
+                PRODUCT_BUNDLE_IDENTIFIER = app.zine.native.widgets;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SDKROOT = iphoneos;
+                SKIP_INSTALL = YES;
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+                SWIFT_EMIT_LOC_STRINGS = YES;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2";
+            };
+            name = Release;
+        };
+
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -483,6 +582,9 @@
 		A10000000000000000000021 /* Build configuration list for PBXNativeTarget "ZineNativeTests" */ = {isa = XCConfigurationList; buildConfigurations = (A10000000000000000000027 /* Debug */, A10000000000000000000028 /* Release */); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 		A10000000000000000000022 /* Build configuration list for PBXProject "ZineNative" */ = {isa = XCConfigurationList; buildConfigurations = (A10000000000000000000023 /* Debug */, A10000000000000000000024 /* Release */); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 		B20000000000000000000017 /* Build configuration list for PBXNativeTarget "ZineShareExtension" */ = {isa = XCConfigurationList; buildConfigurations = (B20000000000000000000015 /* Debug */, B20000000000000000000016 /* Release */); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+
+        C30000000000000000000010 = {isa = XCConfigurationList; buildConfigurations = (C30000000000000000000015, C30000000000000000000016); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */

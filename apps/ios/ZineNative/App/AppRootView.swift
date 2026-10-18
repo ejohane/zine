@@ -42,6 +42,9 @@ struct AppRootView: View {
     let configuration: AppConfiguration
 
     @Environment(Clerk.self) private var clerk
+    @State private var pendingWidgetURL: URL?
+    @State private var showsWidgetAppearance = false
+
     var body: some View {
         Group {
             if let user = clerk.user {
@@ -49,17 +52,42 @@ struct AppRootView: View {
                     configuration: configuration,
                     userID: user.id,
                     userCreatedAt: user.createdAt,
-                    userEmail: user.primaryEmailAddress?.emailAddress
+                    userEmail: user.primaryEmailAddress?.emailAddress,
+                    pendingWidgetURL: $pendingWidgetURL
                 )
                 .id("\(user.id)-\(user.primaryEmailAddress?.emailAddress ?? "")-\(configuration.apiBaseURL.absoluteString)")
             } else {
                 ZineAuthEntryView()
             }
         }
+        .onChange(of: clerk.user?.id, initial: true) { _, userID in
+            let scope = userID.map { JumpBackInWidgetScope(userID: $0, apiBaseURL: configuration.apiBaseURL) }
+            JumpBackInWidgetPublisher.shared.activate(scope)
+        }
+        .sheet(isPresented: $showsWidgetAppearance) {
+            NavigationStack {
+                WidgetAppearanceSettingsView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Done") { showsWidgetAppearance = false }
+                        }
+                    }
+            }
+        }
         .onOpenURL { url in
-            Task { try? await Clerk.shared.handle(url) }
+            if url.absoluteString == "zine://widget/appearance" {
+                showsWidgetAppearance = true
+            } else if JumpBackInWidgetLink(url: url) != nil || url.absoluteString == "zine://widget/home" {
+                pendingWidgetURL = url
+            } else {
+                Task { try? await Clerk.shared.handle(url) }
+            }
         }
     }
+}
+
+private struct WidgetBookmarkRoute: Hashable {
+    let bookmark: Bookmark
 }
 
 struct AuthenticatedAppView: View {
@@ -80,6 +108,8 @@ struct AuthenticatedAppView: View {
     }
 
     @Environment(\.scenePhase) private var scenePhase
+    @Binding private var pendingWidgetURL: URL?
+    @State private var widgetOpenError: String?
 
     private let configuration: AppConfiguration
     private let userID: String
@@ -109,9 +139,10 @@ struct AuthenticatedAppView: View {
     @State private var externalOpenError: String?
     @Namespace private var navigationTransition
 
-    init(configuration: AppConfiguration, userID: String, userCreatedAt: Date, userEmail: String?, initialSession: AuthenticatedAppSession? = nil) {
+    init(configuration: AppConfiguration, userID: String, userCreatedAt: Date, userEmail: String?, initialSession: AuthenticatedAppSession? = nil, pendingWidgetURL: Binding<URL?> = .constant(nil)) {
         self.configuration = configuration
         self.userID = userID
+        _pendingWidgetURL = pendingWidgetURL
         let replayRequested = SourcesOnboardingReplayAccess.consumePreviewRequest(
             verifiedEmail: userEmail
         )
@@ -265,6 +296,16 @@ struct AuthenticatedAppView: View {
                     )
                     .zinePushedDestinationChrome()
             }
+            .navigationDestination(for: WidgetBookmarkRoute.self) { route in
+                BookmarkDetailView(
+                    bookmark: route.bookmark, client: client,
+                    resumesArticleReading: route.bookmark.contentType == .article,
+                    onUpdate: { _ in markBookmarkContentChanged() },
+                    onBookmarkCommit: { _, _ in markBookmarkContentChanged() },
+                    onExternalOpen: handleExternalOpen
+                )
+                .zinePushedDestinationChrome()
+            }
             .navigationDestination(for: HomeSectionRoute.self) { route in
                 homeSectionDestination(for: route)
                     .zinePushedDestinationChrome()
@@ -323,6 +364,44 @@ struct AuthenticatedAppView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .zineBookmarkSaved)) { _ in
             markBookmarkContentChanged()
+        }
+        .task(id: homeStore.widgetItems) {
+            guard let items = homeStore.widgetItems else { return }
+            let scope = JumpBackInWidgetScope(userID: userID, apiBaseURL: configuration.apiBaseURL)
+            await JumpBackInWidgetPublisher.shared.publish(items, scope: scope)
+        }
+        .task(id: pendingWidgetURL) {
+            guard let url = pendingWidgetURL else { return }
+            defer { if pendingWidgetURL == url { pendingWidgetURL = nil } }
+            if url.absoluteString == "zine://widget/home" {
+                navigationPath = NavigationPath()
+                selectedTab = .home
+                return
+            }
+            guard let link = JumpBackInWidgetLink(url: url) else { return }
+            guard link.scope == JumpBackInWidgetScope(userID: userID, apiBaseURL: configuration.apiBaseURL) else {
+                widgetOpenError = "Open this bookmark with the Zine account that added the widget."
+                return
+            }
+            do {
+                let bookmark = try await client.getBookmark(id: link.bookmarkID)
+                try Task.checkCancellation()
+                navigationPath = NavigationPath()
+                selectedTab = .home
+                navigationPath.append(WidgetBookmarkRoute(bookmark: bookmark))
+            } catch is CancellationError {
+                // A newer widget tap or sign-out superseded this request.
+            } catch {
+                widgetOpenError = "This bookmark couldn’t be opened. Check your connection and try again in Zine."
+            }
+        }
+        .alert("Couldn’t open bookmark", isPresented: Binding(
+            get: { widgetOpenError != nil },
+            set: { if !$0 { widgetOpenError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(widgetOpenError ?? "Please try again.")
         }
         .task(id: homeRevision) {
             await homeStore.reload()
