@@ -140,6 +140,17 @@
         flex: 1;
         width: 100%;
       }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+        border: 0;
+      }
       #status {
         color: var(--secondaryText);
         font-size: 0.875rem;
@@ -153,11 +164,65 @@
       }
       #cards {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 28px 16px;
-        padding: 0;
-        margin: 0;
+        grid-auto-flow: column;
+        grid-auto-columns: min(244px, 82vw);
+        gap: 16px;
+        overflow-x: auto;
+        overscroll-behavior-inline: contain;
+        scroll-snap-type: x proximity;
+        scrollbar-width: thin;
+        scrollbar-color: var(--border) transparent;
+        padding: 5px 4px 12px;
+        margin: -5px -4px 0;
         list-style: none;
+      }
+      .card {
+        scroll-snap-align: start;
+      }
+      .card[data-selected='true'] .cover {
+        outline: 2px solid var(--brandAccent);
+        outline-offset: 3px;
+      }
+      .rail-controls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 8px;
+      }
+      .rail-controls p {
+        font-size: 0.75rem;
+        color: var(--secondaryText);
+      }
+      .rail-controls div {
+        display: flex;
+        gap: 6px;
+      }
+      .rail-controls button {
+        min-width: 40px;
+      }
+      #item-details {
+        padding-top: 20px;
+        margin-top: 16px;
+      }
+      #details-meta {
+        margin-top: 8px;
+      }
+      #details-summary {
+        font-size: 0.9375rem;
+        line-height: 1.65;
+        max-width: 65ch;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      #details-tags {
+        margin-top: 14px;
+      }
+      #details-actions {
+        margin-top: 18px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
       }
       .card {
         min-width: 0;
@@ -354,25 +419,12 @@
         line-height: 1.5;
         font-size: 0.875rem;
       }
-      @media (max-width: 720px) {
-        #cards {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-      }
       @media (max-width: 520px) {
         main {
           padding: 16px;
         }
-        #cards {
-          gap: 24px 12px;
-        }
         .cover {
           border-radius: 12px;
-        }
-      }
-      @media (max-width: 320px) {
-        #cards {
-          grid-template-columns: 1fr;
         }
       }
       @media (prefers-reduced-motion: no-preference) {
@@ -390,13 +442,13 @@
   </head>
   <body>
     <main aria-label="Zine saved library">
-      <header>
+      <header hidden>
         <div>
           <h1>Your saved library</h1>
           <p>Find a good read. Keep the conversation going.</p>
         </div>
       </header>
-      <form class="search" id="search-form" role="search">
+      <form class="search" id="search-form" role="search" hidden>
         <input
           id="query"
           type="search"
@@ -406,12 +458,31 @@
         />
         <button class="primary" type="submit" id="search-button">Search</button>
       </form>
-      <p id="status" role="status" aria-live="polite">Connecting to Zine…</p>
+      <p id="status" class="sr-only" role="status" aria-live="polite">Connecting to Zine…</p>
       <p id="error" role="alert" hidden></p>
-      <ul id="cards" aria-label="Saved items"></ul>
+      <ul id="cards" aria-label="Saved items, horizontally scrollable" tabindex="0"></ul>
+      <nav id="rail-controls" class="rail-controls" aria-label="Browse saved items" hidden>
+        <p id="rail-position" aria-live="polite"></p>
+        <div>
+          <button id="rail-previous" aria-label="Previous saved items"></button
+          ><button id="rail-next" aria-label="Next saved items"></button>
+        </div>
+      </nav>
+      <section id="item-details" class="panel" aria-labelledby="details-title" hidden>
+        <div class="panel-head">
+          <div>
+            <h2 id="details-title" tabindex="-1"></h2>
+            <p id="details-meta" class="meta"></p>
+          </div>
+          <button id="close-details" aria-label="Close item details">Close</button>
+        </div>
+        <p id="details-summary"></p>
+        <div id="details-tags" class="tags"></div>
+        <div id="details-actions"></div>
+      </section>
       <div class="empty" id="empty" hidden>
         <h2>No saved items found</h2>
-        <p>Try a shorter phrase or search with an empty field to browse your library.</p>
+        <p>Ask ChatGPT to try a different search or show more of your library.</p>
       </div>
       <button id="more" hidden>Show more</button>
       <section id="reader" class="panel" aria-labelledby="reader-title" hidden>
@@ -452,6 +523,7 @@
         completion: 'incomplete',
         nextCursor: null,
         searching: false,
+        selectedId: null,
         readerId: null,
         readerOffset: null,
         readerBusy: false,
@@ -554,6 +626,8 @@
           VIDEO: ['M4 5h16v14H4z', 'm10 9 5 3-5 3z'],
           PODCAST: ['M5 13v-2a7 7 0 0 1 14 0v2', 'M5 12H3v6h4v-6zM19 12h2v6h-4v-6z'],
           POST: ['M5 4h14v12H9l-4 4z', 'M8 8h8M8 12h5'],
+          previous: ['m14 6-6 6 6 6'],
+          next: ['m10 6 6 6-6 6'],
           external: ['M14 4h6v6', 'm20 4-9 9', 'M10 4H4v16h16v-6'],
         };
         for (const d of paths[kind] || paths.ARTICLE) {
@@ -571,15 +645,119 @@
           ? `${minutes} min`
           : `${Math.floor(minutes / 60)} hr ${minutes % 60} min`;
       }
+      function updateRail() {
+        const rail = $('cards');
+        const maximum = rail.scrollWidth - rail.clientWidth;
+        $('rail-controls').hidden = state.items.length < 1;
+        $('rail-previous').disabled = rail.scrollLeft <= 6;
+        $('rail-next').disabled = rail.scrollLeft >= maximum - 2;
+        const cards = [...rail.children];
+        const bounds = rail.getBoundingClientRect();
+        const visible = cards
+          .map((card, i) => ({ i, rect: card.getBoundingClientRect() }))
+          .filter(({ rect }) => rect.right > bounds.left + 8 && rect.left < bounds.right - 8);
+        $('rail-position').textContent = visible.length
+          ? `${visible[0].i + 1}–${visible.at(-1).i + 1} of ${cards.length}`
+          : '';
+      }
+      function selectedButton() {
+        return [...$('cards').children]
+          .find((card) => card.dataset.id === state.selectedId)
+          ?.querySelector('.cover');
+      }
+      function updateSelection() {
+        for (const card of $('cards').children) {
+          const selected = card.dataset.id === state.selectedId;
+          card.dataset.selected = String(selected);
+          for (const control of card.querySelectorAll('.cover,.title-button'))
+            control.setAttribute('aria-expanded', String(selected));
+        }
+      }
+      function renderDetails(item) {
+        $('item-details').hidden = false;
+        $('details-title').textContent = item.title;
+        $('details-meta').textContent = [
+          item.creator || safeUrl(item.url)?.hostname || item.provider,
+          consumption(item),
+        ]
+          .filter(Boolean)
+          .join(' · ');
+        $('details-summary').textContent = item.summary
+          ? item.summary.length >= 600
+            ? item.summary.replace(/\s+\S*$/, '') + '…'
+            : item.summary
+          : 'No description is available for this saved item.';
+        $('details-tags').replaceChildren(
+          ...(item.tags || []).map((tag) => node('span', tag, 'tag'))
+        );
+        const read = node('button', 'Read saved text');
+        read.type = 'button';
+        read.onclick = () => readItem(item);
+        const collect = node('button', 'Collect');
+        collect.type = 'button';
+        collect.onclick = () => chooseCollection(item);
+        $('details-actions').replaceChildren(read, collect);
+        const source = sourceLink(item);
+        if (source) $('details-actions').append(source);
+      }
+      function selectItem(item) {
+        const closing = state.selectedId === item.bookmarkId;
+        state.selectedId = closing ? null : item.bookmarkId;
+        ++readerSequence;
+        ++collectionSequence;
+        state.readerId = null;
+        state.collectionId = null;
+        $('reader').hidden = true;
+        $('collection-panel').hidden = true;
+        if (closing) $('item-details').hidden = true;
+        else {
+          renderDetails(item);
+          $('details-title').focus({ preventScroll: true });
+        }
+        updateSelection();
+        resize();
+      }
+      function moveRail(direction) {
+        $('cards').scrollBy({
+          left: direction * 260,
+          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            ? 'instant'
+            : 'smooth',
+        });
+      }
+      $('rail-previous').append(icon('previous'));
+      $('rail-next').append(icon('next'));
+      $('rail-previous').onclick = () => moveRail(-1);
+      $('rail-next').onclick = () => moveRail(1);
+      $('cards').addEventListener('scroll', updateRail, { passive: true });
+      new ResizeObserver(updateRail).observe($('cards'));
+      $('cards').onkeydown = (event) => {
+        if (event.target !== $('cards')) return;
+        if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+          event.preventDefault();
+          moveRail(event.key === 'ArrowRight' ? 1 : -1);
+        }
+      };
+      $('close-details').onclick = () => {
+        const target = selectedButton();
+        state.selectedId = null;
+        $('item-details').hidden = true;
+        updateSelection();
+        target?.focus({ preventScroll: true });
+        resize();
+      };
       function render() {
+        const scrollPosition = $('cards').scrollLeft;
         $('cards').replaceChildren();
         for (const item of state.items) {
           const card = node('li', null, 'card');
+          card.dataset.id = item.bookmarkId;
           card.dataset.type = item.contentType || 'ARTICLE';
           const cover = node('button', null, 'cover');
           cover.type = 'button';
-          cover.setAttribute('aria-label', `Read ${item.title} from cover`);
-          cover.onclick = () => readItem(item);
+          cover.setAttribute('aria-label', `Show details for ${item.title}`);
+          cover.setAttribute('aria-controls', 'item-details');
+          cover.onclick = () => selectItem(item);
           cover.append(icon(item.contentType));
           const candidates = [item.thumbnailUrl, item.creatorImageUrl]
             .map(safeUrl)
@@ -608,7 +786,8 @@
           const heading = node('h3');
           const title = node('button', item.title, 'title-button');
           title.type = 'button';
-          title.onclick = () => readItem(item);
+          title.setAttribute('aria-controls', 'item-details');
+          title.onclick = () => selectItem(item);
           heading.append(title);
           body.append(heading);
           const url = safeUrl(item.url);
@@ -648,6 +827,15 @@
           body.append(actions);
           card.append(body);
           $('cards').append(card);
+        }
+        $('cards').scrollLeft = scrollPosition;
+        updateRail();
+        updateSelection();
+        const selected = state.items.find((item) => item.bookmarkId === state.selectedId);
+        if (selected) renderDetails(selected);
+        else {
+          state.selectedId = null;
+          $('item-details').hidden = true;
         }
         $('empty').hidden = state.items.length > 0 || state.searching;
         $('more').hidden = !state.nextCursor;
@@ -840,14 +1028,14 @@
         ++readerSequence;
         state.readerId = null;
         $('reader').hidden = true;
-        $('query').focus();
+        ($('item-details').hidden ? $('cards') : $('details-title')).focus({ preventScroll: true });
         resize();
       };
       $('close-collection').onclick = () => {
         ++collectionSequence;
         state.collectionId = null;
         $('collection-panel').hidden = true;
-        $('query').focus();
+        ($('item-details').hidden ? $('cards') : $('details-title')).focus({ preventScroll: true });
         resize();
       };
       function resize() {

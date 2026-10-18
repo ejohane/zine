@@ -44,7 +44,13 @@ collection actions. See [the UI implementation and verification guide](../../doc
 bun run --cwd integrations/mcp preview:ui
 ```
 
-Open `http://127.0.0.1:8797`. This labeled sample-data harness simulates the
-MCP Apps host; it performs no production reads, writes, or OAuth login. The
-component is the same HTML served by `resources/read`. Use the preview controls
-to check light/dark mode and a 390px-wide iframe. Stop with Ctrl-C when finished.
+Open `http://127.0.0.1:8797`. The playground uses the same component served by
+`resources/read`, at the live ChatGPT embed width and in dark mode by default.
+If `.local-data/mcp-ui-cards.json` exists, it uses that local saved-card snapshot;
+otherwise it uses labeled sample cards. Keep real library snapshots gitignored.
+The simulated host performs no production reads, writes, or OAuth login.
+
+Use the width selector and appearance button to compare chat, phone and wide
+layouts. **Reload design** rebuilds the current component source without
+restarting the server. Collection actions remain simulated; article bodies are
+not loaded from a card snapshot. Stop with Ctrl-C when finished.

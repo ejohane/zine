@@ -43,7 +43,7 @@ export function createMcpServer(env: Bindings, principal: Principal | null, cfg:
           text: libraryHtml,
           _meta: {
             ui: {
-              prefersBorder: true,
+              prefersBorder: false,
               csp: { connectDomains: [], resourceDomains: ARTWORK_ORIGINS },
             },
             'openai/widgetDescription':

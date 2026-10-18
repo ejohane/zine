@@ -35,7 +35,7 @@ enforcement. The resource still declares its explicit CSP.
 1. Call `search_saved` with a title/description/URL query (empty means browse).
 2. Call `show_saved` with the selected `bookmarkIds`, the returned `query`, and
    `nextCursor` when preserving pagination. Only this tool declares a UI resource.
-3. ChatGPT reads `ui://zine/saved-library-v3.html`, served as
+3. ChatGPT reads `ui://zine/saved-library-v4.html`, served as
    `text/html;profile=mcp-app`. The model still receives the structured results
    and text in clients without component support.
 4. The component initializes the MCP Apps bridge and renders the tool result.
@@ -79,8 +79,11 @@ No bookmark completion state is changed by these queries.
 ## Component behavior
 
 - Native Home-style cards: rounded landscape artwork, two-line semibold titles,
-  creator and reading/listening time, and quiet actions underneath. Three columns
-  in wider embeds, two at phone widths, and one in very narrow embeds. Light/dark
+  creator and reading/listening time, and quiet actions underneath. A horizontal
+  scroll rail includes previous/next controls and expands selected card details
+  underneath. The search bar and library header are hidden; requests come from
+  the conversation. The resource requests `prefersBorder: false`; the host
+  controls the final outer frame. Light/dark
   follows host context, falling back to the operating-system preference.
 - Existing shared Zine semantic color roles are injected at bundle time.
 - Titles, creator names, tags and stored article content use DOM text nodes, never

@@ -712,6 +712,7 @@ describe('official MCP transport and discovery', () => {
     };
     const resource = payload.result.contents[0];
     expect(resource.mimeType).toBe('text/html;profile=mcp-app');
+    expect(resource._meta).toHaveProperty('ui.prefersBorder', false);
     expect(resource._meta).toHaveProperty('ui.csp', {
       connectDomains: [],
       resourceDomains: ARTWORK_ORIGINS,
