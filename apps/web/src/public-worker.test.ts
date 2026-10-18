@@ -10,7 +10,7 @@ function environment(): PublicWorkerEnv {
 }
 
 describe('web host', () => {
-  test.each(['/p/id', '/i/id', '/.well-known/apple-app-site-association'])(
+  test.each(['/p/id', '/i/id'])(
     'retires %s without loading publication data or the app shell',
     async (path) => {
       const env = environment();
@@ -21,6 +21,35 @@ describe('web host', () => {
       expect(env.ASSETS.fetch).not.toHaveBeenCalled();
     }
   );
+
+  test.each(['/.well-known/apple-app-site-association', '/apple-app-site-association'])(
+    'serves native bookmark association at %s without auth or redirects',
+    async (path) => {
+      const env = environment();
+      const response = await worker.fetch(new Request(`https://myzine.app${path}`), env);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toContain('application/json');
+      expect(await response.json()).toEqual({
+        applinks: {
+          details: [
+            {
+              appIDs: ['TRA7965NM5.app.zine.native'],
+              components: [{ '/': '/item/*' }],
+            },
+          ],
+        },
+      });
+      expect(env.API!.fetch).not.toHaveBeenCalled();
+      expect(env.ASSETS.fetch).not.toHaveBeenCalled();
+    }
+  );
+
+  test('serves the authenticated web app shell for bookmark fallback links', async () => {
+    const env = environment();
+    const response = await worker.fetch(new Request('https://myzine.app/item/a-public'), env);
+    expect(await response.text()).toBe('app shell');
+    expect(env.API!.fetch).not.toHaveBeenCalled();
+  });
 
   test('serves the app for ordinary routes', async () => {
     const env = environment();

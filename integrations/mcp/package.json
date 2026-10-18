@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
     "dev": "wrangler dev --local --config wrangler.local.toml --ip 127.0.0.1 --port 8798",
+    "preview:ui": "node scripts/preview-ui.mjs",
     "build": "wrangler deploy --dry-run --config wrangler.local.toml --env-file /dev/null --outdir dist",
     "build:production": "wrangler deploy --dry-run --config wrangler.production.toml --env-file /dev/null --outdir dist/production"
   },

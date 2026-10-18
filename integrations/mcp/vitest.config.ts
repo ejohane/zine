@@ -13,6 +13,14 @@ export default defineWorkersConfig(async () => ({
       name: 'bundle-mcp-sdk-for-workerd-tests',
       enforce: 'pre',
       load(id) {
+        if (id.endsWith('/ui/library.html')) {
+          return buildSync({
+            entryPoints: [id],
+            loader: { '.html': 'text' },
+            format: 'esm',
+            write: false,
+          }).outputFiles[0].text;
+        }
         // The older Worker test module fallback cannot load AJV's CJS JSON requires.
         // Bundle the real SDK exactly as Wrangler does; do not mock protocol behavior.
         if (id.endsWith('/@modelcontextprotocol/sdk/dist/esm/server/mcp.js')) {

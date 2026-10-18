@@ -1,0 +1,158 @@
+# Zine saved library in ChatGPT
+
+The optional MCP Apps component adds visual browsing to the existing MCP server.
+It changes no native app, REST endpoint, database schema, OAuth client or scope.
+
+## v0.1 deployment
+
+Deployed on 2026-10-18 from `fa070ac8cb8f5d96fef665c0d5f32c2c3cd27fc8`
+to the existing `zine-mcp-production` Worker at `https://mcp.myzine.app/mcp`.
+Cloudflare version: `13d2ebb0-c215-44ce-bb0a-db69fd1a2b97` (100%).
+Previous version for rollback: `c0e60f70-dc5a-42c4-b0d1-316d799c7a2c`.
+
+The live deployment has existing Dashboard-managed authentication variables.
+Preserve those with `wrangler deploy --config wrangler.production.toml
+--env-file /dev/null --keep-vars`; do not replace variables using only the
+checked-in manifest. The release changed no credentials, OAuth scopes or data
+bindings. Never print remote variable values when checking deployment metadata.
+
+Production readback confirmed seven tools, the v2 MCP Apps HTML resource/MIME/CSP,
+anonymous linking challenges, and authenticated search with covers/creator/time
+metadata through the existing ChatGPT connection. ChatGPT's Refresh tools action
+was run after deployment.
+
+Direct computer-use acceptance in an actual ChatGPT Chat conversation observed
+the inline component with six owned saved items and real YouTube cover images.
+Opening a saved article loaded stored text in the inline reader; searching from
+the component returned 20 results for a query. This was the deployed Worker and
+existing linked OAuth account, not the sample host. Collection writes were not
+performed during this acceptance. The ChatGPT development surface displayed
+“CSP off”; this trial establishes rendering and bridge behavior, not host CSP
+enforcement. The resource still declares its explicit CSP.
+
+## Horizontal rail release
+
+Deployed on 2026-10-18 from `442d70e9` to the existing MCP Worker.
+Cloudflare version: `ae7f8486-9508-472c-835d-161b6eba92eb`.
+Previous version for rollback: `ac8ff46c-c448-4950-8828-9c890a7a8838`.
+
+The release passed 79 MCP tests, typecheck, lint, formatting and the production
+bundle dry run. Local browser interaction confirmed card-detail expansion.
+Production resource readback confirmed v4 HTML, horizontal rail, detail panel,
+hidden search form and `prefersBorder: false`. ChatGPT controls whether to honor
+that outer-border preference. Existing rendered messages retain their old UI;
+request a fresh card response after refreshing tools.
+
+## Tool flow
+
+1. Call `search_saved` with a title/description/URL query (empty means browse).
+2. Call `show_saved` with the selected `bookmarkIds`, the returned `query`, and
+   `nextCursor` when preserving pagination. Only this tool declares a UI resource.
+3. ChatGPT reads `ui://zine/saved-library-v5.html`, served as
+   `text/html;profile=mcp-app`. The model still receives the structured results
+   and text in clients without component support.
+4. The component initializes the MCP Apps bridge and renders the tool result.
+   Cards open original source links. Further searches, pagination, saved-text
+   reading and collection actions use separate conversation tools with the
+   existing OAuth authorization.
+
+`show_saved` accepts only IDs and search context, then rechecks every ID against
+the linked account and current bookmarked state. It uses the same Gmail/private
+source provenance predicate as search/read. It does not trust model-supplied
+titles, URLs, summaries, artwork or tags. Supplied cursors must match the account
+and query. Tags are fetched only for the authorized rows and account.
+
+## Completion filtering
+
+Deployed on 2026-10-18 from `2281b4926e2fef0062d8ffe08320567537e0ae7e`.
+Cloudflare version: `ac8ff46c-c448-4950-8828-9c890a7a8838`.
+Previous version for rollback: `13d2ebb0-c215-44ce-bb0a-db69fd1a2b97`.
+The exact exported release passed 79 tests, typecheck, lint and the production
+bundle dry run on Node 22. It includes the query fix and completion-aware
+pagination in the existing grid component; in-progress rail/border playground
+changes were excluded from this release.
+
+Authenticated live checks confirmed default results all had `isFinished: false`,
+completed-only results all had `isFinished: true`, and all-mode results contained
+both states. Live all-mode pagination succeeded and rejected reuse of the same
+cursor under incomplete mode. ChatGPT's tools were refreshed after deployment.
+
+`search_saved` defaults to `completion: "incomplete"`, matching the app's
+`user_items.is_finished = 0` behavior. Explicit requests can use
+`completion: "completed"` for completed bookmarks only or `completion: "all"`
+for both states. Returned cards include the current `isFinished` value.
+
+Filtering happens in SQL before ordering and pagination. The returned completion
+mode must be carried into subsequent searches and `show_saved`; cursors are
+bound to account, query and mode. Old cursors require a fresh search after this
+change. Directly reading or displaying a known owned completed bookmark is
+still allowed: completion changes search defaults, not ownership or permissions.
+No bookmark completion state is changed by these queries.
+
+## Component behavior
+
+The simplified rail was deployed on 2026-10-18 from `beee7922`.
+Cloudflare version: `117a4a24-29cd-4144-871c-633a7e79b61f`.
+Previous version for rollback: `ae7f8486-9508-472c-835d-161b6eba92eb`.
+Production v5 resource readback confirmed the rail, whole-card source links,
+removed panels/actions/navigation controls and borderless preference.
+The source passed 79 tests, typecheck, lint, formatting and production dry run.
+
+The component is a borderless horizontal rail of native Home-style cards:
+rounded landscape artwork, two-line semibold titles, creator and duration,
+and existing tags. Each whole card is one accessible link to its original source.
+There are no expanded detail panels, action rows, arrows or visible result counts.
+Users can scroll horizontally or focus the rail and use keyboard arrow keys.
+Further searches, pagination, saved-text reading and collection actions are
+handled through conversation tools rather than controls inside the component.
+
+- Existing shared Zine semantic color roles are injected at bundle time.
+- Light/dark follows host context, falling back to the operating-system preference.
+- Titles, creator names and tags use DOM text nodes, never source HTML.
+- Original links require public-shaped HTTPS URLs without credentials or known
+  secret-bearing query parameters. They open separately with `noopener noreferrer`.
+- Artwork loads only from the explicit CDN origins in `src/ui.ts`, with no referrer.
+  Missing covers try the creator image, then the neutral content icon.
+  Podcast images fit without cropping. There is no image proxy or arbitrary fetch.
+- Resource CSP permits no direct fetch/XHR connections. No credentials enter the
+  component or its resources. Errors and empty results remain visible.
+- The component retains only temporary view state and performs no library writes.
+
+## Local evidence and live acceptance
+
+Run the package's `typecheck`, `lint`, `test`, `build`, and `build:production`
+commands. Both builds are dry runs. Worker tests use migrated isolated D1/R2,
+synthetic signed OAuth tokens and the real MCP SDK transport. They check resource
+discovery/MIME/CSP, render metadata, card metadata, ownership/private-source
+exclusion, tag isolation, strict inputs and pagination context.
+
+`bun run --cwd integrations/mcp preview:ui` starts a loopback-only, clearly labeled
+simulated host at `http://127.0.0.1:8797`. This serves the actual component HTML
+and simulates bridge results with sample content and the existing shared card
+fixtures' illustrative photos. These are not real library items or their covers.
+Use its light/dark and phone
+width controls. Search `personal` for filtered results, a nonsense phrase for
+empty results, `error` for a failure, and `permission` for a linking error. An
+empty search plus Show more exposes unavailable-content and hostile-text fixtures.
+Read, Continue reading and Collect exercise the bridge; all preview collection
+writes remain in memory and reset on reload. Stop with Ctrl-C.
+
+The preview is component interaction evidence, not authenticated production or
+ChatGPT rendering evidence. To accept the live integration after deployment:
+
+1. Refresh the existing Zine plugin connection so it discovers `show_saved`.
+2. In ChatGPT, ask: “Show my saved articles about personal software as cards.”
+3. Confirm the model searches and calls `show_saved`, and that the component
+   renders real owned items. Exercise search/pagination, Read, and Open original.
+4. Choose a private collection and add an item; independently list/read the
+   account's collection to verify persistence. Verify read-only grants cannot add.
+5. Check light/dark and a narrow ChatGPT client. Record those as live observations
+   separately from the local fixture checks.
+
+Publishing the code alone does not update the deployed MCP Worker. Deploy the
+reviewed integration through the existing production configuration, preserve
+its current secret bindings, and refresh the ChatGPT connection afterward.
+No new OAuth grant or broader permissions are needed for the existing actions.
+
+Implementation follows the [official MCP Apps UI guidance](https://developers.openai.com/plugins/build/chatgpt-ui)
+and [host bridge quickstart](https://developers.openai.com/plugins/build/app-quickstart).

@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 
 import { useAppSession, useAuthAvailability } from './lib/trpc';
 
 function ClerkProtectedRoute({ children }: { children: ReactNode }) {
   const auth = useAppSession();
+  const location = useLocation();
 
   if (!auth.isLoaded) {
     return (
@@ -18,7 +19,12 @@ function ClerkProtectedRoute({ children }: { children: ReactNode }) {
   }
 
   if (!auth.isSignedIn) {
-    return <Navigate to="/sign-in" replace />;
+    return (
+      <Navigate
+        to={`/sign-in?returnTo=${encodeURIComponent(location.pathname + location.search)}`}
+        replace
+      />
+    );
   }
 
   return <>{children}</>;

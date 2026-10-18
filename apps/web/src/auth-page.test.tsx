@@ -57,4 +57,24 @@ describe('AuthPage', () => {
       'SignUp /sign-up path /welcome /sign-in'
     );
   });
+  test('preserves a bookmark destination through sign-in and sign-up', () => {
+    setAuthAvailability({ isEnabled: true, mode: 'clerk' });
+    renderRoute(<AuthPage mode="sign-in" />, {
+      route: '/sign-in?returnTo=%2Fitem%2Fa-public',
+      path: '/sign-in',
+    });
+    expect(screen.getByTestId('clerk-sign-in')).toHaveTextContent(
+      'SignIn /sign-in path /item/a-public /sign-up?returnTo=%2Fitem%2Fa-public'
+    );
+  });
+  test('keeps the bookmark return path after switching to sign-up', () => {
+    setAuthAvailability({ isEnabled: true, mode: 'clerk' });
+    renderRoute(<AuthPage mode="sign-up" />, {
+      route: '/sign-up?returnTo=%2Fitem%2Fa-public',
+      path: '/sign-up',
+    });
+    expect(screen.getByTestId('clerk-sign-up')).toHaveTextContent(
+      'SignUp /sign-up path /item/a-public /sign-in?returnTo=%2Fitem%2Fa-public'
+    );
+  });
 });

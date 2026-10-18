@@ -1,9 +1,10 @@
 import { SignIn, SignUp } from '@clerk/clerk-react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 
 import { Colors } from '@zine/design-system';
 
 import { AppWordmark } from './app-wordmark';
+import { bookmarkReturnDestination } from './lib/bookmark-return';
 import { useAuthAvailability } from './lib/trpc';
 
 const clerkAppearance = {
@@ -22,7 +23,12 @@ const clerkAppearance = {
 };
 
 export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
-  const destination = '/welcome';
+  const location = useLocation();
+  const bookmarkDestination = bookmarkReturnDestination(location.search);
+  const destination = bookmarkDestination ?? '/welcome';
+  const authQuery = bookmarkDestination
+    ? `?returnTo=${encodeURIComponent(bookmarkDestination)}`
+    : '';
   const { isEnabled, mode: authMode } = useAuthAvailability();
 
   if (!isEnabled) {
@@ -51,7 +57,7 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
               appearance={clerkAppearance}
               path="/sign-in"
               routing="path"
-              signUpUrl="/sign-up"
+              signUpUrl={`/sign-up${authQuery}`}
               fallbackRedirectUrl={destination}
               forceRedirectUrl={destination}
             />
@@ -60,7 +66,7 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
               appearance={clerkAppearance}
               path="/sign-up"
               routing="path"
-              signInUrl="/sign-in"
+              signInUrl={`/sign-in${authQuery}`}
               fallbackRedirectUrl={destination}
               forceRedirectUrl={destination}
             />

@@ -1,3 +1,4 @@
+import { useLocation } from 'react-router-dom';
 import { screen } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -52,5 +53,18 @@ describe('ProtectedRoute', () => {
     renderRoute(<ProtectedRoute>private</ProtectedRoute>);
 
     expect(screen.getByText('private')).toBeVisible();
+  });
+  test('keeps the bookmark route when sending signed-out readers to sign-in', async () => {
+    setAuthAvailability({ isEnabled: true, mode: 'clerk' });
+    setSessionState({ isLoaded: true, isSignedIn: false });
+    function Destination() {
+      return <div>{useLocation().search}</div>;
+    }
+    renderRoute(<ProtectedRoute>private</ProtectedRoute>, {
+      route: '/item/a-public',
+      path: '/item/:bookmarkId',
+      redirects: [{ path: '/sign-in', element: <Destination /> }],
+    });
+    expect(await screen.findByText('?returnTo=%2Fitem%2Fa-public')).toBeVisible();
   });
 });
