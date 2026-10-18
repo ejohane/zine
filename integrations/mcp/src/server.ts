@@ -118,7 +118,7 @@ export function createMcpServer(env: Bindings, principal: Principal | null, cfg:
   tool(
     'search_saved',
     'Search saved items',
-    'Search titles, descriptions and URLs of your saved bookmarks. Follow nextCursor for more results. When the user wants visual results, then call show_saved with the returned bookmarkIds, query and nextCursor.',
+    'Search titles, descriptions and URLs of saved bookmarks. By default only incomplete bookmarks are returned, matching the app. Set completion to completed (completed only) or all (both) only when the user explicitly asks. Preserve completion and query with nextCursor on every page. For visual results, call show_saved with the selected bookmarkIds and the returned query, completion and nextCursor.',
     searchSchema,
     false,
     (s, p) => s.search(p),
@@ -127,7 +127,7 @@ export function createMcpServer(env: Bindings, principal: Principal | null, cfg:
   tool(
     'show_saved',
     'Show saved items',
-    'Display interactive Zine article cards. First call search_saved, then pass the selected bookmarkIds and its query/nextCursor. Rechecks ownership and reads current metadata; never pass fabricated article data. Users can search, read stored content, open sources and add to collections in the component.',
+    'Display interactive Zine article cards. First call search_saved, then pass the selected bookmarkIds and its query/completion/nextCursor. Keep the completion mode from the search result for pagination. Rechecks ownership and reads current metadata; never pass fabricated article data. Users can search, read stored content, open sources and add to collections in the component.',
     showSchema,
     false,
     (s, p) => s.show(p),

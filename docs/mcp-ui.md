@@ -35,7 +35,7 @@ enforcement. The resource still declares its explicit CSP.
 1. Call `search_saved` with a title/description/URL query (empty means browse).
 2. Call `show_saved` with the selected `bookmarkIds`, the returned `query`, and
    `nextCursor` when preserving pagination. Only this tool declares a UI resource.
-3. ChatGPT reads `ui://zine/saved-library-v2.html`, served as
+3. ChatGPT reads `ui://zine/saved-library-v3.html`, served as
    `text/html;profile=mcp-app`. The model still receives the structured results
    and text in clients without component support.
 4. The component initializes the MCP Apps bridge and renders the tool result.
@@ -48,6 +48,20 @@ the linked account and current bookmarked state. It uses the same Gmail/private
 source provenance predicate as search/read. It does not trust model-supplied
 titles, URLs, summaries, artwork or tags. Supplied cursors must match the account
 and query. Tags are fetched only for the authorized rows and account.
+
+## Completion filtering
+
+`search_saved` defaults to `completion: "incomplete"`, matching the app's
+`user_items.is_finished = 0` behavior. Explicit requests can use
+`completion: "completed"` for completed bookmarks only or `completion: "all"`
+for both states. Returned cards include the current `isFinished` value.
+
+Filtering happens in SQL before ordering and pagination. The returned completion
+mode must be carried into subsequent searches and `show_saved`; cursors are
+bound to account, query and mode. Old cursors require a fresh search after this
+change. Directly reading or displaying a known owned completed bookmark is
+still allowed: completion changes search defaults, not ownership or permissions.
+No bookmark completion state is changed by these queries.
 
 ## Component behavior
 

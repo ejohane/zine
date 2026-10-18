@@ -449,6 +449,7 @@
       const state = {
         items: [],
         query: '',
+        completion: 'incomplete',
         nextCursor: null,
         searching: false,
         readerId: null,
@@ -663,6 +664,7 @@
           ? [...new Map([...state.items, ...data.items].map((i) => [i.bookmarkId, i])).values()]
           : data.items;
         state.query = data.query ?? state.query;
+        state.completion = data.completion ?? 'incomplete';
         state.nextCursor = data.nextCursor ?? null;
         $('query').value = state.query;
         render();
@@ -684,6 +686,7 @@
         try {
           const data = await call('search_saved', {
             query: append ? state.query : $('query').value.trim(),
+            completion: state.completion,
             limit: 20,
             ...(append && state.nextCursor ? { cursor: state.nextCursor } : {}),
           });

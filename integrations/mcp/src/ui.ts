@@ -1,7 +1,7 @@
 import template from './ui/library.html';
 import { SemanticColorRoles } from '../../../packages/design-system/src/foundations';
 
-export const LIBRARY_UI_URI = 'ui://zine/saved-library-v2.html';
+export const LIBRARY_UI_URI = 'ui://zine/saved-library-v3.html';
 // Only established public artwork CDNs. Other artwork gets a text-first card;
 // the component never fetches arbitrary saved URLs or sends OAuth credentials.
 export const ARTWORK_ORIGINS = [

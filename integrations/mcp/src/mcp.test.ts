@@ -158,6 +158,67 @@ describe('OAuth resource authentication with synthetic signed tokens', () => {
 });
 
 describe('account-scoped workflows on actual migrated D1 and R2', () => {
+  it('hides completed bookmarks by default and supports explicit completed-only and all searches', async () => {
+    await seed('done');
+    await own('user_alice', 'done', 'z-done');
+    await bindings.DB.prepare('UPDATE user_items SET is_finished=1 WHERE id=?')
+      .bind('z-done')
+      .run();
+    const alice = new McpLibrary(bindings, 'user_alice');
+    // Filter before LIMIT: a newer completed item must not displace an unfinished result.
+    const normal = await alice.search({ limit: 1 });
+    expect(normal.completion).toBe('incomplete');
+    expect(normal.items.map((i) => [i.bookmarkId, i.isFinished])).toEqual([['a-public', false]]);
+    expect(normal.nextCursor).toBeNull();
+    expect((await alice.search({ query: 'done' })).items).toEqual([]);
+    const completed = await alice.search({ completion: 'completed', query: 'done' });
+    expect(completed.items.map((i) => [i.bookmarkId, i.isFinished])).toEqual([['z-done', true]]);
+    expect((await alice.search({ completion: 'all' })).items.map((i) => i.bookmarkId)).toEqual([
+      'z-done',
+      'a-public',
+    ]);
+    expect(
+      (await new McpLibrary(bindings, 'user_bob').search({ completion: 'all' })).items.map(
+        (i) => i.bookmarkId
+      )
+    ).toEqual(['b-bob']);
+    // Completion is a query filter, not an ownership restriction on explicit reads.
+    expect((await alice.read({ bookmarkId: 'z-done' })).bookmarkId).toBe('z-done');
+    await expect(
+      new McpLibrary(bindings, 'user_bob').read({ bookmarkId: 'z-done' })
+    ).rejects.toThrow('NOT_FOUND');
+    expect(searchSchema.safeParse({ completion: 'sometimes' }).success).toBe(false);
+  });
+  it('binds query and visual pagination to completion mode', async () => {
+    for (const name of ['second', 'done-one', 'done-two']) {
+      await seed(name);
+      await own('user_alice', name, `z-${name}`);
+    }
+    await bindings.DB.prepare(
+      "UPDATE user_items SET is_finished=1 WHERE id IN ('z-done-one','z-done-two')"
+    ).run();
+    const alice = new McpLibrary(bindings, 'user_alice');
+    for (const completion of ['incomplete', 'completed', 'all'] as const) {
+      const first = await alice.search({ completion, limit: 1 });
+      expect(first.nextCursor).toBeTruthy();
+      const next = await alice.search({ completion, limit: 1, cursor: first.nextCursor! });
+      expect(next.items[0].bookmarkId).not.toBe(first.items[0].bookmarkId);
+      const renderInput = {
+        bookmarkIds: first.items.map((i) => i.bookmarkId),
+        query: first.query,
+        completion,
+        nextCursor: first.nextCursor,
+      };
+      expect(await alice.show(renderInput)).toEqual(first);
+      const otherMode = completion === 'all' ? 'incomplete' : 'all';
+      await expect(
+        alice.search({ completion: otherMode, cursor: first.nextCursor! })
+      ).rejects.toThrow('INVALID_INPUT');
+      await expect(alice.show({ ...renderInput, completion: otherMode })).rejects.toThrow(
+        'INVALID_INPUT'
+      );
+    }
+  });
   it('presents only reauthorized IDs with current card metadata and account-owned tags', async () => {
     await db.insert(creators).values({
       id: 'card-creator',
@@ -242,6 +303,7 @@ describe('account-scoped workflows on actual migrated D1 and R2', () => {
     expect(await alice.show({ bookmarkIds: [] })).toEqual({
       items: [],
       query: '',
+      completion: 'incomplete',
       nextCursor: null,
     });
   });
@@ -621,6 +683,10 @@ describe('official MCP transport and discovery', () => {
     expect(list.result.tools.find((t) => t.name === 'search_saved')).not.toHaveProperty(
       '_meta.ui.resourceUri'
     );
+    expect(list.result.tools.find((t) => t.name === 'search_saved')).toHaveProperty(
+      'inputSchema.properties.completion.default',
+      'incomplete'
+    );
     expect(list.result.tools[0]).toHaveProperty('securitySchemes');
     expect(list.result.tools[0]._meta).toHaveProperty('securitySchemes');
     const result = (await (
@@ -685,6 +751,26 @@ describe('official MCP transport and discovery', () => {
       await rpc('tools/call', { name: 'search_saved', arguments: {} }, signed)
     ).json()) as { result: { structuredContent: { data: { items: unknown[] } } } };
     expect(result.result.structuredContent.data.items).toHaveLength(1);
+    await bindings.DB.prepare("UPDATE user_items SET is_finished=1 WHERE id='a-public'").run();
+    const hidden = await (
+      await rpc('tools/call', { name: 'search_saved', arguments: {} }, signed)
+    ).json();
+    expect(hidden).toHaveProperty('result.structuredContent.data.items', []);
+    const completedOnly = await (
+      await rpc(
+        'tools/call',
+        { name: 'search_saved', arguments: { completion: 'completed' } },
+        signed
+      )
+    ).json();
+    expect(completedOnly).toHaveProperty('result.structuredContent.data.items.0.isFinished', true);
+    const includingCompleted = await (
+      await rpc('tools/call', { name: 'search_saved', arguments: { completion: 'all' } }, signed)
+    ).json();
+    expect(includingCompleted).toHaveProperty(
+      'result.structuredContent.data.items.0.bookmarkId',
+      'a-public'
+    );
     const initialized = await (
       await rpc(
         'initialize',
