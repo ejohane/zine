@@ -106,12 +106,13 @@ Dir.mktmpdir do |directory|
   source = File.expand_path('../../apps/ios/ZineNative.xcodeproj', __dir__)
   project = File.join(directory, 'ZineNative.xcodeproj')
   FileUtils.cp_r(source, project)
-  profiles = {'ZineNative' => 'app-profile', 'ZineShareExtension' => 'share-profile'}
+  profiles = {'ZineNative' => 'app-profile', 'ZineShareExtension' => 'share-profile',
+              'ZineWidgetExtension' => 'widget-profile'}
   ZineTestFlight.run({'action' => 'project', 'project' => project, 'prepare' => true,
                       'certificate' => 'fixture-certificate', 'profiles' => profiles,
                       'build' => '2026101702'})
   targets = ZineTestFlight.run({'action' => 'project', 'project' => project})
-  assert(targets.size == 2, 'Unexpected targets')
+  assert(targets.size == 3, 'Expected app, share, and widget targets')
   targets.each do |target|
     settings = target[:settings]
     assert(settings['CURRENT_PROJECT_VERSION'] == '2026101702', 'Build mismatch')

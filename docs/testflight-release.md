@@ -13,12 +13,18 @@ revocation operation is implemented.
   or `xcode-select`, Ruby 3.2+ and Bundler 2.7.2. The Mac's system Ruby is too old.
 - Existing distribution identity/private key
   `089C7A0D222C10692C5CCCF0A1E0F13875313822` in the unlocked signing keychain.
-- Existing manual App Store profiles `87993fb3-51ec-4f97-8ebb-809355265827`
-  (app) and `6033050f-e759-4dea-ae66-ef19c71273f7` (share extension), installed
-  under Xcode UserData or MobileDevice Provisioning Profiles. Doctor checks
-  expiry, certificate membership, identifiers, team and relevant entitlements.
-- App `6823593368`, bundle `app.zine.native`, extension
-  `app.zine.native.share`, team `TRA7965NM5`. The only permitted group is
+- Manual App Store profiles for the app, share extension, and widget, installed
+  under Xcode UserData or MobileDevice Provisioning Profiles. Set the approved
+  UUIDs with `ZINE_TF_APP_PROFILE_UUID`, `ZINE_TF_SHARE_PROFILE_UUID`, and
+  `ZINE_TF_WIDGET_PROFILE_UUID`. These are profile identifiers, not credentials.
+  The legacy app/share UUIDs remain defaults; the widget has no legacy default.
+  The app and widget profiles must authorize `group.app.zine.native`. The old
+  app profile predates widgets and must be replaced with an App Group profile.
+  Doctor checks expiry, distribution type, certificate membership, identifiers,
+  team, and target-specific grants. It never accepts a development profile.
+- App `6823593368`, bundle `app.zine.native`, extensions
+  `app.zine.native.share` and `app.zine.native.widgets`, team `TRA7965NM5`.
+  The only permitted TestFlight group is
   `83615578-9adf-46d6-9ffd-a6b30d319160`, named Erik Internal, internal,
   public link disabled, automatic distribution (`hasAccessToAllBuilds`) off,
   and exactly one tester: `ejohane@gmail.com`. Every app group must report automatic
@@ -83,6 +89,11 @@ fetches latest main, requires the reviewed SHA to match, and takes a detached
 worktree at that immutable SHA. Source overrides are restricted to manual
 signing and synchronized app/extension build numbers in that snapshot. The prepared
 project hash is checked after archiving as well as tracked source changes.
+Selected profile UUIDs are recorded in the release manifest and used to verify
+every archived and exported product. Both extensions must be present. The widget
+reads the shared App Group snapshot and has no API configuration or keychain grant;
+production API checks apply to the app and share extension. Entitlement checks
+match the current source exactly, including the app's three associated domains.
 
 Before a release, review changes since the last release, native dependency pins,
 production endpoint/auth configuration, signing and entitlements. Changes to
