@@ -202,7 +202,7 @@ in two rows; large shows up to six in three rows, both in two columns. Its items
 Jump Back In section, including its ordering, complete-row cropping, optimistic
 updates, completion/archive/removal exclusions, rollback, and older-history refill.
 Accessibility text sizes use one column with up to two or three entries respectively.
-The header has no disclosure icon. Zine supplies a clear container background;
+The widget has no heading or disclosure icon. Zine supplies a clear container background;
 iOS still controls the outer container in Default/Dark appearances. Home Screen
 Clear/Tinted appearances use the system glass and omit solid card fills.
 
@@ -216,7 +216,7 @@ account/API-environment switches clear the shared snapshot.
 Each tile has a scoped `zine://widget/bookmark` link. The app waits for sign-in,
 checks the account and API environment, then fetches that bookmark through the
 existing REST client. Articles resume in the normal bookmark reader. Unavailable
-bookmarks show a recoverable error. The widget header opens Home.
+bookmarks show a recoverable error. Tapping unused widget space opens Home.
 
 For device signing, enable the App Group for both `app.zine.native` and
 `app.zine.native.widgets` in the Apple developer account and regenerate their

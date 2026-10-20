@@ -60,12 +60,6 @@ struct JumpBackInWidgetView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Link(destination: homeURL) {
-                Text("Jump Back In")
-                    .font(.headline)
-                    .foregroundStyle(foreground)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
             if let snapshot = entry.snapshot, !snapshot.items.isEmpty {
                 GeometryReader { geometry in
                     let columnCount = dynamicTypeSize.isAccessibilitySize ? 1 : 2

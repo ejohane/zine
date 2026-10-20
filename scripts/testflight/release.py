@@ -25,6 +25,9 @@ GROUP = '83615578-9adf-46d6-9ffd-a6b30d319160'
 CERT = '089C7A0D222C10692C5CCCF0A1E0F13875313822'
 PROFILES = {'ZineNative': '87993fb3-51ec-4f97-8ebb-809355265827',
             'ZineShareExtension': '6033050f-e759-4dea-ae66-ef19c71273f7'}
+BUNDLES = {'ZineNative': BUNDLE, 'ZineShareExtension': BUNDLE + '.share',
+           'ZineWidgetExtension': BUNDLE + '.widgets'}
+APP_GROUP = 'group.app.zine.native'
 TARGET = dict(app=APP, bundle=BUNDLE, team=TEAM, group=GROUP)
 STATE = Path.home() / 'Library/Application Support/Zine/TestFlight'
 PROJECT = 'apps/ios/ZineNative.xcodeproj'
@@ -161,31 +164,48 @@ def source_sha(fetch=True):
 
 def project_info(root):
     targets = bridge('project', project=str(root / PROJECT))
-    require({t['name'] for t in targets} == set(PROFILES), 'Unexpected release targets')
+    require({t['name'] for t in targets} == set(BUNDLES), 'Unexpected release targets')
     versions = set()
     for target in targets:
         settings = target['settings']
-        suffix = '' if target['name'] == 'ZineNative' else '.share'
-        require(settings.get('PRODUCT_BUNDLE_IDENTIFIER') == BUNDLE + suffix
+        require(settings.get('PRODUCT_BUNDLE_IDENTIFIER') == BUNDLES[target['name']]
                 and settings.get('DEVELOPMENT_TEAM') == TEAM, 'Project app/team mismatch')
         expected_entitlements = 'Configuration/' + target['name'] + '.entitlements'
         require(settings.get('CODE_SIGN_ENTITLEMENTS') == expected_entitlements, 'Entitlement source changed')
-        if target['name'] == 'ZineNative':
-            require(settings.get('ZINE_APNS_ENVIRONMENT') == 'production', 'Release APNs setting changed')
         versions.add(settings.get('MARKETING_VERSION'))
     require(len(versions) == 1 and None not in versions, 'App/extension version mismatch')
     require(not (root / 'apps/ios/Configuration/Local.xcconfig').exists(), 'Local configuration present')
     config = root / 'apps/ios/Configuration'
-    app_ent = plistlib.loads((config / 'ZineNative.entitlements').read_bytes())
-    share_ent = plistlib.loads((config / 'ZineShareExtension.entitlements').read_bytes())
-    require(app_ent == {
-        'com.apple.developer.associated-domains': ['webcredentials:clerk.myzine.app', 'applinks:$(ZINE_PUBLICATION_HOST)'],
-        'aps-environment': '$(ZINE_APNS_ENVIRONMENT)',
-        'com.apple.developer.applesignin': ['Default'],
-        'keychain-access-groups': ['$(AppIdentifierPrefix)app.zine.native']}
-        and share_ent == {'keychain-access-groups': ['$(AppIdentifierPrefix)app.zine.native']},
-        'Entitlement grants changed; release tooling review required')
+    for name, bundle in BUNDLES.items():
+        ent = plistlib.loads((config / (name + '.entitlements')).read_bytes())
+        require(ent == source_entitlements(bundle),
+                'Entitlement grants changed; release tooling review required')
     return versions.pop()
+
+
+def source_entitlements(bundle):
+    if bundle == BUNDLE:
+        return {
+            'com.apple.developer.associated-domains': ['webcredentials:clerk.myzine.app', 'applinks:myzine.app', 'applinks:www.myzine.app'],
+            'com.apple.developer.applesignin': ['Default'],
+            'keychain-access-groups': ['$(AppIdentifierPrefix)app.zine.native'],
+            'com.apple.security.application-groups': [APP_GROUP]}
+    if bundle == BUNDLE + '.share':
+        return {'keychain-access-groups': ['$(AppIdentifierPrefix)app.zine.native']}
+    require(bundle == BUNDLE + '.widgets', 'Unexpected bundle')
+    return {'com.apple.security.application-groups': [APP_GROUP]}
+
+
+def signing_profiles():
+    profiles = dict(PROFILES)
+    for name, variable in [('ZineNative', 'ZINE_TF_APP_PROFILE_UUID'),
+                           ('ZineShareExtension', 'ZINE_TF_SHARE_PROFILE_UUID'),
+                           ('ZineWidgetExtension', 'ZINE_TF_WIDGET_PROFILE_UUID')]:
+        uuid = os.environ.get(variable, profiles.get(name))
+        require(uuid and re.fullmatch(r'[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}', uuid),
+                f'Set {variable} to the approved installed App Store profile UUID')
+        profiles[name] = uuid
+    return profiles
 
 
 def profile_path(uuid):
@@ -211,8 +231,13 @@ def profile_check(profile, bundle, uuid):
             'Profile does not include existing distribution certificate')
     require(ent.get('keychain-access-groups') == [TEAM + '.*', 'com.apple.token'],
             'Existing profile keychain grants changed')
+    expected = source_entitlements(bundle)
+    require(ent.get('com.apple.security.application-groups', []) ==
+            expected.get('com.apple.security.application-groups', []), 'Profile App Group mismatch')
     if bundle == BUNDLE:
-        require(ent.get('aps-environment') == 'production', 'Profile APNs mismatch')
+        require(ent.get('com.apple.developer.applesignin') == ['Default']
+                and ent.get('com.apple.developer.associated-domains') == ['*'],
+                'Profile auth capabilities mismatch')
 
 
 def validate_credentials():
@@ -238,9 +263,9 @@ def doctor(credentials=True):
     version = project_info(ROOT)
     identities = run(['security', 'find-identity', '-v', '-p', 'codesigning']).decode()
     require(CERT in identities, 'Existing distribution identity unavailable; unlock keychain/check host keychain access (do not replace signing)')
-    for name, uuid in PROFILES.items():
+    for name, uuid in signing_profiles().items():
         profile = plistlib.loads(run(['security', 'cms', '-D', '-i', profile_path(uuid)]))
-        profile_check(profile, BUNDLE + ('.share' if name == 'ZineShareExtension' else ''), uuid)
+        profile_check(profile, BUNDLES[name], uuid)
     if credentials:
         validate_credentials()
         guard_audience()
@@ -298,28 +323,42 @@ def load(path):
 def verify_app(app, manifest):
     run(['codesign', '--verify', '--deep', '--strict', app])
     extensions = list((app / 'PlugIns').glob('*.appex'))
-    require(len(extensions) == 1, 'Unexpected extensions')
-    products = [(app, BUNDLE, PROFILES['ZineNative']),
-                (extensions[0], BUNDLE + '.share', PROFILES['ZineShareExtension'])]
-    for product, bundle, uuid in products:
+    require(len(extensions) == 2, 'Expected share and widget extensions')
+    profiles = manifest.get('profiles') or signing_profiles()
+    require(set(profiles) == set(BUNDLES), 'Release signing profiles mismatch')
+    products = {}
+    for product in [app, *extensions]:
+        bundle = plistlib.loads((product / 'Info.plist').read_bytes())['CFBundleIdentifier']
+        require(bundle not in products, 'Duplicate signed bundle')
+        products[bundle] = product
+    require(set(products) == set(BUNDLES.values()) and products[BUNDLE] == app,
+            'Signed app/extension bundle set mismatch')
+    for name, bundle in BUNDLES.items():
+        product, uuid = products[bundle], profiles[name]
         info = plistlib.loads((product / 'Info.plist').read_bytes())
         require(info['CFBundleIdentifier'] == bundle and info['CFBundleVersion'] == manifest['build']
                 and info['CFBundleShortVersionString'] == manifest['version'], 'Signed build identity mismatch')
-        require(info.get('ZINEAPIBaseURL') == 'https://api.myzine.app'
-                and not info.get('NSAppTransportSecurity', {}).get('NSExceptionDomains'), 'Production API/ATS mismatch')
+        if name != 'ZineWidgetExtension':
+            require(info.get('ZINEAPIBaseURL') == 'https://api.myzine.app'
+                    and not info.get('NSAppTransportSecurity', {}).get('NSExceptionDomains'), 'Production API/ATS mismatch')
+        else:
+            require(info.get('NSExtension', {}).get('NSExtensionPointIdentifier') ==
+                    'com.apple.widgetkit-extension', 'Widget extension point mismatch')
         profile = plistlib.loads(run(['security', 'cms', '-D', '-i', product / 'embedded.mobileprovision']))
         profile_check(profile, bundle, uuid)
         # codesign emits the entitlement plist on stdout with this invocation.
         ent = plistlib.loads(run(['codesign', '-d', '--entitlements', '-', '--xml', product]))
         require(ent.get('application-identifier') == TEAM + '.' + bundle
                 and ent.get('com.apple.developer.team-identifier') == TEAM
-                and ent.get('get-task-allow') is not True
-                and ent.get('keychain-access-groups') == [TEAM + '.' + BUNDLE], 'Signed entitlements mismatch')
-        if bundle == BUNDLE:
-            require(ent.get('aps-environment') == 'production', 'Signed APNs mismatch')
-            require(ent.get('com.apple.developer.applesignin') == ['Default']
-                    and ent.get('com.apple.developer.associated-domains') ==
-                    ['webcredentials:clerk.myzine.app', 'applinks:myzine.app'], 'Signed auth domains changed')
+                and ent.get('get-task-allow') is not True, 'Signed entitlements mismatch')
+        expected = source_entitlements(bundle)
+        for key in ('keychain-access-groups', 'com.apple.security.application-groups',
+                    'com.apple.developer.applesignin', 'com.apple.developer.associated-domains',
+                    'aps-environment'):
+            value = expected.get(key)
+            if key == 'keychain-access-groups' and value:
+                value = [TEAM + '.' + BUNDLE]
+            require(ent.get(key) == value, 'Signed capability mismatch: ' + key)
         with tempfile.TemporaryDirectory() as directory:
             prefix = Path(directory) / 'cert'
             run(['codesign', '-d', '--extract-certificates=' + str(prefix), product])
@@ -333,8 +372,9 @@ def archive(directory, manifest):
     git('worktree', 'add', '--detach', str(checkout), manifest['sha'])
     require(git('-C', str(checkout), 'rev-parse', 'HEAD') == manifest['sha'], 'Snapshot mismatch')
     require(project_info(checkout) == manifest['version'], 'Snapshot version mismatch')
+    manifest['profiles'] = signing_profiles()
     bridge('project', project=str(checkout / PROJECT), prepare=True,
-           certificate=CERT, profiles=PROFILES, build=manifest['build'])
+           certificate=CERT, profiles=manifest['profiles'], build=manifest['build'])
     prepared_project_hash = hashlib.sha256((checkout / PROJECT / 'project.pbxproj').read_bytes()).hexdigest()
     archive_path = directory / 'Zine.xcarchive'
     # No provisioning updates: only the installed certificate and profiles can be used.
@@ -358,8 +398,8 @@ def export_archive(directory, manifest):
     archive_path = directory / 'Zine.xcarchive'
     options = dict(method='app-store-connect', signingStyle='manual', teamID=TEAM,
                    signingCertificate=CERT, manageAppVersionAndBuildNumber=False,
-                   uploadSymbols=True, provisioningProfiles={BUNDLE: PROFILES['ZineNative'],
-                   BUNDLE + '.share': PROFILES['ZineShareExtension']})
+                   uploadSymbols=True, provisioningProfiles={BUNDLES[name]: uuid
+                   for name, uuid in manifest['profiles'].items()})
     options_path = directory / 'ExportOptions.plist'
     options_path.write_bytes(plistlib.dumps(options))
     run(['xcodebuild', '-exportArchive', '-archivePath', archive_path,

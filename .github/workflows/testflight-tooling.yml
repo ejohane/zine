@@ -7,6 +7,8 @@ on:
       - 'scripts/testflight-release'
       - 'tests/testflight/**'
       - '.github/workflows/testflight-tooling.yml'
+      - 'apps/ios/ZineNative.xcodeproj/**'
+      - 'apps/ios/Configuration/**'
   push:
     branches: [main]
     paths:
@@ -14,6 +16,8 @@ on:
       - 'scripts/testflight-release'
       - 'tests/testflight/**'
       - '.github/workflows/testflight-tooling.yml'
+      - 'apps/ios/ZineNative.xcodeproj/**'
+      - 'apps/ios/Configuration/**'
 
 permissions:
   contents: read

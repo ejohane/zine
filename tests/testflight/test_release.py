@@ -3,6 +3,7 @@ import copy
 import importlib.util
 import io
 import json
+import plistlib
 from pathlib import Path
 import tempfile
 import unittest
@@ -25,6 +26,7 @@ class ReleaseTests(unittest.TestCase):
         self.directory = Path(self.temp.name)
         self.path = self.directory / 'manifest.json'
         self.m = manifest()
+        self.profiles = dict(r.PROFILES, ZineWidgetExtension='11111111-2222-3333-4444-555555555555')
         self.ipa = self.directory / 'Zine.ipa'
         self.ipa.write_bytes(b'fixture signed bytes')
         self.m.update(ipa=str(self.ipa), ipa_sha256=r.hashlib.sha256(self.ipa.read_bytes()).hexdigest())
@@ -197,6 +199,9 @@ class ReleaseTests(unittest.TestCase):
                    'DeveloperCertificates': [b'fixture certificate'],
                    'Entitlements': {'application-identifier': r.TEAM + '.' + r.BUNDLE,
                                     'get-task-allow': False, 'aps-environment': 'production',
+                                    'com.apple.security.application-groups': [r.APP_GROUP],
+                                    'com.apple.developer.applesignin': ['Default'],
+                                    'com.apple.developer.associated-domains': ['*'],
                                     'keychain-access-groups': [r.TEAM + '.*', 'com.apple.token']}}
         with patch.object(r, 'CERT', r.hashlib.sha1(b'fixture certificate').hexdigest().upper()):
             r.profile_check(profile, r.BUNDLE, r.PROFILES['ZineNative'])
@@ -292,10 +297,112 @@ class ReleaseTests(unittest.TestCase):
         def build(*args, **kwargs):
             project_file.write_text('unexpected project edit during build')
             return b''
-        with patch.object(r, 'git', side_effect=['', self.m['sha']]), patch.object(r, 'project_info', return_value='0.1'), patch.object(r, 'bridge'), patch.object(r, 'run', side_effect=build), patch.object(r, 'export_archive') as export:
+        with patch.object(r, 'signing_profiles', return_value=self.profiles), patch.object(r, 'git', side_effect=['', self.m['sha']]), patch.object(r, 'project_info', return_value='0.1'), patch.object(r, 'bridge'), patch.object(r, 'run', side_effect=build), patch.object(r, 'export_archive') as export:
             with self.assertRaisesRegex(r.ReleaseError, 'Prepared project changed'):
                 r.archive(self.directory, self.m)
             export.assert_not_called()
+
+    def test_signing_profiles_require_explicit_widget_store_profile(self):
+        with patch.dict(r.os.environ, {}, clear=True):
+            with self.assertRaisesRegex(r.ReleaseError, 'ZINE_TF_WIDGET_PROFILE_UUID'):
+                r.signing_profiles()
+        with patch.dict(r.os.environ, {'ZINE_TF_WIDGET_PROFILE_UUID': self.profiles['ZineWidgetExtension'],
+                                     'ZINE_TF_APP_PROFILE_UUID': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'}, clear=True):
+            profiles = r.signing_profiles()
+            self.assertEqual(profiles['ZineNative'], 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee')
+            self.assertEqual(profiles['ZineWidgetExtension'], self.profiles['ZineWidgetExtension'])
+            self.assertEqual(profiles['ZineShareExtension'], r.PROFILES['ZineShareExtension'])
+
+    def test_project_checks_all_three_targets_and_exact_source_grants(self):
+        config = self.directory / 'apps/ios/Configuration'
+        config.mkdir(parents=True)
+        targets = []
+        for name, bundle in r.BUNDLES.items():
+            (config / (name + '.entitlements')).write_bytes(plistlib.dumps(r.source_entitlements(bundle)))
+            targets.append(dict(name=name, settings=dict(PRODUCT_BUNDLE_IDENTIFIER=bundle,
+                DEVELOPMENT_TEAM=r.TEAM, CODE_SIGN_ENTITLEMENTS='Configuration/' + name + '.entitlements',
+                MARKETING_VERSION='0.1')))
+        with patch.object(r, 'bridge', return_value=targets):
+            self.assertEqual(r.project_info(self.directory), '0.1')
+            for name, bundle in r.BUNDLES.items():
+                path = config / (name + '.entitlements')
+                ent = r.source_entitlements(bundle)
+                ent['unreviewed-capability'] = True
+                path.write_bytes(plistlib.dumps(ent))
+                with self.assertRaisesRegex(r.ReleaseError, 'Entitlement grants changed'):
+                    r.project_info(self.directory)
+                path.write_bytes(plistlib.dumps(r.source_entitlements(bundle)))
+        with patch.object(r, 'bridge', return_value=targets[:2]):
+            with self.assertRaisesRegex(r.ReleaseError, 'Unexpected release targets'):
+                r.project_info(self.directory)
+
+    def test_canonical_app_entitlements_match_reviewed_release_contract(self):
+        config = r.ROOT / 'apps/ios/Configuration'
+        for name, bundle in r.BUNDLES.items():
+            with self.subTest(target=name):
+                ent = plistlib.loads((config / (name + '.entitlements')).read_bytes())
+                self.assertEqual(ent, r.source_entitlements(bundle))
+
+    def test_widget_profile_requires_distribution_and_exact_app_group(self):
+        name = 'ZineWidgetExtension'
+        profile = dict(UUID=self.profiles[name], TeamIdentifier=[r.TEAM],
+            ExpirationDate=r.dt.datetime(2099, 1, 1), DeveloperCertificates=[b'fixture certificate'],
+            Entitlements={'application-identifier': r.TEAM + '.' + r.BUNDLES[name],
+                'get-task-allow': False, 'keychain-access-groups': [r.TEAM + '.*', 'com.apple.token'],
+                'com.apple.security.application-groups': [r.APP_GROUP]})
+        with patch.object(r, 'CERT', r.hashlib.sha1(b'fixture certificate').hexdigest().upper()):
+            r.profile_check(profile, r.BUNDLES[name], self.profiles[name])
+            for groups in ([], ['group.other'], [r.APP_GROUP, 'group.other']):
+                bad = copy.deepcopy(profile)
+                bad['Entitlements']['com.apple.security.application-groups'] = groups
+                with self.assertRaisesRegex(r.ReleaseError, 'App Group mismatch'):
+                    r.profile_check(bad, r.BUNDLES[name], self.profiles[name])
+            profile['ProvisionedDevices'] = ['phone']
+            with self.assertRaisesRegex(r.ReleaseError, 'App Store profile mismatch'):
+                r.profile_check(profile, r.BUNDLES[name], self.profiles[name])
+
+    def test_signed_archive_requires_both_extensions_and_widget_grants(self):
+        app = self.directory / 'Zine.app'
+        products = {'ZineNative': app, 'ZineShareExtension': app / 'PlugIns/Zine.appex',
+                    'ZineWidgetExtension': app / 'PlugIns/Widget.appex'}
+        for name, product in products.items():
+            product.mkdir(parents=True, exist_ok=True)
+            info = dict(CFBundleIdentifier=r.BUNDLES[name], CFBundleVersion=self.m['build'],
+                        CFBundleShortVersionString=self.m['version'])
+            if name == 'ZineWidgetExtension':
+                info['NSExtension'] = dict(NSExtensionPointIdentifier='com.apple.widgetkit-extension')
+            else:
+                info['ZINEAPIBaseURL'] = 'https://api.myzine.app'
+            (product / 'Info.plist').write_bytes(plistlib.dumps(info))
+        self.m['profiles'] = self.profiles
+        bad_widget = False
+        def run(args, **kwargs):
+            if args[:3] == ['security', 'cms', '-D']:
+                return plistlib.dumps({})
+            if '--entitlements' in args:
+                name = next(name for name, path in products.items() if path == args[-1])
+                bundle = r.BUNDLES[name]
+                ent = r.source_entitlements(bundle)
+                ent.update({'application-identifier': r.TEAM + '.' + bundle,
+                            'com.apple.developer.team-identifier': r.TEAM, 'get-task-allow': False})
+                if 'keychain-access-groups' in ent:
+                    ent['keychain-access-groups'] = [r.TEAM + '.' + r.BUNDLE]
+                if name == 'ZineWidgetExtension' and bad_widget:
+                    ent['com.apple.security.application-groups'] = ['group.other']
+                return plistlib.dumps(ent)
+            for arg in args:
+                if str(arg).startswith('--extract-certificates='):
+                    Path(str(arg).split('=', 1)[1] + '0').write_bytes(b'fixture certificate')
+            return b''
+        with patch.object(r, 'run', side_effect=run), patch.object(r, 'profile_check') as profiles, patch.object(r, 'CERT', r.hashlib.sha1(b'fixture certificate').hexdigest().upper()):
+            r.verify_app(app, self.m)
+            self.assertEqual({call.args[1] for call in profiles.call_args_list}, set(r.BUNDLES.values()))
+            bad_widget = True
+            with self.assertRaisesRegex(r.ReleaseError, 'Signed capability mismatch'):
+                r.verify_app(app, self.m)
+            products['ZineWidgetExtension'].rename(app / 'PlugIns/Widget.missing')
+            with self.assertRaisesRegex(r.ReleaseError, 'Expected share and widget'):
+                r.verify_app(app, self.m)
 
     def test_uploaded_resume_reconciles_without_local_signing_or_artifacts(self):
         for upload in ('intent_recorded', 'returned', 'observed'):
