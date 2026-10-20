@@ -169,3 +169,18 @@ white labels chosen by WCAG contrast. Custom-background cards inherit that
 surface and foreground. Native settings retain the standard semantic app roles;
 Clear/Tinted widget appearances defer to system rendering. Core widget color
 tests cover contrast across a sampled sRGB cube and stable saved-color identities.
+
+## Agent-composed Home
+
+Home Lab uses `HomeView` with an optional composition of real account-owned items.
+The seven card types are featured, landscape, cover, compact, tile, row and grid;
+containers are single, horizontal, two-column and vertical. Implementations live
+in `ZineNative/Features/Home/Components` and the existing Home view files.
+`HomeComposedSectionView` reuses these actual cards and Home navigation routes.
+
+Agents select item IDs, card types, container types and short section headings.
+All titles, covers, authors, excerpts and metadata come from real items. Do not
+use editorial story blocks or generate prose to fill the Home screen. The page
+title, sans-serif typography, 16pt gutters, 18pt section spacing, neutral card
+surfaces, Dynamic Type and interaction behavior remain owned by native Home.
+See [the composition contract](../../docs/home-composition.md).

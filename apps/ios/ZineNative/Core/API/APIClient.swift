@@ -1155,6 +1155,7 @@ struct APIClient {
             )
         }
         return HomeResponse(
+            composition: response.composition, compositionItems: response.compositionItems.map(visible),
             recentBookmarks: visible(response.recentBookmarks),
             jumpBackIn: visible(response.jumpBackIn),
             byContentType: HomeContentTypeSections(

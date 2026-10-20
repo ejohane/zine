@@ -1,3 +1,4 @@
+import { getHomeComposition } from '../../lib/home-composition';
 import { listTagSuggestions, decideTagSuggestion } from '../../tagging/service';
 import { TRPCError } from '@trpc/server';
 import { BookmarkSaveInputSchema, saveBookmark } from '../../bookmarks/save';
@@ -211,10 +212,17 @@ apiV1Routes.get('/inbox', apiAuth('bookmarks:read'), async (c) => {
 
 apiV1Routes.get('/home', apiAuth('bookmarks:read'), async (c) => {
   const caller = appRouter.createCaller(await createContext(c));
-  const result = await caller.items.home({});
+  const [result, composition] = await Promise.all([
+    caller.items.home({}),
+    getHomeComposition(c.env, c.get('userId')!).catch(() => ({
+      composition: null,
+      compositionItems: [],
+    })),
+  ]);
 
   return c.json({
     ...result,
+    ...composition,
     requestId: c.get('requestId'),
     traceId: c.get('traceId'),
   });

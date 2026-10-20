@@ -4,7 +4,12 @@ import { generateKeyPair, exportJWK, SignJWT, createLocalJWKSet, type KeyLike } 
 import { authenticate, config, type McpConfig } from './auth';
 import { McpLibrary, safeLink, searchSchema } from './library';
 import { handleMcp } from './server';
+import { McpHome, createHomeSchema } from './home';
+import type { DailyEdition, PublishEditorialEdition } from '@zine/editorial-schema';
+import { homeBundle } from './home.fixture';
 import type { Bindings } from '../../../apps/worker/src/types';
+import { eq } from 'drizzle-orm';
+import { HomeCompositionSchema } from '../../../packages/shared/src/home-composition';
 import { createDb } from '../../../apps/worker/src/db';
 import { buildArticleBodyArtifact } from '../../../apps/worker/src/article-body/artifact';
 import { putArticleBodyArtifact } from '../../../apps/worker/src/article-body/storage';
@@ -672,7 +677,12 @@ describe('official MCP transport and discovery', () => {
     expect(clerkBindings.MCP_VERIFICATION_LIMITER.limit).toHaveBeenCalledTimes(3);
     fetchMock.assertNoPendingInterceptors();
   });
-  async function rpc(method: string, params: unknown = {}, auth?: string) {
+  async function rpc(
+    method: string,
+    params: unknown = {},
+    auth?: string,
+    requestBindings = bindings
+  ) {
     return handleMcp(
       new Request('https://zine.example/mcp', {
         method: 'POST',
@@ -683,14 +693,14 @@ describe('official MCP transport and discovery', () => {
         },
         body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
       }),
-      bindings
+      requestBindings
     );
   }
   it('discovers tools anonymously and requests OAuth at the tool boundary', async () => {
     const list = (await (await rpc('tools/list')).json()) as {
       result: { tools: Array<{ name: string; _meta: unknown }> };
     };
-    expect(list.result.tools).toHaveLength(7);
+    expect(list.result.tools).toHaveLength(17);
     expect(list.result.tools.find((t) => t.name === 'show_saved')).toHaveProperty(
       '_meta.ui.resourceUri',
       LIBRARY_UI_URI
@@ -717,6 +727,176 @@ describe('official MCP transport and discovery', () => {
       resource: cfg.MCP_RESOURCE,
       authorization_servers: [cfg.MCP_OAUTH_ISSUER],
     });
+  });
+  type HomeToolResponse = {
+    result: {
+      isError?: boolean;
+      content: Array<{ text: string }>;
+      structuredContent: {
+        data: {
+          bundle: PublishEditorialEdition;
+          issue: DailyEdition;
+          generation: { status: string };
+          published: boolean;
+          created: boolean;
+          result: { created: boolean };
+        };
+      };
+    };
+  };
+  it('creates, publishes and reads an account-scoped Home edition over MCP', async () => {
+    fetchMock.activate();
+    fetchMock.disableNetConnect();
+    fetchMock
+      .get('https://identity.example')
+      .intercept({ path: '/home-jwks' })
+      .reply(200, JSON.stringify({ keys: [jwk] }))
+      .persist();
+    const homeBindings = { ...bindings, MCP_OAUTH_JWKS_URL: 'https://identity.example/home-jwks' };
+    const signed = await token();
+    const readOnly = await token({ scope: 'bookmarks:read' });
+    const fixture = homeBundle();
+    const call = async (name: string, args: unknown, auth = signed) =>
+      (await (
+        await rpc('tools/call', { name, arguments: args }, auth, homeBindings)
+      ).json()) as HomeToolResponse;
+    const missing = await call('get_home_edition', {});
+    expect(missing.result.structuredContent.data.issue).toBeNull();
+    expect(missing.result.structuredContent.data.generation.status).toBe('UNAVAILABLE');
+    const run = {
+      id: fixture.edition.generation.generatorRunId,
+      editionDate: fixture.edition.editionDate,
+      workflowVersion: fixture.edition.generation.workflowVersion,
+      promptVersion: fixture.edition.generation.promptVersion,
+      model: fixture.edition.generation.model,
+    };
+    expect((await call('start_home_edition', run, readOnly)).result.isError).toBe(true);
+    expect((await call('start_home_edition', run)).result.structuredContent.data.created).toBe(
+      true
+    );
+    expect((await call('start_home_edition', run)).result.structuredContent.data.created).toBe(
+      false
+    );
+    const catalog = await call('get_home_components', {});
+    expect(catalog.result.structuredContent.data).toHaveProperty('version', 1);
+    const input = {
+      edition: fixture.edition,
+      snapshot: fixture.snapshot,
+    };
+    const created = await call('create_home_edition', input);
+    expect(created.result.isError).not.toBe(true);
+    const bundle = created.result.structuredContent.data.bundle;
+    expect(bundle.edition.userId).toBe('user_alice');
+    expect(created.result.structuredContent.data.published).toBe(false);
+    expect((await call('get_home_edition', {})).result.structuredContent.data.issue).toBeNull();
+    expect((await call('publish_home_edition', { bundle }, readOnly)).result.isError).toBe(true);
+    const published = await call('publish_home_edition', { bundle });
+    expect(published.result.structuredContent.data).toMatchObject({
+      published: true,
+      verified: true,
+      visibleInEditorialFeed: true,
+      editionId: 'edition-1',
+    });
+    expect(
+      (await call('publish_home_edition', { bundle })).result.structuredContent.data.result.created
+    ).toBe(false);
+    const current = await call('get_home_edition', {});
+    expect(current.result.structuredContent.data.issue.headline).toBe('Daily edition');
+    expect(current.result.content[0].text).toContain('# Daily edition');
+    expect(current.result.content[0].text).toContain('The latest edition is from');
+    const bob = await call('get_home_edition', {}, await token({ sub: 'user_bob' }));
+    expect(bob.result.structuredContent.data.issue).toBeNull();
+    expect(
+      (await call('start_home_edition', run, await token({ sub: 'user_bob' }))).result.isError
+    ).toBe(true);
+    const changed = structuredClone(bundle);
+    changed.edition.headline = 'Overwritten';
+    expect((await call('publish_home_edition', { bundle: changed })).result.content[0].text).toBe(
+      'EDITION_CONFLICT'
+    );
+  });
+  it('reports draft validation failures and refuses fabricated successful validation', async () => {
+    const home = new McpHome(bindings, 'user_alice');
+    const fixture = homeBundle();
+    const input = createHomeSchema.parse({ edition: fixture.edition, snapshot: fixture.snapshot });
+    input.edition.claims[0].sourceIds = ['missing-source'];
+    const prepared = home.create(input);
+    expect(prepared.bundle).toBeNull();
+    expect(prepared.validation.valid).toBe(false);
+    await expect(
+      home.publish({ bundle: { ...fixture, edition: input.edition } } as never)
+    ).rejects.toThrow('server-side validation');
+    expect((await home.get()).issue).toBeNull();
+  });
+  it('requires ranked candidate provenance for new v2 drafts', () => {
+    const home = new McpHome(bindings, 'user_alice');
+    const fixture = homeBundle();
+    const input = createHomeSchema.parse({ edition: fixture.edition, snapshot: fixture.snapshot });
+    input.edition.generation.workflowVersion = 'editorial-v2';
+    expect(() => home.create(input)).toThrow('ranked v2 candidate artifact');
+  });
+  it.each(['bob', 'mail', 'private'])(
+    'never enriches a Home source with inaccessible item metadata: %s',
+    async (itemId) => {
+      const home = new McpHome(bindings, 'user_alice');
+      const fixture = homeBundle();
+      const input = createHomeSchema.parse({
+        edition: fixture.edition,
+        snapshot: fixture.snapshot,
+      });
+      input.edition.sources[0].zineItemId = itemId;
+      input.edition.sources[0].title = 'Agent supplied title';
+      input.snapshot.documents[0].source = input.edition.sources[0];
+      const prepared = home.create(input);
+      const published = await home.publish({ bundle: prepared.bundle! });
+      expect(published).toMatchObject({ published: true, verified: true });
+      const current = await home.get();
+      expect(current.presentation.sources['source-1'].title).toBe('Agent supplied title');
+      expect(current.presentation.sources['source-1'].excerpt).toBeNull();
+    }
+  );
+  it('reports a completed publication separately from a failed readback', async () => {
+    const fixture = homeBundle();
+    const home = new McpHome(
+      {
+        ...bindings,
+        ARTICLE_CONTENT: {
+          put: bindings.ARTICLE_CONTENT.put.bind(bindings.ARTICLE_CONTENT),
+          get: async () => {
+            throw new Error('Temporary R2 read outage');
+          },
+        } as unknown as R2Bucket,
+      },
+      'user_alice'
+    );
+    const prepared = home.create(
+      createHomeSchema.parse({ edition: fixture.edition, snapshot: fixture.snapshot })
+    );
+    expect(prepared.bundle).not.toBeNull();
+    const published = await home.publish({ bundle: prepared.bundle! });
+    expect(published).toMatchObject({ published: true, verified: false, editionId: 'edition-1' });
+    const recovered = await new McpHome(bindings, 'user_alice').get();
+    expect(recovered.issue?.id).toBe('edition-1');
+  });
+  it('records generation failures but refuses to fail another account’s run', async () => {
+    const alice = new McpHome(bindings, 'user_alice');
+    const bob = new McpHome(bindings, 'user_bob');
+    await alice.start({
+      id: 'failed-run',
+      editionDate: '2026-10-18',
+      workflowVersion: 'editorial-v2',
+      promptVersion: 'daily-editorial-v2',
+      model: 'fixture',
+    });
+    await expect(
+      bob.fail({ runId: 'failed-run', stage: 'SNAPSHOT', message: 'Source unavailable' })
+    ).rejects.toThrow();
+    const failure = await alice.fail({
+      runId: 'failed-run',
+      stage: 'SNAPSHOT',
+      message: 'Source unavailable',
+    });
+    expect(failure.run.status).toBe('FAILED');
   });
   it('serves a static MCP Apps resource without private content or direct network access', async () => {
     const resources = await (await rpc('resources/list')).json();
@@ -864,5 +1044,101 @@ describe('official MCP transport and discovery', () => {
       arguments: { url: 'https://example.com', userId: 'user_bob' },
     });
     expect(await invalid.json()).toHaveProperty('result.isError', true);
+  });
+});
+
+describe('native Home card composition', () => {
+  const composition = {
+    version: 1,
+    sections: [
+      { id: 'lead', layout: 'single', card: 'featured', itemIds: ['a-public'] },
+      {
+        id: 'shelf',
+        title: 'Saved reads',
+        layout: 'horizontal',
+        card: 'landscape',
+        itemIds: ['a-public'],
+      },
+    ],
+  };
+  it('resolves real metadata, previews without writing, publishes and isolates accounts', async () => {
+    const alice = new McpHome(bindings, 'user_alice');
+    const bob = new McpHome(bindings, 'user_bob');
+    const parsed = HomeCompositionSchema.parse(composition);
+    expect((await alice.candidates()).items.map((i) => i.id)).toEqual(['a-public']);
+    const draft = await alice.prepareComposition({ composition: parsed });
+    expect(draft.valid).toBe(true);
+    expect(draft.compositionItems[0]).toMatchObject({
+      id: 'a-public',
+      title: 'public',
+      canonicalUrl: 'https://example.com/public',
+    });
+    expect((await alice.composition()).composition).toBeNull();
+    expect(await alice.publishComposition({ composition: parsed })).toMatchObject({
+      published: true,
+      verified: true,
+      composition: parsed,
+    });
+    expect((await bob.composition()).composition).toBeNull();
+    expect(await bob.publishComposition({ composition: parsed })).toMatchObject({
+      published: false,
+      unavailableItemIds: ['a-public'],
+    });
+    await db.update(userItems).set({ isFinished: true }).where(eq(userItems.id, 'a-public'));
+    expect((await alice.composition()).compositionItems).toEqual([]);
+  });
+  it.each([
+    { ...composition, paragraphs: ['Generated prose'] },
+    { version: 1, sections: [{ ...composition.sections[1], card: 'grid' }] },
+    { version: 1, sections: [{ ...composition.sections[1], layout: 'two_column' }] },
+    { version: 2, sections: composition.sections },
+    { version: 1, sections: [{ ...composition.sections[0], title: 'Paragraph\nMore text' }] },
+    { version: 1, sections: [{ ...composition.sections[0], layout: 'horizontal' }] },
+    { version: 1, sections: [{ ...composition.sections[1], itemIds: ['a-public', 'a-public'] }] },
+    { version: 1, sections: [{ ...composition.sections[1], css: 'red' }] },
+  ])('rejects prose, arbitrary styling and incoherent arrangements', (input) => {
+    expect(HomeCompositionSchema.safeParse(input).success).toBe(false);
+  });
+  it('keeps the featured article action tied to real article content', async () => {
+    await db.update(items).set({ contentType: 'PODCAST' }).where(eq(items.id, 'public'));
+    const result = await new McpHome(bindings, 'user_alice').publishComposition({
+      composition: HomeCompositionSchema.parse(composition),
+    });
+    expect(result).toMatchObject({ published: false, incompatibleItemIds: ['a-public'] });
+  });
+  it('falls back on malformed or future stored compositions', async () => {
+    const home = new McpHome(bindings, 'user_alice');
+    for (const data of ['invalid json', JSON.stringify({ version: 2, sections: [] })]) {
+      await bindings.ARTICLE_CONTENT.put('home-compositions/user_alice/current.json', data);
+      expect(await home.composition()).toEqual({ composition: null, compositionItems: [] });
+    }
+  });
+  it('resolves the maximum manifest without exceeding D1 binding limits', async () => {
+    const composition = HomeCompositionSchema.parse({
+      version: 1,
+      sections: Array.from({ length: 5 }, (_, section) => ({
+        id: `section-${section}`,
+        layout: 'horizontal',
+        card: 'landscape',
+        itemIds: Array.from({ length: 20 }, (_, item) => `missing-${section}-${item}`),
+      })),
+    });
+    const result = await new McpHome(bindings, 'user_alice').prepareComposition({ composition });
+    expect(result.unavailableItemIds).toHaveLength(100);
+    expect(result.valid).toBe(false);
+  });
+  it('hides archived, inaccessible and another account’s items at publication', async () => {
+    await db.update(userItems).set({ state: 'ARCHIVED' }).where(eq(userItems.id, 'a-public'));
+    const home = new McpHome(bindings, 'user_alice');
+    const parsed = HomeCompositionSchema.parse({
+      version: 1,
+      sections: [
+        { id: 'rows', layout: 'vertical', card: 'row', itemIds: ['a-public', 'a-mail', 'b-bob'] },
+      ],
+    });
+    expect(await home.publishComposition({ composition: parsed })).toMatchObject({
+      published: false,
+      unavailableItemIds: ['a-public', 'a-mail', 'b-bob'],
+    });
   });
 });

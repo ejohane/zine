@@ -39,6 +39,9 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 struct ZineNativeApp: App {
     private let configuration = AppConfiguration.current
     @AppStorage(AppAppearance.storageKey) private var storedAppearance = AppAppearance.system.rawValue
+#if DEBUG
+    @State private var componentPreviewDark = true
+#endif
 
     init() {
         ZineTheme.configureUIKitAppearance()
@@ -57,6 +60,9 @@ struct ZineNativeApp: App {
 
     private var appearance: AppAppearance {
 #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-home-components-preview") {
+            return componentPreviewDark ? .dark : .light
+        }
         if ProcessInfo.processInfo.arguments.contains("-screenshot-light-mode") {
             return .light
         }
@@ -98,6 +104,8 @@ struct ZineNativeApp: App {
             ScreenshotArticleReaderView(unavailable: true)
         } else if ProcessInfo.processInfo.arguments.contains("-screenshot-today-story-fixture") {
             ScreenshotTodayStoryView()
+        } else if ProcessInfo.processInfo.arguments.contains("-home-components-preview") {
+            HomeCompositionPreviewView(dark: $componentPreviewDark)
         } else if ProcessInfo.processInfo.arguments.contains("-screenshot-today-fixtures") {
             ScreenshotTodayView()
         } else if ProcessInfo.processInfo.arguments.contains("-screenshot-daily-overview-fixture") {
