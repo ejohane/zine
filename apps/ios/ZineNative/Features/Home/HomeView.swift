@@ -47,6 +47,7 @@ struct HomeView: View {
     let store: HomeStore
     var density: HomeLayoutDensity = .standard
     var title = "Home"
+    var usesComposition = false
     let onContentChanged: () -> Void
     let onExternalOpen: (Bookmark) -> Void
     let onHomeItemExternalOpen: (HomeItem) -> Void
@@ -68,6 +69,7 @@ struct HomeView: View {
         store: HomeStore,
         density: HomeLayoutDensity = .standard,
         title: String = "Home",
+        usesComposition: Bool = false,
         onContentChanged: @escaping () -> Void,
         onExternalOpen: @escaping (Bookmark) -> Void,
         onHomeItemExternalOpen: @escaping (HomeItem) -> Void,
@@ -82,6 +84,7 @@ struct HomeView: View {
         self.store = store
         self.density = density
         self.title = title
+        self.usesComposition = usesComposition
         self.onContentChanged = onContentChanged
         self.onExternalOpen = onExternalOpen
         self.onHomeItemExternalOpen = onHomeItemExternalOpen
@@ -155,9 +158,9 @@ struct HomeView: View {
 
     @ViewBuilder
     private var content: some View {
-        if store.isLoading && dashboardSections.isEmpty {
+        if store.isLoading && (dashboardSections.isEmpty && composedSections.isEmpty) {
             ZineLoadingView(label: "Loading \(title)…")
-        } else if let error = store.errorMessage, dashboardSections.isEmpty {
+        } else if let error = store.errorMessage, (dashboardSections.isEmpty && composedSections.isEmpty) {
             ContentUnavailableView {
                 Label("\(title) unavailable", systemImage: "exclamationmark.triangle")
             } description: {
@@ -167,7 +170,7 @@ struct HomeView: View {
                     Task { await store.reload() }
                 }
             }
-        } else if dashboardSections.isEmpty {
+        } else if (dashboardSections.isEmpty && composedSections.isEmpty) {
             ContentUnavailableView(
                 "Nothing to pick up yet",
                 systemImage: "sparkles.rectangle.stack",
@@ -179,13 +182,16 @@ struct HomeView: View {
                     ObservedListTitle(title: title, state: titleCollapseState)
                         .padding(.horizontal, 18)
 
-                    ForEach(dashboardSections) { section in
-                        HomeDashboardSectionView(
-                            section: section,
-                            density: density,
-                            transitionNamespace: bookmarkTransition,
-                            client: client
-                        )
+                    if !composedSections.isEmpty {
+                        ForEach(composedSections) { section in
+                            HomeComposedSectionView(resolved: section,
+                                                    transitionNamespace: bookmarkTransition, client: client)
+                        }
+                    } else {
+                        ForEach(dashboardSections) { section in
+                            HomeDashboardSectionView(section: section, density: density,
+                                                     transitionNamespace: bookmarkTransition, client: client)
+                        }
                     }
                 }
                 .environment(\.homeTabReselection, tabReselection)
@@ -205,6 +211,8 @@ struct HomeView: View {
             }
         }
     }
+
+    private var composedSections: [HomeComposedSection] { usesComposition ? store.composedSections : [] }
 
     private var dashboardSections: [HomeDashboardSection] {
         density.visibleSections(from: store.sections)

@@ -77,42 +77,6 @@ struct CondensedHomeDashboardSectionView: View {
     }
 }
 
-private struct CondensedSectionHeader: View {
-    let title: String
-    let route: HomeSectionRoute
-
-    @Environment(\.zineTabNavigationActions) private var navigation
-
-    var body: some View {
-        Group {
-            if let navigate = navigation.homeSection {
-                Button {
-                    navigate(route)
-                } label: {
-                    headerLabel
-                }
-            } else {
-                NavigationLink(value: route) {
-                    headerLabel
-                }
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("View all \(title)")
-    }
-
-    private var headerLabel: some View {
-        HStack(spacing: 5) {
-            Text(title)
-                .font(.headline)
-            Image(systemName: "chevron.right")
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(ZineTheme.tertiaryText)
-        }
-        .foregroundStyle(ZineTheme.primaryText)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
 
 private struct CondensedJumpBackInSection: View {
     let items: [HomeItem]
@@ -134,7 +98,7 @@ private struct CondensedJumpBackInSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            CondensedSectionHeader(title: "Jump Back In", route: .jumpBackIn)
+            HomeCompactSectionHeader(title: "Jump Back In", route: .jumpBackIn)
                 .padding(.horizontal, 16)
 
             if let latest = items.first {
@@ -166,7 +130,7 @@ private struct CondensedJumpBackInSection: View {
                         route: .item(item, sectionID: sectionID),
                         transitionNamespace: transitionNamespace
                     ) {
-                        CondensedJumpBackInTile(item: item)
+                        HomeCompactItemTile(item: item)
                     }
                 }
             }
@@ -175,39 +139,6 @@ private struct CondensedJumpBackInSection: View {
     }
 }
 
-private struct CondensedJumpBackInTile: View {
-    let item: HomeItem
-
-    @ScaledMetric(relativeTo: .subheadline) private var artworkSize: CGFloat = 64
-
-    var body: some View {
-        HStack(spacing: 10) {
-            CachedRemoteImage(
-                url: item.thumbnailUrl,
-                targetSize: CGSize(width: artworkSize, height: artworkSize)
-            ) {
-                HomeImagePlaceholder(contentType: item.contentType, iconSize: 20)
-            }
-            .frame(width: artworkSize, height: artworkSize)
-            .clipped()
-
-            Text(item.title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(ZineTheme.primaryText)
-                .lineLimit(2)
-                .truncationMode(.tail)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.trailing, 8)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(height: artworkSize)
-        .background(ZineTheme.surface)
-        .clipShape(.rect(cornerRadius: 10))
-        .contentShape(.rect(cornerRadius: 10))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(item.title)
-    }
-}
 
 private struct CondensedInboxSection: View {
     let items: [Bookmark]
@@ -216,7 +147,7 @@ private struct CondensedInboxSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            CondensedSectionHeader(title: "Fresh in Your Inbox", route: .inbox)
+            HomeCompactSectionHeader(title: "Fresh in Your Inbox", route: .inbox)
                 .padding(.horizontal, 16)
 
             HomeHorizontalScrollView {
@@ -292,7 +223,7 @@ private struct CondensedLandscapeRail: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            CondensedSectionHeader(title: title, route: route)
+            HomeCompactSectionHeader(title: title, route: route)
                 .padding(.horizontal, 16)
 
             HomeHorizontalScrollView {
@@ -302,7 +233,7 @@ private struct CondensedLandscapeRail: View {
                             route: .item(item, sectionID: sectionID),
                             transitionNamespace: transitionNamespace
                         ) {
-                            CondensedLandscapeCard(item: item)
+                            HomeCompactLandscapeCard(item: item)
                         }
                     }
                 }
@@ -321,7 +252,7 @@ private struct CondensedCoverRail: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            CondensedSectionHeader(title: title, route: route)
+            HomeCompactSectionHeader(title: title, route: route)
                 .padding(.horizontal, 16)
 
             HomeHorizontalScrollView {
@@ -331,7 +262,7 @@ private struct CondensedCoverRail: View {
                             route: .item(item, sectionID: sectionID),
                             transitionNamespace: transitionNamespace
                         ) {
-                            CondensedCoverCard(item: item)
+                            HomeCompactCoverCard(item: item)
                         }
                     }
                 }
@@ -355,7 +286,7 @@ private struct CondensedGridSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            CondensedSectionHeader(title: title, route: route)
+            HomeCompactSectionHeader(title: title, route: route)
 
             LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
                 ForEach(items) { item in
@@ -363,7 +294,7 @@ private struct CondensedGridSection: View {
                         route: .item(item, sectionID: sectionID),
                         transitionNamespace: transitionNamespace
                     ) {
-                        CondensedGridCard(item: item)
+                        HomeCompactGridCard(item: item)
                     }
                 }
             }
@@ -381,7 +312,7 @@ private struct CondensedItemListSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            CondensedSectionHeader(title: title, route: route)
+            HomeCompactSectionHeader(title: title, route: route)
 
             VStack(spacing: 0) {
                 ForEach(items) { item in
@@ -404,91 +335,5 @@ private struct CondensedItemListSection: View {
             .background(ZineTheme.surface, in: .rect(cornerRadius: 13))
         }
         .padding(.horizontal, 16)
-    }
-}
-
-private struct CondensedLandscapeCard: View {
-    let item: HomeItem
-
-    private let width: CGFloat = 178
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            CachedRemoteImage(
-                url: item.thumbnailUrl,
-                targetSize: CGSize(width: width, height: 96)
-            ) {
-                HomeImagePlaceholder(contentType: item.contentType, iconSize: 22)
-            }
-            .frame(width: width, height: 96)
-            .clipped()
-            .clipShape(.rect(cornerRadius: 10))
-
-            Text(item.title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ZineTheme.primaryText)
-                .lineLimit(2)
-
-            HomeItemMetadata(item: item)
-        }
-        .frame(width: width, alignment: .leading)
-        .accessibilityElement(children: .combine)
-    }
-}
-
-private struct CondensedCoverCard: View {
-    let item: HomeItem
-
-    private let width: CGFloat = 112
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            CachedRemoteImage(
-                url: item.thumbnailUrl,
-                targetSize: CGSize(width: width, height: 136)
-            ) {
-                HomeImagePlaceholder(contentType: item.contentType, iconSize: 24)
-            }
-            .frame(width: width, height: 136)
-            .clipped()
-            .clipShape(.rect(cornerRadius: 10))
-
-            Text(item.title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ZineTheme.primaryText)
-                .lineLimit(2)
-
-            HomeItemMetadata(item: item)
-        }
-        .frame(width: width, alignment: .leading)
-        .accessibilityElement(children: .combine)
-    }
-}
-
-private struct CondensedGridCard: View {
-    let item: HomeItem
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            CachedRemoteImage(
-                url: item.thumbnailUrl,
-                targetSize: CGSize(width: 180, height: 72)
-            ) {
-                HomeImagePlaceholder(contentType: item.contentType, iconSize: 19)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 72)
-            .clipped()
-            .clipShape(.rect(cornerRadius: 9))
-
-            Text(item.title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ZineTheme.primaryText)
-                .lineLimit(2)
-
-            HomeItemMetadata(item: item)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
     }
 }

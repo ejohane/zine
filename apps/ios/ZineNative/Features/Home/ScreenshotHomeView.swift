@@ -279,7 +279,7 @@ private struct ScreenshotHomeSectionListView: View {
     }
 }
 
-private enum ScreenshotHomeFixtures {
+enum ScreenshotHomeFixtures {
     static let openedBookmarks = [
         bookmark(id: "opened-1", title: "Building products that feel inevitable", creator: "Lenny’s Podcast"),
         bookmark(id: "opened-2", title: "The hidden systems behind great teams", creator: "Acquired"),

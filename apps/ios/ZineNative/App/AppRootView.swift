@@ -115,6 +115,7 @@ struct AuthenticatedAppView: View {
 
     private enum AppTab: Hashable {
         case home
+        case homeLab
         case library
         case inbox
         case search
@@ -145,11 +146,13 @@ struct AuthenticatedAppView: View {
     @State private var searchTabReselection = 0
     @State private var selectedTab = AppTab.home
     @State private var navigationPath = NavigationPath()
+    @State private var homeLabTabReselection = 0
     @State private var homeTabReselection = 0
     @State private var inboxTabReselection = 0
     @State private var inboxTitleCollapseState = ListTitleCollapseState()
     @State private var libraryTabReselection = 0
     @State private var homeTitleCollapseState = ListTitleCollapseState()
+    @State private var homeLabTitleCollapseState = ListTitleCollapseState()
     @State private var libraryTitleCollapseState = ListTitleCollapseState()
     @State private var searchTitleCollapseState = ListTitleCollapseState()
     @State private var homeRevision = 0
@@ -213,6 +216,21 @@ struct AuthenticatedAppView: View {
                         transitionNamespace: navigationTransition,
                         registersNavigationDestinations: false,
                         titleCollapseState: homeTitleCollapseState
+                    )
+                    .tint(ZineTheme.brandAccent)
+                }
+
+                Tab("Home Lab", systemImage: "flask", value: AppTab.homeLab) {
+                    HomeView(
+                        client: client, store: homeStore, density: .compact,
+                        title: "Home Lab", usesComposition: true,
+                        onContentChanged: markBookmarkContentChanged,
+                        onExternalOpen: handleExternalOpen,
+                        onHomeItemExternalOpen: handleHomeItemExternalOpen,
+                        tabReselection: homeLabTabReselection,
+                        transitionNamespace: navigationTransition,
+                        registersNavigationDestinations: false,
+                        titleCollapseState: homeLabTitleCollapseState
                     )
                     .tint(ZineTheme.brandAccent)
                 }
@@ -481,7 +499,7 @@ struct AuthenticatedAppView: View {
 
     private var selectedRootTitle: String {
         switch selectedTab {
-        case .home, .library, .inbox:
+        case .home, .homeLab, .library, .inbox:
             ""
         case .search:
             ""
@@ -490,6 +508,7 @@ struct AuthenticatedAppView: View {
 
     private var selectedTitleCollapseState: ListTitleCollapseState? {
         switch selectedTab {
+        case .homeLab: homeLabTitleCollapseState
         case .home: homeTitleCollapseState
         case .inbox: inboxTitleCollapseState
         case .library: libraryTitleCollapseState
@@ -499,6 +518,8 @@ struct AuthenticatedAppView: View {
 
     private var selectedCompactRootTitle: (title: String, progress: CGFloat)? {
         switch selectedTab {
+        case .homeLab:
+            ("Home Lab", 0)
         case .home:
             ("Home", 0)
         case .inbox:
@@ -528,6 +549,8 @@ struct AuthenticatedAppView: View {
 
     private func handleTabReselection(_ tab: AppTab) {
         switch tab {
+        case .homeLab:
+            homeLabTabReselection += 1
         case .home:
             homeTabReselection += 1
         case .inbox:

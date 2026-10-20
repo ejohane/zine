@@ -3426,6 +3426,56 @@
               "sectionOrder"
             ],
             "properties": {
+              "composition": {
+                "type": "object",
+                "nullable": true,
+                "description": "Optional version 1 native Home Lab card arrangement. Regular Home ignores it.",
+                "required": ["version", "sections"],
+                "properties": {
+                  "version": { "type": "integer", "enum": [1] },
+                  "sections": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 12,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["id", "layout", "card", "itemIds"],
+                      "properties": {
+                        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+                        "title": { "type": "string", "minLength": 1, "maxLength": 60 },
+                        "layout": {
+                          "type": "string",
+                          "enum": ["single", "horizontal", "two_column", "vertical"]
+                        },
+                        "card": {
+                          "type": "string",
+                          "enum": [
+                            "featured",
+                            "landscape",
+                            "cover",
+                            "compact",
+                            "tile",
+                            "row",
+                            "grid"
+                          ]
+                        },
+                        "itemIds": {
+                          "type": "array",
+                          "minItems": 1,
+                          "maxItems": 20,
+                          "uniqueItems": true,
+                          "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "compositionItems": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/HomeItem" }
+              },
               "recentBookmarks": {
                 "type": "array",
                 "items": { "$ref": "#/components/schemas/HomeItem" }

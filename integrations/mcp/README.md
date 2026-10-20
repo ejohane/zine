@@ -54,3 +54,56 @@ Use the width selector and appearance button to compare chat, phone and wide
 layouts. **Reload design** rebuilds the current component source without
 restarting the server. Cards open their original source in a separate tab.
 Article bodies are not loaded from a card snapshot. Stop with Ctrl-C when finished.
+
+## Home editions
+
+The MCP editorial tools use the same account-scoped services, D1 records, R2
+artifacts and server validation as `/api/v1/editorial/today` for the daily editorial feed:
+
+| Tool                   | Permission        | Behavior                                                                                                                                                            |
+| ---------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_home_edition`     | `bookmarks:read`  | Returns the published edition as readable Markdown and structured data, including freshness, coverage and source presentation.                                      |
+| `start_home_edition`   | `bookmarks:write` | Registers a stable generation run before collecting inputs.                                                                                                         |
+| `create_home_edition`  | `bookmarks:read`  | Validates an agent-authored draft against its captured snapshot and candidate artifact, calculates quality, and renders a reviewable publication bundle. No writes. |
+| `publish_home_edition` | `bookmarks:write` | Revalidates and publishes the reviewed bundle, retains artifacts, and verifies edition and Home readback.                                                           |
+| `fail_home_edition`    | `bookmarks:write` | Records a sanitized terminal failure before publication.                                                                                                            |
+
+Example requests: “Show my Zine Home edition” or “Create a daily Home edition
+from my sources, show me the draft, then publish it when I approve.” The tool
+input schemas describe the canonical editorial contract. Follow
+[the daily editorial workflow](../../docs/daily-editorial.md): register the run,
+collect/read real sources, capture coverage gaps, rank the corpus, author the
+draft, validate/revise, review the returned `bundle.markdown`, then publish the
+exact bundle. Source collection and authoring are performed by the agent; these
+tools do not invoke a model, scrape X, schedule a run, or manufacture a snapshot.
+New v2 editions require their exact ranked candidate artifact.
+
+All operations derive account ownership from OAuth. Draft user IDs are replaced
+by the linked account; no tool accepts a target account. Existing edition IDs,
+revisions and artifact bundles are immutable. Reuse identifiers on retries;
+changed content requires a new revision. A readback outage after a successful
+write returns `published: true, verified: false`; do not mark that run failed.
+`visibleInEditorialFeed: false` means a published historical edition is not the latest
+edition selected by the editorial feed. Freshness and coverage warnings remain explicit.
+
+Publication updates the shared editorial feed, not a separate tab-only store.
+It does not promote A/B experiments, replace the ordinary Home tab, or create an
+automation. Display currently uses Markdown in chat; the card rail remains the
+saved-library component. No additional OAuth scopes or secrets are introduced.
+
+## Native Home Lab composition
+
+Home Lab composes existing native Home cards and real items, independently of
+editorial editions. No generated stories, briefings or filler paragraphs.
+
+| Tool                       | Purpose                                                 |
+| -------------------------- | ------------------------------------------------------- |
+| `get_home_components`      | Seven real card types and four native layout containers |
+| `get_home_candidates`      | Up to 100 eligible recent inbox/library items           |
+| `get_home_composition`     | Current arrangement and fresh real item metadata        |
+| `create_home_composition`  | Read-only validation and resolved card preview          |
+| `publish_home_composition` | Revalidate and replace the linked account's arrangement |
+
+Only publishing requires `bookmarks:write`; other composition tools require
+`bookmarks:read`. Missing/unavailable compositions fall back to normal Home.
+See [Native Home composition](../../docs/home-composition.md) for the contract.

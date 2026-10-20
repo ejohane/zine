@@ -166,6 +166,8 @@ struct HomeContentTypeSections: Codable, Hashable {
 }
 
 struct HomeResponse: Codable, Hashable {
+    var composition: HomeComposition? = nil
+    var compositionItems: [HomeItem]? = nil
     let recentBookmarks: [HomeItem]
     let jumpBackIn: [HomeItem]
     let byContentType: HomeContentTypeSections

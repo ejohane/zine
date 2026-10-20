@@ -30,6 +30,11 @@ enum HomeDashboardSection: Identifiable {
 @MainActor
 @Observable
 final class HomeStore {
+    var composedSections: [HomeComposedSection] {
+        home?.composition?.resolve(items: home?.compositionItems ?? [],
+                                   hiddenIDs: effectiveHiddenItemIDs) ?? []
+    }
+
     var sections: [HomeDashboardSection] {
         Self.makeSections(
             home: visibleHome,
@@ -94,6 +99,7 @@ final class HomeStore {
             items.filter { includes($0.id, key: key) }
         }
         return HomeResponse(
+            composition: home.composition, compositionItems: home.compositionItems,
             recentBookmarks: visible(home.recentBookmarks, key: "recently-saved"),
             jumpBackIn: visibleUnfinished(visible(home.jumpBackIn, key: "jump-back-in")),
             byContentType: HomeContentTypeSections(
@@ -152,6 +158,8 @@ final class HomeStore {
                 completionMembership: collection.completionMembership)
         }
         home = HomeResponse(
+            composition: current.composition,
+            compositionItems: retain(oldValue.compositionItems ?? [], current.compositionItems ?? [], key: "composition"),
             recentBookmarks: retain(oldValue.recentBookmarks, current.recentBookmarks, key: "recently-saved"),
             jumpBackIn: retain(oldValue.jumpBackIn, current.jumpBackIn, key: "jump-back-in"),
             byContentType: HomeContentTypeSections(
@@ -324,6 +332,7 @@ final class HomeStore {
                 snapshot.includeReturned(returned.map(\.id))
                 membership["jump-back-in"] = snapshot
                 home = HomeResponse(
+                    composition: current.composition, compositionItems: current.compositionItems,
                     recentBookmarks: current.recentBookmarks,
                     jumpBackIn: Self.orderedOpenedItems(current.jumpBackIn + returned),
                     byContentType: current.byContentType, customCollections: current.customCollections,

@@ -2,6 +2,7 @@ import type { DailyEdition, SourceReference } from '@zine/editorial-schema';
 
 import { getEditorialEdition } from './editorial-storage';
 import { parseLink } from './link-parser';
+import { savedItemVisibilitySql } from './saved-item-visibility';
 
 const DEFAULT_TIMEZONE = 'America/Chicago';
 
@@ -110,9 +111,9 @@ async function sourceItemRows(
     ),
   ];
 
-  for (const { column, values, requireUserItem } of [
-    { column: 'id', values: itemIds, requireUserItem: false },
-    { column: 'canonical_url', values: canonicalUrls, requireUserItem: true },
+  for (const { column, values } of [
+    { column: 'id', values: itemIds },
+    { column: 'canonical_url', values: canonicalUrls },
   ] as const) {
     for (let offset = 0; offset < values.length; offset += 50) {
       const batch = values.slice(offset, offset + 50);
@@ -124,9 +125,9 @@ async function sourceItemRows(
             c.name AS creator_name, i.publisher, ui.id AS user_item_id, ui.state, ui.is_finished
            FROM items i
            LEFT JOIN creators c ON c.id = i.creator_id
-           ${requireUserItem ? 'JOIN' : 'LEFT JOIN'} user_items ui
+           JOIN user_items ui
              ON ui.item_id = i.id AND ui.user_id = ?
-           WHERE i.${column} IN (${placeholders})`
+           WHERE i.${column} IN (${placeholders}) AND ${savedItemVisibilitySql}`
         )
         .bind(userId, ...batch)
         .all<SourceItemRow>();
