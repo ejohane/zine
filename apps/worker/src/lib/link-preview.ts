@@ -35,6 +35,7 @@ import { fetchFxTwitterByUrl, type FxTwitterResponse, type FxTwitterTweet } from
 import { fetchFavicon } from './favicon';
 import { logger } from './logger';
 import { parseISO8601Duration } from './duration';
+import { isSupportedBookPage } from './book-metadata';
 
 /**
  * Result of fetching link preview metadata
@@ -68,7 +69,8 @@ export interface LinkPreviewResult {
     | 'fallback'
     | 'article_extractor'
     | 'fxtwitter'
-    | 'podcast_page';
+    | 'podcast_page'
+    | 'book_page';
 
   // Article-specific fields
   /** Publication or site name (for articles) */
@@ -927,6 +929,33 @@ export async function fetchLinkPreview(
   });
 
   let result: LinkPreviewResult | null = null;
+
+  if (parsedLink.provider === Provider.WEB && isSupportedBookPage(parsedLink.canonicalUrl)) {
+    const page = await scrapeOpenGraph(parsedLink.canonicalUrl);
+    if (page.book && isSupportedBookPage(page.resolvedUrl ?? parsedLink.canonicalUrl)) {
+      const book = page.book;
+      // Keep the edition URL the user shared; OG often advertises a different format's cover.
+      const canonical = new URL(parsedLink.canonicalUrl);
+      canonical.hash = '';
+      canonical.pathname = canonical.pathname.replace(/\/$/, '');
+      const canonicalUrl = canonical.toString();
+      result = {
+        provider: Provider.WEB,
+        contentType: ContentType.BOOK,
+        providerId: canonicalUrl,
+        canonicalUrl,
+        title: book.title,
+        creator: book.author,
+        thumbnailUrl: book.coverUrl ?? page.image,
+        description: page.description ?? book.description ?? undefined,
+        siteName: book.publisher ?? page.siteName ?? undefined,
+        duration: null,
+        hasArticleContent: false,
+        rawMetadata: JSON.stringify({ book }),
+        source: 'book_page',
+      };
+    }
+  }
 
   if (parsedLink.podcastLink) {
     result = await fetchPodcastPlayerPreview(parsedLink);

@@ -5,6 +5,7 @@ enum ContentType: String, Codable, CaseIterable, Identifiable {
     case podcast = "PODCAST"
     case article = "ARTICLE"
     case post = "POST"
+    case book = "BOOK"
 
     var id: String { rawValue }
 
@@ -16,6 +17,7 @@ enum ContentType: String, Codable, CaseIterable, Identifiable {
         case .podcast: "waveform"
         case .article: "doc.text"
         case .post: "text.bubble"
+        case .book: "book.closed"
         }
     }
 }

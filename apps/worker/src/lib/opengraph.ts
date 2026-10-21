@@ -19,6 +19,7 @@
  */
 
 import { logger } from './logger';
+import { extractBookMetadata, type BookMetadata } from './book-metadata';
 
 const ogLogger = logger.child('opengraph');
 
@@ -26,6 +27,7 @@ const ogLogger = logger.child('opengraph');
  * Extracted Open Graph metadata from a URL
  */
 export interface OpenGraphData {
+  book?: BookMetadata | null;
   /** Page title from og:title or <title> tag */
   title: string | null;
   /** Page description from og:description or meta description */
@@ -313,7 +315,8 @@ export async function scrapeOpenGraph(
         },
         text(text) {
           currentStructuredData?.push(text.text);
-          if (text.lastInTextNode) currentStructuredData = null;
+          // JSON-LD can contain multiple text nodes (for example leading newlines).
+          // The next matching script element starts a new buffer.
         },
       })
       .on('audio#audioplayer', {
@@ -380,6 +383,11 @@ export async function scrapeOpenGraph(
     if (!result.title && titleChunks.length > 0) {
       result.title = titleChunks.join('').trim();
     }
+
+    result.book = extractBookMetadata(
+      structuredDataChunks.map((chunks) => chunks.join('')),
+      response.url || url
+    );
 
     for (const chunks of structuredDataChunks) {
       try {

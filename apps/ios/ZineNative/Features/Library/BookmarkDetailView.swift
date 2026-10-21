@@ -639,6 +639,21 @@ struct BookmarkDetailView: View {
             actionRow
                 .background(BookmarkDetailScrollTarget())
 
+            if content.contentType == .book {
+                Button {
+                    ActionRowHaptics.play()
+                    onExternalOpen(bookmark)
+                    openURL(content.canonicalUrl)
+                } label: {
+                    Label("Open book page", systemImage: "arrow.up.right")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .foregroundStyle(ZineTheme.primaryText)
+                        .background(ZineTheme.raised, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+
             if content.contentType == .podcast, content.provider == .web,
                subscriptionSettings == nil {
                 Button {
@@ -726,6 +741,8 @@ struct BookmarkDetailView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Read in Zine")
                 .padding(.trailing, 8)
+            } else if content.contentType == .book {
+                EmptyView()
             } else if content.contentType == .podcast && content.provider == .rss {
                 PodcastOpenControl(
                     publisherURL: content.canonicalUrl,
@@ -955,7 +972,7 @@ struct BookmarkDetailView: View {
                 .frame(width: geometry.size.width, height: renderedHeight)
                 .clipped()
                 .overlay(alignment: .bottom) {
-                    if colorScheme == .dark {
+                    if colorScheme == .dark && content.contentType != .book {
                         LinearGradient(
                             stops: heroFadeStops,
                             startPoint: .top,
@@ -1021,8 +1038,9 @@ struct BookmarkDetailView: View {
                 width: 430,
                 height: showsContextualArtwork
                     ? (content.provider == .spotify ? 430 : 242)
-                    : 320
-            )
+                    : (content.contentType == .book ? 500 : 320)
+            ),
+            contentMode: content.contentType == .book ? .fit : .fill
         ) {
             ZStack {
                 activeArtworkPalette?.controlBackground ?? ZineTheme.raised
@@ -1040,7 +1058,9 @@ struct BookmarkDetailView: View {
     }
 
     private func heroHeight(in viewport: CGSize) -> CGFloat {
-        alignedToDisplayPixel(min(max(viewport.height * 0.33, 240), 320))
+        alignedToDisplayPixel(content.contentType == .book
+            ? min(viewport.height * 0.5, 420)
+            : min(max(viewport.height * 0.33, 240), 320))
     }
 
     private func alignedToDisplayPixel(_ value: CGFloat) -> CGFloat {
@@ -1054,7 +1074,7 @@ struct BookmarkDetailView: View {
 
     private var metadata: some View {
         HStack(spacing: 10) {
-            Label(content.provider.title, systemImage: content.contentType.systemImage)
+            Label(content.contentType == .book ? "Book" : content.provider.title, systemImage: content.contentType.systemImage)
             if let label = content.consumptionLabel {
                 Text(label)
             }

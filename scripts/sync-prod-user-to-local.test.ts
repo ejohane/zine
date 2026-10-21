@@ -5,6 +5,7 @@ import {
   collectArticleBodyObjects,
   parseSyncOptions,
   snapshotHasCurrentMigrationBaseline,
+  snapshotHasTagSuggestions,
 } from './sync-prod-user-to-local.mjs';
 
 const databases: Database[] = [];
@@ -107,5 +108,20 @@ describe('snapshotHasCurrentMigrationBaseline', () => {
       CREATE TABLE items (title TEXT);
     `);
     expect(snapshotHasCurrentMigrationBaseline(database)).toBe(false);
+  });
+});
+
+describe('snapshotHasTagSuggestions', () => {
+  test('reconciles only a complete existing tag-suggestion schema', () => {
+    const database = new Database(':memory:');
+    databases.push(database);
+    expect(snapshotHasTagSuggestions(database)).toBe(false);
+    database.exec(`
+      CREATE TABLE tag_suggestion_runs (user_item_id TEXT, fingerprint TEXT, token TEXT, status TEXT, updated_at INTEGER);
+      CREATE TABLE tag_suggestions (id TEXT, user_item_id TEXT, normalized_name TEXT, name TEXT, confidence REAL, decision TEXT);
+    `);
+    expect(snapshotHasTagSuggestions(database)).toBe(false);
+    database.exec('ALTER TABLE tag_suggestions ADD COLUMN generated_at INTEGER');
+    expect(snapshotHasTagSuggestions(database)).toBe(true);
   });
 });

@@ -1,6 +1,7 @@
 import { ContentType, Provider } from '@zine/shared';
 import { extractArticle } from '../lib/article-extractor';
 import { fetchLinkPreview } from '../lib/link-preview';
+import type * as LinkPreviewModule from '../lib/link-preview';
 import { expectLoggerErrorCalls } from '../test/mock-logger';
 import { applyD1Migrations, env } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
@@ -907,6 +908,73 @@ describe('REST completion saves with durable enrichment and People', () => {
   });
 });
 
+it.skipIf(!(env as unknown as { BOOK_LIVE_PROOF: boolean }).BOOK_LIVE_PROOF)(
+  'LIVE: saves the actual publisher page through REST and verifies persisted book, tags, duplicate save and completion',
+  async () => {
+    const real = await vi.importActual<typeof LinkPreviewModule>('../lib/link-preview');
+    vi.mocked(fetchLinkPreview).mockImplementation(real.fetchLinkPreview);
+    const url =
+      'https://www.penguinrandomhouse.com/books/57757/the-inner-game-of-tennis-50th-anniversary-edition-by-w-timothy-gallwey/9780307758859/';
+    const saved = await request('/bookmarks', 'POST', { url, tags: ['Books'] });
+    expect(saved.status).toBe(200);
+    const body = (await saved.json()) as {
+      bookmark: { itemId: string; userItemId: string; status: string };
+    };
+    const { itemId, userItemId } = body.bookmark;
+    expect(body.bookmark.status).toBe('created');
+    const persisted = await db.query.items.findFirst({ where: eq(items.id, itemId) });
+    expect(persisted).toMatchObject({
+      contentType: 'BOOK',
+      title: 'The Inner Game of Tennis',
+      thumbnailUrl: 'https://images.penguinrandomhouse.com/cover/9780307758859',
+      articleContentKey: null,
+      readingTimeMinutes: null,
+    });
+    expect(persisted?.summary).toContain('relaxed concentration');
+    expect(
+      await db.query.creators.findFirst({ where: eq(creators.id, persisted!.creatorId!) })
+    ).toMatchObject({ name: 'W. Timothy Gallwey' });
+    const library = await request('/bookmarks?contentType=BOOK');
+    expect(library.status).toBe(200);
+    expect(await library.json()).toMatchObject({
+      items: [
+        { id: userItemId, contentType: 'BOOK', isFinished: false, tags: [{ name: 'Books' }] },
+      ],
+    });
+    const repeated = await request('/bookmarks', 'POST', { url });
+    expect(repeated.status).toBe(200);
+    expect(await repeated.json()).toMatchObject({
+      bookmark: { itemId, userItemId, status: 'already_bookmarked' },
+    });
+    expect((await request(`/bookmarks/${userItemId}`, 'PATCH', { isFinished: true })).status).toBe(
+      200
+    );
+    expect(
+      await db.query.userItems.findFirst({ where: eq(userItems.id, userItemId) })
+    ).toMatchObject({ isFinished: true, state: 'BOOKMARKED' });
+    const detail = await request(`/bookmarks/${userItemId}`);
+    expect(detail.status).toBe(200);
+    expect(await detail.json()).toMatchObject({
+      item: { title: 'The Inner Game of Tennis', contentType: 'BOOK', isFinished: true },
+    });
+    console.log(
+      'LIVE_BOOK_REST_PROOF',
+      JSON.stringify({
+        title: persisted?.title,
+        contentType: persisted?.contentType,
+        thumbnailUrl: persisted?.thumbnailUrl,
+        created: true,
+        duplicateDeduplicated: true,
+        libraryBookFilter: true,
+        tagsPersisted: true,
+        completionPersisted: true,
+        articleContentKey: persisted?.articleContentKey,
+      })
+    );
+  },
+  60000
+);
+
 describe.each(['REST', 'tRPC'])('%s manual bookmark save contract', (api) => {
   const metadata = {
     canonicalUrl: 'https://www.youtube.com/watch?v=save-contract',
@@ -1008,6 +1076,55 @@ describe.each(['REST', 'tRPC'])('%s manual bookmark save contract', (api) => {
       ]);
     }
   );
+
+  it('persists books, filters the Library, preserves tags on duplicate save, and persists completion', async () => {
+    vi.mocked(extractArticle).mockClear();
+    const book = {
+      provider: Provider.WEB,
+      contentType: ContentType.BOOK,
+      providerId: 'https://www.penguinrandomhouse.com/books/57757/book/9780307758859',
+      canonicalUrl: 'https://www.penguinrandomhouse.com/books/57757/book/9780307758859',
+      title: 'The Inner Game of Tennis',
+      creator: 'W. Timothy Gallwey',
+      thumbnailUrl: 'https://images.penguinrandomhouse.com/cover/9780307758859',
+      description: 'A guide to relaxed concentration.',
+      siteName: 'Random House Group',
+      duration: null,
+      hasArticleContent: true,
+    };
+    const first = await result(await save(book, ['Books']));
+    expect(first.status).toBe('created');
+    expect(await db.query.items.findFirst({ where: eq(items.id, first.itemId) })).toMatchObject({
+      contentType: 'BOOK',
+      title: book.title,
+      summary: book.description,
+      thumbnailUrl: book.thumbnailUrl,
+      articleContentKey: null,
+      readingTimeMinutes: null,
+    });
+    expect(vi.mocked(extractArticle)).not.toHaveBeenCalled();
+    const request = (path: string, method = 'GET') =>
+      app.request(
+        path,
+        {
+          method,
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          ...(method === 'PATCH' ? { body: JSON.stringify({ isFinished: true }) } : {}),
+        },
+        bindings
+      );
+    const library = await request('/api/v1/bookmarks?contentType=BOOK');
+    expect(library.status).toBe(200);
+    expect(await library.json()).toMatchObject({
+      items: [{ id: first.userItemId, contentType: 'BOOK', creator: book.creator }],
+    });
+    expect((await result(await save(book, ['Tennis']))).status).toBe('already_bookmarked');
+    expect(await db.select().from(userItemTags)).toHaveLength(2);
+    expect((await request(`/api/v1/bookmarks/${first.userItemId}`, 'PATCH')).status).toBe(200);
+    const detail = await request(`/api/v1/bookmarks/${first.userItemId}`);
+    expect(detail.status).toBe(200);
+    expect(await detail.json()).toMatchObject({ item: { contentType: 'BOOK', isFinished: true } });
+  });
 
   it('rejects invalid preview metadata before creating content', async () => {
     const response = await save({ title: '' });

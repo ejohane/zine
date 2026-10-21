@@ -166,7 +166,11 @@ export async function saveBookmark(
     let articleContentKey: string | null = null;
 
     // For WEB provider items with article content, extract and store the article
-    if (provider === Provider.WEB && input.hasArticleContent === true) {
+    if (
+      provider === Provider.WEB &&
+      contentType === ContentType.ARTICLE &&
+      input.hasArticleContent === true
+    ) {
       try {
         bookmarksLogger.debug('Extracting article content', {
           url: canonicalUrl,

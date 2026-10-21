@@ -331,7 +331,7 @@ export const items = sqliteTable(
     id: text('id').primaryKey(), // ULID
 
     // Classification - values stored as UPPERCASE to match existing enums
-    contentType: text('content_type').notNull(), // VIDEO | PODCAST | ARTICLE | POST
+    contentType: text('content_type').notNull(), // VIDEO | PODCAST | ARTICLE | POST | BOOK
     provider: text('provider').notNull(), // YOUTUBE | SPOTIFY | SUBSTACK | RSS | X
     providerId: text('provider_id').notNull(), // External ID
     canonicalUrl: text('canonical_url').notNull(),

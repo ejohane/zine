@@ -13,7 +13,10 @@ export default defineWorkersConfig(async () => ({
     poolOptions: {
       workers: {
         miniflare: {
-          bindings: { TEST_MIGRATIONS: await readD1Migrations('./src/db/migrations') },
+          bindings: {
+            TEST_MIGRATIONS: await readD1Migrations('./src/db/migrations'),
+            BOOK_LIVE_PROOF: process.env.ZINE_BOOK_LIVE_PROOF === '1',
+          },
         },
         wrangler: {
           configPath: './wrangler.test.toml',

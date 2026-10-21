@@ -51,7 +51,8 @@ struct BookmarkRow: View {
     private var thumbnail: some View {
         CachedRemoteImage(
             url: bookmark.thumbnailUrl,
-            targetSize: CGSize(width: 64, height: 48)
+            targetSize: CGSize(width: 64, height: 48),
+            contentMode: bookmark.contentType == .book ? .fit : .fill
         ) {
             ZStack {
                 ZineTheme.raised
