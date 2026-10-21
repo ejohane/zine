@@ -20,6 +20,7 @@
 
 import { logger } from './logger';
 import { extractBookMetadata, type BookMetadata } from './book-metadata';
+import { parseAmazonProductLink } from './amazon-book';
 
 const ogLogger = logger.child('opengraph');
 
@@ -169,6 +170,13 @@ export async function scrapeOpenGraph(
   const pocketPodcastTitleChunks: string[] = [];
   const pocketDurationChunks: string[] = [];
   let externalBadgeHref: string | null = null;
+  const amazonTitle: string[] = [];
+  const amazonKindleTitle: string[] = [];
+  const amazonAuthors: string[][] = [];
+  let amazonAuthor: string[] = [];
+  const amazonDescription: string[] = [];
+  let amazonCover: string | null = null;
+  let hasAmazonBookEvidence = false;
 
   try {
     // Create abort controller for timeout
@@ -319,6 +327,54 @@ export async function scrapeOpenGraph(
           // The next matching script element starts a new buffer.
         },
       })
+      .on('#productTitle', {
+        text(chunk) {
+          amazonTitle.push(chunk.text);
+        },
+      })
+      .on('#ebooksProductTitle', {
+        element() {
+          hasAmazonBookEvidence = true;
+        },
+        text(chunk) {
+          amazonKindleTitle.push(chunk.text);
+        },
+      })
+      .on('#bylineInfo .author a.a-link-normal', {
+        element() {
+          amazonAuthor = [];
+          amazonAuthors.push(amazonAuthor);
+        },
+        text(chunk) {
+          amazonAuthor.push(chunk.text);
+        },
+      })
+      .on('#imgBlkFront, #ebooksImgBlkFront', {
+        element(el) {
+          hasAmazonBookEvidence = true;
+          if (!amazonCover || el.getAttribute('id') === 'ebooksImgBlkFront') {
+            amazonCover = el.getAttribute('data-old-hires') || el.getAttribute('src');
+          }
+        },
+      })
+      .on('#bookDescription_feature_div', {
+        element() {
+          hasAmazonBookEvidence = true;
+        },
+      })
+      .on(
+        '#bookDescription_feature_div .a-expander-content p, #bookDescription_feature_div .a-expander-content li, #bookDescription_feature_div .a-expander-content br',
+        {
+          element() {
+            amazonDescription.push(' ');
+          },
+        }
+      )
+      .on('#bookDescription_feature_div .a-expander-content', {
+        text(chunk) {
+          amazonDescription.push(chunk.text);
+        },
+      })
       .on('audio#audioplayer', {
         element(el) {
           result.podcastEpisode = {
@@ -388,6 +444,23 @@ export async function scrapeOpenGraph(
       structuredDataChunks.map((chunks) => chunks.join('')),
       response.url || url
     );
+
+    if (!result.book && parseAmazonProductLink(response.url || url) && hasAmazonBookEvidence) {
+      const clean = (value: string) => value.replace(/\s+/g, ' ').trim();
+      const title = clean((amazonKindleTitle.length ? amazonKindleTitle : amazonTitle).join(''));
+      const author = [
+        ...new Set(amazonAuthors.map((parts) => clean(parts.join(''))).filter(Boolean)),
+      ].join(', ');
+      if (title && author)
+        result.book = {
+          title,
+          author,
+          coverUrl: resolveUrl(amazonCover, response.url || url),
+          description: clean(amazonDescription.join('')) || result.description,
+          publisher: null,
+          isbn: null,
+        };
+    }
 
     for (const chunks of structuredDataChunks) {
       try {

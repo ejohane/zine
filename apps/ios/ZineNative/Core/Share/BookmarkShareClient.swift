@@ -1,6 +1,7 @@
 import Foundation
 
 struct BookmarkShareClient: Sendable {
+    typealias SharedTextProvider = @MainActor @Sendable () async -> String?
     typealias TokenProvider = @MainActor @Sendable () async throws -> String
 
     var preview: @Sendable (_ url: URL) async throws -> BookmarkSharePreview
@@ -10,7 +11,8 @@ struct BookmarkShareClient: Sendable {
     static func live(
         baseURL: URL,
         session: URLSession = .shared,
-        tokenProvider: @escaping TokenProvider
+        tokenProvider: @escaping TokenProvider,
+        sharedTextProvider: @escaping SharedTextProvider = { nil }
     ) -> BookmarkShareClient {
         let transport = BookmarkShareTransport(
             baseURL: baseURL,
@@ -22,7 +24,7 @@ struct BookmarkShareClient: Sendable {
             preview: { url in
                 let response: PreviewResponse = try await transport.post(
                     path: "/api/v1/bookmarks/preview",
-                    body: BookmarkURLBody(url: url.absoluteString)
+                    body: BookmarkURLBody(url: url.absoluteString, sharedText: await sharedTextProvider())
                 )
                 return response.item
             },
@@ -33,7 +35,7 @@ struct BookmarkShareClient: Sendable {
             save: { url, tags in
                 let response: SaveResponse = try await transport.post(
                     path: "/api/v1/bookmarks",
-                    body: SaveBookmarkBody(url: url.absoluteString, tags: tags)
+                    body: SaveBookmarkBody(url: url.absoluteString, tags: tags, sharedText: await sharedTextProvider())
                 )
                 return BookmarkShareSaveResult(
                     status: response.bookmark.status,
@@ -111,11 +113,13 @@ private struct BookmarkShareTransport: Sendable {
 
 private struct BookmarkURLBody: Encodable, Sendable {
     let url: String
+    let sharedText: String?
 }
 
 private struct SaveBookmarkBody: Encodable, Sendable {
     let url: String
     let tags: [String]
+    let sharedText: String?
 }
 
 private struct PreviewResponse: Decodable, Sendable {

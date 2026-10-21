@@ -1,9 +1,47 @@
 import Foundation
 import Testing
+import UniformTypeIdentifiers
+#if canImport(ZineCore)
+@testable import ZineCore
+#else
 @testable import ZineNative
+#endif
 
 @MainActor
 struct BookmarkShareTests {
+    @Test
+    func extractsURLFromJoinedKindleShareText() throws {
+        let text = "I think you might like this book: The Devil's Chessboard: Allen Dulles, the CIA, and the Rise of America's Secret Government by David Talbothttps://www.amazon.com/dp/B00SFZB93Y?ref_=quick_view_ref_tag"
+        #expect(SharedLinkText.url(in: text)?.absoluteString == "https://www.amazon.com/dp/B00SFZB93Y?ref_=quick_view_ref_tag")
+        #expect(SharedLinkText.url(in: "A book\nhttps://www.amazon.com/dp/B00SFZB93Y")?.host == "www.amazon.com")
+        #expect(SharedLinkText.url(in: "file:///tmp/book.epub") == nil)
+        #expect(SharedLinkText.url(in: "There is no link here") == nil)
+    }
+
+    @Test
+    func loadsKindleAttachmentsAndPreservesRichTextAlongsideURLOnlyAttachment() async throws {
+        let text = "I think you might like this book: The Devil's Chessboard: Allen Dulles, the CIA, and the Rise of America's Secret Government by David Talbothttps://www.amazon.com/dp/B00SFZB93Y?ref_=quick_view_ref_tag"
+        let url = try #require(URL(string: "https://www.amazon.com/dp/B00SFZB93Y?ref_=quick_view_ref_tag"))
+        let item = NSExtensionItem()
+        item.attachments = [
+            NSItemProvider(item: url as NSURL, typeIdentifier: UTType.url.identifier),
+            NSItemProvider(item: url.absoluteString as NSString, typeIdentifier: UTType.plainText.identifier),
+            NSItemProvider(item: text as NSString, typeIdentifier: UTType.plainText.identifier),
+        ]
+        #expect(try await ShareItemLoader.url(from: [item]) == url)
+        #expect(await ShareItemLoader.text(from: [item]) == text)
+        item.attachments = [NSItemProvider(item: text as NSString, typeIdentifier: UTType.plainText.identifier)]
+        #expect(try await ShareItemLoader.url(from: [item]) == url)
+        item.attachments = nil
+        item.attributedContentText = NSAttributedString(string: text)
+        #expect(try await ShareItemLoader.url(from: [item]) == url)
+        #expect(await ShareItemLoader.text(from: [item]) == text)
+        item.attributedContentText = NSAttributedString(string: "Unrelated shared prose https://example.com")
+        #expect(await ShareItemLoader.text(from: [item]) == nil)
+        item.attributedContentText = NSAttributedString(string: text + String(repeating: "x", count: 4096))
+        #expect(await ShareItemLoader.text(from: [item]) == nil)
+    }
+
     @Test
     func loadsPreviewAndSavesCreatedBookmark() async throws {
         let preview = makeBookmarkSharePreview()
@@ -226,7 +264,8 @@ struct BookmarkShareTests {
         let client = BookmarkShareClient.live(
             baseURL: URL(string: "https://api.myzine.app")!,
             session: session,
-            tokenProvider: { "clerk-token" }
+            tokenProvider: { "clerk-token" },
+            sharedTextProvider: { "I think you might like this book: A Book by An Authorhttps://example.com/story" }
         )
 
         let preview = try await client.preview(URL(string: "https://example.com/story")!)
@@ -256,6 +295,11 @@ struct BookmarkShareTests {
             }
         )
         #expect(savePayload["tags"] as? [String] == ["Design", "Reading"])
+        #expect(savePayload["sharedText"] as? String == "I think you might like this book: A Book by An Authorhttps://example.com/story")
+        let recordedPreviewBody = await recorder.previewBody
+        let previewBody = try #require(recordedPreviewBody)
+        let previewPayload = try #require(JSONSerialization.jsonObject(with: previewBody) as? [String: Any])
+        #expect(previewPayload["sharedText"] as? String == savePayload["sharedText"] as? String)
     }
 
 }
@@ -279,9 +323,11 @@ private func makeBookmarkSharePreview() -> BookmarkSharePreview {
 private actor RequestRecorder {
     private(set) var requests: [URLRequest] = []
     private(set) var saveBody: Data?
+    private(set) var previewBody: Data?
 
     func record(_ request: URLRequest) {
         requests.append(request)
+        if request.url?.path == "/api/v1/bookmarks/preview" { previewBody = Self.bodyData(from: request) }
         if request.url?.path == "/api/v1/bookmarks" {
             saveBody = Self.bodyData(from: request)
         }

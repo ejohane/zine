@@ -26,7 +26,10 @@ const bookmarksLogger = logger.child('bookmarks');
 
 export type { BookmarkSaveResult, BookmarkSaveStatus } from '../../bookmarks/save';
 
-const PreviewInputSchema = z.object({ url: z.string().url('Invalid URL format') });
+const PreviewInputSchema = z.object({
+  url: z.string().url('Invalid URL format'),
+  sharedText: z.string().max(4096).optional(),
+});
 
 // Helper Functions
 
@@ -98,7 +101,10 @@ export const bookmarksRouter = router({
 
     // Fetch preview with optional OAuth tokens
     try {
-      return await fetchLinkPreview(input.url, { accessTokens });
+      return await fetchLinkPreview(input.url, {
+        accessTokens,
+        ...(input.sharedText ? { sharedText: input.sharedText } : {}),
+      });
     } catch (error) {
       if (error instanceof LinkPreviewUnsupportedError) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: error.message });

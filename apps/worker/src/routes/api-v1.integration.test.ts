@@ -975,6 +975,95 @@ it.skipIf(!(env as unknown as { BOOK_LIVE_PROOF: boolean }).BOOK_LIVE_PROOF)(
   60000
 );
 
+async function verifyAmazonBookShare(live: boolean) {
+  const real = await vi.importActual<typeof LinkPreviewModule>('../lib/link-preview');
+  vi.mocked(fetchLinkPreview).mockImplementation(real.fetchLinkPreview);
+  const url = 'https://www.amazon.com/dp/B00SFZB93Y?ref_=quick_view_ref_tag';
+  const sharedText =
+    "I think you might like this book: The Devil's Chessboard: Allen Dulles, the CIA, and the Rise of America's Secret Government by David Talbothttps://www.amazon.com/dp/B00SFZB93Y?ref_=quick_view_ref_tag";
+  const unavailable = live
+    ? null
+    : vi
+        .spyOn(globalThis, 'fetch')
+        .mockImplementation(async () => new Response('Unavailable', { status: 500 }));
+  try {
+    const preview = await request('/bookmarks/preview', 'POST', { url, sharedText });
+    expect(preview.status).toBe(200);
+    expect(await preview.json()).toMatchObject({
+      item: {
+        contentType: 'BOOK',
+        creator: 'David Talbot',
+        canonicalUrl: 'https://www.amazon.com/dp/B00SFZB93Y',
+      },
+    });
+    const saved = await request('/bookmarks', 'POST', { url, sharedText, tags: ['Books'] });
+    expect(saved.status).toBe(200);
+    const body = (await saved.json()) as {
+      bookmark: { itemId: string; userItemId: string; status: string };
+    };
+    const { itemId, userItemId } = body.bookmark;
+    expect(body.bookmark.status).toBe('created');
+    const stored = await db.query.items.findFirst({ where: eq(items.id, itemId) });
+    expect(stored).toMatchObject({
+      contentType: 'BOOK',
+      providerId: 'amazon.com:B00SFZB93Y',
+      title:
+        "The Devil's Chessboard: Allen Dulles, the CIA, and the Rise of America's Secret Government",
+      articleContentKey: null,
+    });
+    expect(JSON.parse(stored!.rawMetadata!).book.asin).toBe('B00SFZB93Y');
+    expect(
+      await db.query.creators.findFirst({ where: eq(creators.id, stored!.creatorId!) })
+    ).toMatchObject({ name: 'David Talbot' });
+    const repeat = await request('/bookmarks', 'POST', {
+      url: 'https://www.amazon.com/gp/product/B00SFZB93Y?tag=another',
+      sharedText,
+    });
+    expect(repeat.status).toBe(200);
+    expect(await repeat.json()).toMatchObject({
+      bookmark: { itemId, userItemId, status: 'already_bookmarked' },
+    });
+    const library = await request('/bookmarks?contentType=BOOK');
+    expect(await library.json()).toMatchObject({
+      items: [{ id: userItemId, contentType: 'BOOK', tags: [{ name: 'Books' }] }],
+    });
+    expect((await request(`/bookmarks/${userItemId}`, 'PATCH', { isFinished: true })).status).toBe(
+      200
+    );
+    const detail = await request(`/bookmarks/${userItemId}`);
+    expect(await detail.json()).toMatchObject({ item: { contentType: 'BOOK', isFinished: true } });
+    if (live) {
+      const cover = await fetch(stored!.thumbnailUrl!);
+      expect(cover.status).toBe(200);
+      expect(cover.headers.get('content-type')).toContain('image/');
+      expect((await cover.arrayBuffer()).byteLength).toBeGreaterThan(1000);
+      console.log(
+        'LIVE_AMAZON_BOOK_PROOF',
+        JSON.stringify({
+          asin: 'B00SFZB93Y',
+          title: stored?.title,
+          metadataSource: JSON.parse(stored!.rawMetadata!).metadataSource,
+          coverAccessible: true,
+          persisted: true,
+          duplicateDeduplicated: true,
+          tagsPersisted: true,
+          completionPersisted: true,
+        })
+      );
+    }
+  } finally {
+    unavailable?.mockRestore();
+  }
+}
+
+it('saves the exact Kindle share through REST even when Amazon is unavailable', () =>
+  verifyAmazonBookShare(false));
+it.skipIf(!(env as unknown as { BOOK_LIVE_PROOF: boolean }).BOOK_LIVE_PROOF)(
+  'LIVE: saves the exact Amazon Kindle share and verifies cover, tags, duplicate handling and completion',
+  () => verifyAmazonBookShare(true),
+  60000
+);
+
 describe.each(['REST', 'tRPC'])('%s manual bookmark save contract', (api) => {
   const metadata = {
     canonicalUrl: 'https://www.youtube.com/watch?v=save-contract',

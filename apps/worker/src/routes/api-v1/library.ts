@@ -83,11 +83,13 @@ async function enrollSavedArticleBestEffort(
 
 const SaveBookmarkBodySchema = z.object({
   url: z.string().url('Invalid URL format'),
+  sharedText: z.string().max(4096).optional(),
   tags: z.array(z.string().min(1).max(64)).max(20).optional(),
 });
 
 const PreviewBookmarkBodySchema = z.object({
   url: z.string().url('Invalid URL format'),
+  sharedText: z.string().max(4096).optional(),
 });
 
 const InboxQuerySchema = z.object({
@@ -440,7 +442,10 @@ apiV1Routes.post('/bookmarks/preview', apiAuth('bookmarks:write'), async (c) => 
   const caller = appRouter.createCaller(await createContext(c));
 
   try {
-    const preview = await caller.bookmarks.preview({ url: parsedBody.data.url });
+    const preview = await caller.bookmarks.preview({
+      url: parsedBody.data.url,
+      ...(parsedBody.data.sharedText ? { sharedText: parsedBody.data.sharedText } : {}),
+    });
 
     if (!preview) {
       return c.json(
@@ -483,7 +488,10 @@ apiV1Routes.post('/bookmarks', apiAuth('bookmarks:write'), async (c) => {
 
   const caller = appRouter.createCaller(await createContext(c));
   try {
-    const preview = await caller.bookmarks.preview({ url: parsedBody.data.url });
+    const preview = await caller.bookmarks.preview({
+      url: parsedBody.data.url,
+      ...(parsedBody.data.sharedText ? { sharedText: parsedBody.data.sharedText } : {}),
+    });
 
     if (!preview) {
       return c.json(

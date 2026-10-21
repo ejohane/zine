@@ -32,6 +32,9 @@ final class ShareViewController: UIViewController {
                         throw BookmarkShareError.signedOut
                     }
                     return token
+                },
+                sharedTextProvider: { [weak self] in
+                    await ShareItemLoader.text(from: self?.extensionContext)
                 }
             )
         } else {

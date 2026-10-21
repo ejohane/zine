@@ -3577,6 +3577,11 @@
         "required": ["url"],
         "additionalProperties": false,
         "properties": {
+          "sharedText": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "Optional original share text. A matching Kindle book recommendation can supply title and author when Amazon metadata is unavailable."
+          },
           "url": { "type": "string", "format": "uri", "description": "HTTP or HTTPS URL to save." },
           "tags": {
             "type": "array",
@@ -3591,6 +3596,11 @@
         "required": ["url"],
         "additionalProperties": false,
         "properties": {
+          "sharedText": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "Optional original share text. A matching Kindle book recommendation can supply title and author when Amazon metadata is unavailable."
+          },
           "url": {
             "type": "string",
             "format": "uri",
