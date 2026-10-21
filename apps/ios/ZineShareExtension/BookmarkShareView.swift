@@ -362,7 +362,7 @@ private struct BookmarkPreviewCard: View {
                     if let image = phase.image {
                         image
                             .resizable()
-                            .scaledToFill()
+                            .aspectRatio(contentMode: preview.contentType.uppercased() == "BOOK" ? .fit : .fill)
                     } else if phase.error != nil {
                         imagePlaceholder
                     } else {
@@ -388,6 +388,7 @@ private struct BookmarkPreviewCard: View {
         case "VIDEO": "play.rectangle"
         case "PODCAST": "waveform"
         case "POST": "text.bubble"
+        case "BOOK": "book.closed"
         default: "doc.text"
         }
     }

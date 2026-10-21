@@ -5,6 +5,7 @@ export enum ContentType {
   PODCAST = 'PODCAST',
   ARTICLE = 'ARTICLE',
   POST = 'POST',
+  BOOK = 'BOOK',
 }
 
 export enum Provider {

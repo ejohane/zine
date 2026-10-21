@@ -2390,7 +2390,7 @@ describe('apiV1Routes', () => {
     const app = createTestApp();
 
     const res = await app.fetch(
-      new Request('http://localhost/api/v1/bookmarks?contentType=BOOK', {
+      new Request('http://localhost/api/v1/bookmarks?contentType=MAGAZINE', {
         headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
       }),
       createMockEnv()
@@ -2407,7 +2407,7 @@ describe('apiV1Routes', () => {
     const app = createTestApp();
 
     const res = await app.fetch(
-      new Request('http://localhost/api/v1/bookmarks/opened?contentType=BOOK', {
+      new Request('http://localhost/api/v1/bookmarks/opened?contentType=MAGAZINE', {
         headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
       }),
       createMockEnv()

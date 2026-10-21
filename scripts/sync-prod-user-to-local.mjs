@@ -1,7 +1,15 @@
 #!/usr/bin/env bun
 import { execFile, execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
@@ -226,7 +234,8 @@ function buildRawSqlite() {
 
 export function snapshotHasCurrentMigrationBaseline(db) {
   const hasColumn = (table, name) =>
-    db.query(`PRAGMA table_info(${quoteIdentifier(table)})`)
+    db
+      .query(`PRAGMA table_info(${quoteIdentifier(table)})`)
       .all()
       .some((column) => column.name === name);
 
@@ -240,13 +249,42 @@ export function snapshotHasCurrentMigrationBaseline(db) {
   );
 }
 
+export function snapshotHasTagSuggestions(db) {
+  const hasColumns = (table, required) => {
+    const columns = db.query(`PRAGMA table_info(${quoteIdentifier(table)})`).all();
+    return required.every((name) => columns.some((column) => column.name === name));
+  };
+  return (
+    hasColumns('tag_suggestion_runs', [
+      'user_item_id',
+      'fingerprint',
+      'token',
+      'status',
+      'updated_at',
+    ]) &&
+    hasColumns('tag_suggestions', [
+      'id',
+      'user_item_id',
+      'normalized_name',
+      'name',
+      'confidence',
+      'decision',
+      'generated_at',
+    ])
+  );
+}
+
 function reconcileSnapshotMigrationHistory() {
   const db = new Database(RAW_DB);
   try {
     if (!snapshotHasCurrentMigrationBaseline(db)) return;
 
-    const migrationNames = readdirSync(join(WORKER_DIR, 'src/db/migrations'))
-      .filter((name) => /^\d{4}_.*\.sql$/.test(name) && Number(name.slice(0, 4)) <= 33);
+    const migrationNames = readdirSync(join(WORKER_DIR, 'src/db/migrations')).filter(
+      (name) => /^\d{4}_.*\.sql$/.test(name) && Number(name.slice(0, 4)) <= 33
+    );
+    // Production may contain 0034 under an older migration ledger.
+    // Reconcile only when both complete table shapes are present.
+    if (snapshotHasTagSuggestions(db)) migrationNames.push('0034_add_tag_suggestions.sql');
     const insert = db.query('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)');
     db.transaction(() => {
       for (const name of migrationNames) insert.run(name);

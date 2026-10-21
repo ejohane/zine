@@ -2551,7 +2551,7 @@
         "name": "contentType",
         "in": "query",
         "description": "Filter items by content type.",
-        "schema": { "type": "string", "enum": ["VIDEO", "PODCAST", "ARTICLE", "POST"] }
+        "schema": { "type": "string", "enum": ["VIDEO", "PODCAST", "ARTICLE", "POST", "BOOK"] }
       },
       "UserItemId": {
         "name": "id",
@@ -3271,7 +3271,10 @@
           "title": { "type": "string" },
           "thumbnailUrl": { "type": ["string", "null"], "format": "uri" },
           "canonicalUrl": { "type": "string", "format": "uri" },
-          "contentType": { "type": "string", "enum": ["VIDEO", "PODCAST", "ARTICLE", "POST"] },
+          "contentType": {
+            "type": "string",
+            "enum": ["VIDEO", "PODCAST", "ARTICLE", "POST", "BOOK"]
+          },
           "provider": {
             "type": "string",
             "enum": ["YOUTUBE", "SPOTIFY", "GMAIL", "RSS", "SUBSTACK", "WEB", "X"]
@@ -3337,7 +3340,10 @@
           "title": { "type": "string" },
           "thumbnailUrl": { "type": ["string", "null"], "format": "uri" },
           "canonicalUrl": { "type": "string", "format": "uri" },
-          "contentType": { "type": "string", "enum": ["VIDEO", "PODCAST", "ARTICLE", "POST"] },
+          "contentType": {
+            "type": "string",
+            "enum": ["VIDEO", "PODCAST", "ARTICLE", "POST", "BOOK"]
+          },
           "provider": {
             "type": "string",
             "enum": ["YOUTUBE", "SPOTIFY", "GMAIL", "RSS", "SUBSTACK", "WEB", "X"]
@@ -3615,7 +3621,10 @@
             "type": "string",
             "enum": ["YOUTUBE", "SPOTIFY", "GMAIL", "RSS", "SUBSTACK", "WEB", "X"]
           },
-          "contentType": { "type": "string", "enum": ["VIDEO", "PODCAST", "ARTICLE", "POST"] },
+          "contentType": {
+            "type": "string",
+            "enum": ["VIDEO", "PODCAST", "ARTICLE", "POST", "BOOK"]
+          },
           "providerId": { "type": "string" },
           "title": { "type": "string" },
           "creator": { "type": "string" },

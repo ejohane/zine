@@ -74,7 +74,7 @@ struct ContentTypeFilterBar: View {
     @Binding var selection: ContentType?
     var background = ZineTheme.canvas
 
-    private let options: [ContentType?] = [nil, .article, .podcast, .video, .post]
+    private let options: [ContentType?] = [nil, .article, .podcast, .video, .post, .book]
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
