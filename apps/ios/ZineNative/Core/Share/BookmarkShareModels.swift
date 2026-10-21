@@ -28,7 +28,7 @@ struct BookmarkSharePreview: Decodable, Equatable, Sendable {
         }
 
         if let host = URL(string: canonicalUrl)?.host(percentEncoded: false) {
-            return host.replacing(/^www\./, with: "")
+            return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
         }
 
         return provider.replacingOccurrences(of: "_", with: " ").capitalized
@@ -117,5 +117,24 @@ enum BookmarkShareError: LocalizedError, Equatable, Sendable {
         case let .server(_, message):
             message
         }
+    }
+}
+
+
+/// Start detection at an explicit web URL, even when a source app omits its preceding space.
+enum SharedLinkText {
+    static func url(in text: String) -> URL? {
+        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+        let start = text.range(of: #"https?://"#, options: [.regularExpression, .caseInsensitive])?.lowerBound
+        let candidate = start.map { String(text[$0...]) } ?? text
+        let range = NSRange(candidate.startIndex..<candidate.endIndex, in: candidate)
+        guard let url = detector?.matches(in: candidate, options: [], range: range)
+            .compactMap(\.url).first(where: isWebURL) else { return nil }
+        return url
+    }
+
+    static func isWebURL(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased(), let host = url.host, !host.isEmpty else { return false }
+        return scheme == "http" || scheme == "https"
     }
 }

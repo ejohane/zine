@@ -36,6 +36,7 @@ import { fetchFavicon } from './favicon';
 import { logger } from './logger';
 import { parseISO8601Duration } from './duration';
 import { isSupportedBookPage } from './book-metadata';
+import { parseAmazonProductLink, bookFromKindleShare, amazonBookCover } from './amazon-book';
 
 /**
  * Result of fetching link preview metadata
@@ -70,7 +71,8 @@ export interface LinkPreviewResult {
     | 'article_extractor'
     | 'fxtwitter'
     | 'podcast_page'
-    | 'book_page';
+    | 'book_page'
+    | 'book_share';
 
   // Article-specific fields
   /** Publication or site name (for articles) */
@@ -93,6 +95,8 @@ export interface LinkPreviewResult {
  * Context for fetching link previews
  */
 export interface PreviewContext {
+  /** Optional source-app text; only a matching explicit Kindle book share is used. */
+  sharedText?: string;
   /** User's valid access tokens for each provider */
   accessTokens?: {
     youtube?: string;
@@ -955,6 +959,34 @@ export async function fetchLinkPreview(
         source: 'book_page',
       };
     }
+  }
+
+  const amazon =
+    parsedLink.provider === Provider.WEB ? parseAmazonProductLink(parsedLink.canonicalUrl) : null;
+  if (amazon) {
+    const page = await scrapeOpenGraph(amazon.canonicalUrl);
+    const resolved = parseAmazonProductLink(page.resolvedUrl ?? amazon.canonicalUrl);
+    const pageBook = resolved?.providerId === amazon.providerId ? page.book : null;
+    const book = pageBook ?? bookFromKindleShare(context?.sharedText, amazon);
+    if (book)
+      result = {
+        provider: Provider.WEB,
+        contentType: ContentType.BOOK,
+        providerId: amazon.providerId,
+        canonicalUrl: amazon.canonicalUrl,
+        title: book.title,
+        creator: book.author,
+        thumbnailUrl: book.coverUrl ?? amazonBookCover(amazon.asin),
+        description: book.description ?? (pageBook ? (page.description ?? undefined) : undefined),
+        siteName: 'Amazon',
+        duration: null,
+        hasArticleContent: false,
+        rawMetadata: JSON.stringify({
+          book: { ...book, asin: amazon.asin },
+          metadataSource: pageBook ? 'amazon_page' : 'kindle_share',
+        }),
+        source: pageBook ? 'book_page' : 'book_share',
+      };
   }
 
   if (parsedLink.podcastLink) {

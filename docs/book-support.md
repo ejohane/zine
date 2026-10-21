@@ -1,4 +1,4 @@
-# Publisher book links
+# Book links
 
 Zine recognizes Penguin Random House book detail links as `BOOK` content when
 its public page exposes a JSON-LD `Book` with a title and author. Recognition is
@@ -18,6 +18,33 @@ book details show the cover, author, synopsis, and an Open book page action.
 Books do not enter the article reader or receive an article reading-time estimate.
 The share extension shows the Book label and preserves the cover's proportions.
 
+## Amazon and Kindle shares
+
+US Amazon product URLs (`amazon.com` and `www.amazon.com`) support `/dp/ASIN`,
+`/gp/product/ASIN`, and `/gp/aw/d/ASIN`, including title-prefixed product paths.
+Book saves use one identity per ASIN and canonical `https://www.amazon.com/dp/ASIN`
+URLs, so affiliate parameters and alternate product paths do not create duplicates.
+A product URL alone is not evidence that the product is a book: recognition
+requires structured Book metadata, book-specific Amazon markup with an author,
+or an explicit matching Kindle book recommendation.
+
+The native share extension preserves Kindle's English recommendation text,
+including the case where the author and `https://` have no separating space.
+Preview and save accept optional `sharedText` (maximum 4096 characters). Only the
+known book recommendation is forwarded; unrelated shared prose is omitted.
+If Amazon's page is unavailable, the matching recommendation supplies title and
+author, and the ASIN supplies the cover URL. The original ASIN must match the
+shared URL. A bare URL with no accessible book metadata retains ordinary-link
+handling. Short links, other Amazon marketplaces, and localized recommendation
+templates are not included in this increment.
+
+Fetched book metadata takes precedence. The saved raw metadata records the ASIN
+and `amazon_page` or `kindle_share` provenance; it does not retain the original
+share text. A share-text fallback has no invented synopsis. During implementation
+Amazon returned HTTP 500 for the supplied product page; its ASIN cover was
+accessible. The Amazon page parser therefore has representative DOM tests,
+while the exact share fallback also has a live network/REST/D1 test.
+
 ## Automated verification
 
 Deterministic extraction tests retain public metadata captured from the shared
@@ -27,6 +54,7 @@ exercise book saving, filtering, tags, duplicate handling, and completion.
 ```sh
 bun run --cwd apps/worker test:run \
   src/lib/book-metadata.test.ts \
+  src/lib/amazon-book.test.ts \
   src/lib/opengraph.test.ts \
   src/lib/link-preview.test.ts \
   src/routes/api-v1.integration.test.ts \
@@ -35,7 +63,7 @@ bun run test:native:core
 bun run native:agent scenario run all
 ```
 
-Two opt-in checks fetch the actual publisher page. The REST check uses actual
+Opt-in checks fetch the actual publisher page or use the exact Amazon Kindle share. The REST check uses actual
 PAT verification and isolated D1, then reads back the persisted book and its
 completion. Its preview mock delegates to the real preview implementation;
 network fetch and book metadata extraction are real. Unrelated Node-only Google
