@@ -54,7 +54,12 @@ const bindings = env as unknown as Bindings & {
 };
 const db = createDb(bindings.DB);
 
-async function request(path: string, method = 'GET', body?: unknown) {
+async function request(
+  path: string,
+  method = 'GET',
+  body?: unknown,
+  requestBindings: Bindings = bindings
+) {
   return app.request(
     `/api/v1${path}`,
     {
@@ -62,7 +67,7 @@ async function request(path: string, method = 'GET', body?: unknown) {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     },
-    bindings
+    requestBindings
   );
 }
 
@@ -1062,6 +1067,119 @@ it.skipIf(!(env as unknown as { BOOK_LIVE_PROOF: boolean }).BOOK_LIVE_PROOF)(
   'LIVE: saves the exact Amazon Kindle share and verifies cover, tags, duplicate handling and completion',
   () => verifyAmazonBookShare(true),
   60000
+);
+
+async function verifyAmazonShortBook(live: boolean) {
+  const real = await vi.importActual<typeof LinkPreviewModule>('../lib/link-preview');
+  vi.mocked(fetchLinkPreview).mockImplementation(real.fetchLinkPreview);
+  // Queue consumption is outside this persistence proof and must not outlive D1 rollback.
+  const requestBindings = {
+    ...bindings,
+    ENRICHMENT_QUEUE: { send: vi.fn(async () => {}) } as unknown as Queue,
+  };
+  const shortRequest = (path: string, method = 'GET', body?: unknown) =>
+    request(path, method, body, requestBindings);
+  const shortUrl = 'https://a.co/0gbZxe3s';
+  const otherShortUrl = 'https://a.co/0108tGE8';
+  const canonicalUrl = 'https://www.amazon.com/dp/B000O76ON6';
+  const network = live
+    ? null
+    : vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+        const url = String(input);
+        if (url.startsWith('https://a.co/'))
+          return new Response(null, {
+            status: 302,
+            headers: { location: canonicalUrl + '?ref_=k4w_ss_dp_bot' },
+          });
+        const response = new Response(
+          url.includes('/gp/aw/d/')
+            ? '<html><span id="productTitle">Neuromancer (Sprawl Trilogy Book 1)</span><div id="bylineInfo"><span class="author"><a class="a-link-normal">William Gibson</a></span></div><div id="bookDescription_feature_div"><div class="a-expander-content">A science fiction masterpiece.</div></div></html>'
+            : '<html><title>Amazon</title></html>',
+          { headers: { 'content-type': 'text/html' } }
+        );
+        Object.defineProperty(response, 'url', { value: url });
+        return response;
+      });
+  try {
+    const preview = await shortRequest('/bookmarks/preview', 'POST', { url: shortUrl });
+    expect(preview.status).toBe(200);
+    expect(await preview.json()).toMatchObject({
+      item: {
+        contentType: 'BOOK',
+        canonicalUrl,
+        creator: 'William Gibson',
+        title: 'Neuromancer (Sprawl Trilogy Book 1)',
+      },
+    });
+    const saved = await shortRequest('/bookmarks', 'POST', { url: shortUrl, tags: ['Books'] });
+    expect(saved.status).toBe(200);
+    const body = (await saved.json()) as {
+      bookmark: { itemId: string; userItemId: string; status: string };
+    };
+    const { itemId, userItemId } = body.bookmark;
+    expect(body.bookmark.status).toBe('created');
+    const stored = await db.query.items.findFirst({ where: eq(items.id, itemId) });
+    expect(stored).toMatchObject({
+      contentType: 'BOOK',
+      providerId: 'amazon.com:B000O76ON6',
+      title: 'Neuromancer (Sprawl Trilogy Book 1)',
+      articleContentKey: null,
+    });
+    expect(JSON.parse(stored!.rawMetadata!).book.asin).toBe('B000O76ON6');
+    for (const url of [otherShortUrl, canonicalUrl]) {
+      const repeated = await shortRequest('/bookmarks', 'POST', { url });
+      expect(repeated.status).toBe(200);
+      expect(await repeated.json()).toMatchObject({
+        bookmark: { itemId, userItemId, status: 'already_bookmarked' },
+      });
+    }
+    expect(await (await shortRequest('/bookmarks?contentType=BOOK')).json()).toMatchObject({
+      items: [
+        {
+          id: userItemId,
+          contentType: 'BOOK',
+          creator: 'William Gibson',
+          tags: [{ name: 'Books' }],
+        },
+      ],
+    });
+    expect(
+      (await shortRequest(`/bookmarks/${userItemId}`, 'PATCH', { isFinished: true })).status
+    ).toBe(200);
+    expect(await (await shortRequest(`/bookmarks/${userItemId}`)).json()).toMatchObject({
+      item: { contentType: 'BOOK', isFinished: true },
+    });
+    if (live) {
+      const cover = await fetch(stored!.thumbnailUrl!);
+      expect(cover.status).toBe(200);
+      expect(cover.headers.get('content-type')).toContain('image/');
+      expect((await cover.arrayBuffer()).byteLength).toBeGreaterThan(1000);
+      console.log(
+        'LIVE_AMAZON_SHORT_LINK_PROOF',
+        JSON.stringify({
+          shortUrl,
+          otherShortUrl,
+          canonicalUrl,
+          title: stored!.title,
+          metadataSource: JSON.parse(stored!.rawMetadata!).metadataSource,
+          persisted: true,
+          aliasesDeduplicated: true,
+          coverAccessible: true,
+          completionPersisted: true,
+        })
+      );
+    }
+  } finally {
+    network?.mockRestore();
+  }
+}
+
+it('saves bare Amazon short links through REST and deduplicates short and direct aliases', () =>
+  verifyAmazonShortBook(false));
+it.skipIf(!(env as unknown as { BOOK_LIVE_PROOF: boolean }).BOOK_LIVE_PROOF)(
+  'LIVE: saves both reported Amazon short links as Neuromancer without share text',
+  () => verifyAmazonShortBook(true),
+  120000
 );
 
 describe.each(['REST', 'tRPC'])('%s manual bookmark save contract', (api) => {

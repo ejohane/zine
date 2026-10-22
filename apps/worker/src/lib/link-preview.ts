@@ -36,7 +36,12 @@ import { fetchFavicon } from './favicon';
 import { logger } from './logger';
 import { parseISO8601Duration } from './duration';
 import { isSupportedBookPage } from './book-metadata';
-import { parseAmazonProductLink, bookFromKindleShare, amazonBookCover } from './amazon-book';
+import {
+  parseAmazonProductLink,
+  resolveAmazonProductLink,
+  bookFromKindleShare,
+  amazonBookCover,
+} from './amazon-book';
 
 /**
  * Result of fetching link preview metadata
@@ -962,12 +967,23 @@ export async function fetchLinkPreview(
   }
 
   const amazon =
-    parsedLink.provider === Provider.WEB ? parseAmazonProductLink(parsedLink.canonicalUrl) : null;
+    parsedLink.provider === Provider.WEB
+      ? await resolveAmazonProductLink(parsedLink.canonicalUrl)
+      : null;
   if (amazon) {
-    const page = await scrapeOpenGraph(amazon.canonicalUrl);
-    const resolved = parseAmazonProductLink(page.resolvedUrl ?? amazon.canonicalUrl);
-    const pageBook = resolved?.providerId === amazon.providerId ? page.book : null;
-    const book = pageBook ?? bookFromKindleShare(context?.sharedText, amazon);
+    let pageBook = null;
+    let page;
+    for (const pageUrl of [amazon.canonicalUrl, `https://www.amazon.com/gp/aw/d/${amazon.asin}`]) {
+      page = await scrapeOpenGraph(
+        pageUrl,
+        pageUrl.includes('/gp/aw/d/') ? { userAgent: 'Mozilla/5.0' } : {}
+      );
+      const resolved = parseAmazonProductLink(page.resolvedUrl ?? pageUrl);
+      pageBook = resolved?.providerId === amazon.providerId ? page.book : null;
+      if (pageBook) break;
+    }
+    const book =
+      pageBook ?? bookFromKindleShare(context?.sharedText, amazon, parsedLink.canonicalUrl);
     if (book)
       result = {
         provider: Provider.WEB,
@@ -977,7 +993,7 @@ export async function fetchLinkPreview(
         title: book.title,
         creator: book.author,
         thumbnailUrl: book.coverUrl ?? amazonBookCover(amazon.asin),
-        description: book.description ?? (pageBook ? (page.description ?? undefined) : undefined),
+        description: book.description ?? (pageBook ? (page?.description ?? undefined) : undefined),
         siteName: 'Amazon',
         duration: null,
         hasArticleContent: false,

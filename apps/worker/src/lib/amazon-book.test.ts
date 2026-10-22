@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { parseAmazonProductLink, bookFromKindleShare } from './amazon-book';
+import {
+  parseAmazonProductLink,
+  resolveAmazonProductLink,
+  bookFromKindleShare,
+} from './amazon-book';
 import { fetchLinkPreview } from './link-preview';
 
 vi.mock('googleapis', () => ({ google: {} }));
@@ -114,7 +118,7 @@ describe('Amazon and Kindle book links', () => {
     });
     expect(result?.description).toBeUndefined();
     expect(JSON.parse(result!.rawMetadata!).metadataSource).toBe('kindle_share');
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
   it('prefers fetched book metadata over stale shared text', async () => {
     respond();
@@ -142,5 +146,120 @@ describe('Amazon and Kindle book links', () => {
       title: 'A Book',
       creator: 'An Author',
     });
+  });
+});
+
+const shortUrl = 'https://a.co/0gbZxe3s';
+const productUrl = 'https://www.amazon.com/dp/B000O76ON6?ref_=k4w_ss_dp_bot';
+const neuromancerHTML = bookHTML
+  .replaceAll("The Devil's Chessboard", 'Neuromancer (Sprawl Trilogy Book 1)')
+  .replaceAll('David Talbot', 'William Gibson')
+  .replaceAll('B00SFZB93Y', 'B000O76ON6');
+function networkResponse(body: string, url: string, status = 200, headers = {}) {
+  const response = new Response(body, {
+    status,
+    headers: { 'content-type': 'text/html', ...headers },
+  });
+  Object.defineProperty(response, 'url', { value: url });
+  return response;
+}
+
+describe('Amazon short links', () => {
+  it('stops at the product redirect before Amazon can send the request to sign-in', async () => {
+    const fetch = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(networkResponse('', shortUrl, 302, { location: productUrl }));
+    expect(await resolveAmazonProductLink(shortUrl)).toEqual(parseAmazonProductLink(productUrl));
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith(shortUrl, expect.objectContaining({ redirect: 'manual' }));
+  });
+  it('recognizes the real Kindle kshare redirect without following it into sign-in', async () => {
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      networkResponse('', shortUrl, 301, {
+        location: 'https://read.amazon.com/kp/kshare?asin=B000O76ON6&id=share-id&ref_=share',
+      })
+    );
+    expect(await resolveAmazonProductLink(shortUrl)).toEqual(parseAmazonProductLink(productUrl));
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it('extracts a bare short link using mobile metadata when desktop metadata is generic', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === shortUrl) return networkResponse('', url, 302, { location: productUrl });
+      return networkResponse(
+        url.includes('/gp/aw/d/') ? neuromancerHTML : '<html><title>Amazon</title></html>',
+        url
+      );
+    });
+    expect(await fetchLinkPreview(shortUrl)).toMatchObject({
+      contentType: 'BOOK',
+      title: 'Neuromancer (Sprawl Trilogy Book 1)',
+      creator: 'William Gibson',
+      canonicalUrl: 'https://www.amazon.com/dp/B000O76ON6',
+      providerId: 'amazon.com:B000O76ON6',
+      source: 'book_page',
+      hasArticleContent: false,
+    });
+  });
+  it('uses a matching short-link recommendation when both product pages are unavailable', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) =>
+      String(input) === shortUrl
+        ? networkResponse('', shortUrl, 302, { location: productUrl })
+        : networkResponse('', String(input), 500)
+    );
+    const sharedText = 'I think you might like this book: Neuromancer by William Gibson' + shortUrl;
+    expect(await fetchLinkPreview(shortUrl, { sharedText })).toMatchObject({
+      contentType: 'BOOK',
+      creator: 'William Gibson',
+      source: 'book_share',
+    });
+    expect(
+      bookFromKindleShare(sharedText, parseAmazonProductLink(productUrl)!, 'https://a.co/other')
+    ).toBeNull();
+  });
+  it('does not trust book metadata redirected to another ASIN or ordinary products', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) =>
+      String(input) === shortUrl
+        ? networkResponse('', shortUrl, 302, { location: productUrl })
+        : networkResponse(neuromancerHTML, 'https://www.amazon.com/dp/B012345678')
+    );
+    expect((await fetchLinkPreview(shortUrl))?.contentType).toBe('ARTICLE');
+  });
+  it.each([
+    'http://127.0.0.1/private',
+    'https://evil.test/dp/B000O76ON6',
+    'https://amazon.com.evil.test/dp/B000O76ON6',
+    'http://www.amazon.com/dp/B000O76ON6',
+    '/0gbZxe3s',
+    'https://www.amazon.com/ap/signin',
+    'https://read.amazon.com.evil.test/kp/kshare?asin=B000O76ON6',
+    'https://read.amazon.com/kp/kshare?asin=BAD',
+  ])('does not follow an untrusted, looping or non-product destination: %s', async (location) => {
+    const fetch = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(networkResponse('', shortUrl, 302, { location }));
+    expect(await resolveAmazonProductLink(shortUrl)).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it('bounds redirect chains and handles unavailable short links', async () => {
+    const fetch = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (input) =>
+        networkResponse('', String(input), 302, { location: String(input) + 'x' })
+      );
+    expect(await resolveAmazonProductLink(shortUrl)).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(4);
+    fetch.mockRejectedValue(new Error('Network unavailable'));
+    expect(await resolveAmazonProductLink(shortUrl)).toBeNull();
+  });
+  it.each([
+    'https://a.co.evil.test/abc',
+    'https://user@a.co/abc',
+    'https://a.co:8080/abc',
+    'http://a.co/abc',
+  ])('does not fetch a lookalike or invalid short URL: %s', async (url) => {
+    const fetch = vi.spyOn(globalThis, 'fetch');
+    expect(await resolveAmazonProductLink(url)).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

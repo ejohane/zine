@@ -35,8 +35,19 @@ known book recommendation is forwarded; unrelated shared prose is omitted.
 If Amazon's page is unavailable, the matching recommendation supplies title and
 author, and the ASIN supplies the cover URL. The original ASIN must match the
 shared URL. A bare URL with no accessible book metadata retains ordinary-link
-handling. Short links, other Amazon marketplaces, and localized recommendation
-templates are not included in this increment.
+handling. Amazon `a.co` short links resolve through a bounded, timed redirect
+chain restricted to Amazon short links, US product URLs, and Kindle's
+`read.amazon.com/kp/kshare?asin=...` destination. Resolution stops at the ASIN
+before Kindle redirects to sign-in. Other marketplaces and localized
+recommendation templates remain unsupported.
+
+If the desktop page lacks book metadata, preview tries the same ASIN's mobile
+product page with a browser user agent. Metadata must still resolve to the same
+ASIN and provide explicit book evidence and an author. Both reported short links
+(`https://a.co/0gbZxe3s` and `https://a.co/0108tGE8`) were verified through live
+REST preview/save as **Neuromancer (Sprawl Trilogy Book 1)** by **William Gibson**,
+with no recommendation text. Short and direct links deduplicate to the same book.
+This does not retroactively repair previously saved generic article records.
 
 Fetched book metadata takes precedence. The saved raw metadata records the ASIN
 and `amazon_page` or `kindle_share` provenance; it does not retain the original
