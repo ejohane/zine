@@ -150,3 +150,16 @@ live pass before advancing to each next workflow.
 
 The bridge remains Debug-Simulator-only, opt-in, loopback-only, capability-scoped,
 and expiring. The CLI does not read installed-app caches or export app credentials.
+
+### Home Lab arrangement commands
+
+The opt-in local Debug Simulator bridge supports `home.get`,
+`home.composition.preview`, and `home.composition.publish`. Supply
+`--composition /absolute/path/arrangement.json` for preview/publication; the file
+is the versioned Home composition itself, without an outer `composition` wrapper.
+`home.get` returns the canonical API Home response under `state.home`. Preview
+and publication return `state.homeCompositionResult`; preview never writes.
+Publication reports `server_committed` when `published` is true, even if
+`verified` is false. Inspect readback before retrying an uncertain publication.
+The visible Home store reloads after publication, and the remote command never
+exports the Clerk token. These commands do not prove visible rendering or gestures.

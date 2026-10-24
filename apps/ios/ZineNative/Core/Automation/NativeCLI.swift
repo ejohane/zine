@@ -104,11 +104,14 @@
             let query = try option("--query").map {
                 try JSONDecoder().decode(LibraryQuery.self, from: Data($0.utf8))
             }
+            let composition = try option("--composition").map {
+                try JSONDecoder().decode(HomeComposition.self, from: Data(contentsOf: URL(fileURLWithPath: $0)))
+            }
             let command = NativeCommand(
                 name: arguments[2], bookmarkID: option("--id"),
                 fraction: option("--fraction").flatMap(Double.init), tags: tags, query: query,
                 isFinished: option("--finished").flatMap(Bool.init), url: option("--url"),
-                jobID: option("--job"), timeout: option("--timeout").flatMap(Double.init))
+                jobID: option("--job"), timeout: option("--timeout").flatMap(Double.init), composition: composition)
             let request = BridgeRequest(
                 session: identity.session, capability: identity.capability, command: command)
             try JSONEncoder().encode(request).write(

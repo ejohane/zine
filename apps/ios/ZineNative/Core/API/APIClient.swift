@@ -80,6 +80,15 @@ struct APIClient {
         return await overlayHome(response)
     }
 
+    func prepareHomeComposition(_ composition: HomeComposition, publish: Bool = false) async throws -> HomeCompositionResult {
+        let path = publish ? "/api/v1/home/composition" : "/api/v1/home/composition/preview"
+        var request = URLRequest(url: baseURL.appending(path: path))
+        request.httpMethod = publish ? "PUT" : "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["composition": composition])
+        return try await send(request)
+    }
+
     func overlayHome(_ response: HomeResponse) async -> HomeResponse {
         guard let bookmarkMutationOutbox else { return response }
         let hiddenIDs = await bookmarkMutationOutbox.hiddenHomeItemIDs()

@@ -248,7 +248,7 @@ export function createMcpServer(env: Bindings, principal: Principal | null, cfg:
   tool(
     'get_home_composition',
     'Get Home composition',
-    'Read the current native Home Lab card arrangement and current real item metadata. Missing composition uses normal Home.',
+    'Read the one current Home Lab arrangement and current real item metadata. Its sections are custom collections local to Home Lab, not permanent Library collections. A missing or empty arrangement shows the Home Lab empty state.',
     getHomeSchema,
     false,
     (_s, _p, home) => home.composition()
@@ -264,7 +264,7 @@ export function createMcpServer(env: Bindings, principal: Principal | null, cfg:
   tool(
     'publish_home_composition',
     'Publish Home composition',
-    'Publish a reviewed native card arrangement to Home Lab when requested. Replaces the linked account’s current composition. Does not change regular Home or publish an editorial edition.',
+    'Publish a reviewed arrangement of custom collections to Home Lab when requested. Replaces the linked account’s entire current arrangement, including section/item order and card views. Removed sections do not accumulate as Library collections. Use an empty sections array to clear the page; saved items remain in Library. Does not change regular Home or publish an editorial edition.',
     composeHomeSchema,
     true,
     (_s, p, home) => home.publishComposition(p)

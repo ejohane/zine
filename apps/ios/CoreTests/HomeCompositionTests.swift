@@ -3,6 +3,62 @@ import XCTest
 @testable import ZineCore
 
 final class HomeCompositionTests: XCTestCase {
+    @MainActor
+    func testCompositionCommandsUseAuthenticatedAPIAndKeepUncertainReadbackDistinct() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [HomeCompositionAPIProtocol.self]
+        let client = APIClient(baseURL: URL(string: "https://fixture.invalid")!, tokenProvider: { "fixture-session" },
+                               session: URLSession(configuration: configuration))
+        let session = NativeCommandSession(client: client)
+        let composition = HomeComposition(sections: [])
+        let preview = await session.execute(NativeCommand(name: "home.composition.preview", composition: composition))
+        XCTAssertEqual(preview.status, "completed")
+        XCTAssertEqual(preview.state.homeCompositionResult?.valid, true)
+        XCTAssertNil(preview.state.homeCompositionResult?.published)
+        let published = await session.execute(NativeCommand(name: "home.composition.publish", composition: composition))
+        XCTAssertEqual(published.status, "server_committed")
+        XCTAssertEqual(published.state.homeCompositionResult?.published, true)
+        XCTAssertEqual(published.state.homeCompositionResult?.verified, false)
+        let invalid = await session.execute(NativeCommand(name: "home.composition.publish", composition: .init(version: 2, sections: [])))
+        XCTAssertEqual(invalid.status, "failed")
+        XCTAssertEqual(invalid.error, "valid_composition_required")
+    }
+
+    func testHomeCacheRestoresOnlyTheReplacementArrangementAfterRestart() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let cache = HomeCache(userID: "home-lab", baseDirectory: directory)
+        func response(_ id: String) -> HomeResponse {
+            HomeResponse(composition: .init(sections: [
+                .init(id: id, title: id, layout: .vertical, card: .row, itemIds: ["a"]),
+            ]), compositionItems: [item("a")], recentBookmarks: [], jumpBackIn: [],
+                         byContentType: .init(videos: [], podcasts: [], articles: []),
+                         customCollections: [], sectionOrder: [], requestId: nil, traceId: nil)
+        }
+        await cache.save(home: response("old"), inboxItems: [])
+        await cache.save(home: response("replacement"), inboxItems: [])
+        let restartedCache = HomeCache(userID: "home-lab", baseDirectory: directory)
+        let restored = await restartedCache.load()
+        XCTAssertEqual(restored?.home?.composition?.sections.map(\.id), ["replacement"])
+        XCTAssertEqual(restored?.home?.compositionItems?.map(\.id), ["a"])
+    }
+
+    func testEmptyArrangementIsPersistableAndReplacementDoesNotMergeCollections() throws {
+        let original = HomeComposition(sections: [
+            .init(id: "old", title: "Old collection", layout: .vertical, card: .row, itemIds: ["a"]),
+        ])
+        let replacement = HomeComposition(sections: [
+            .init(id: "new", title: "New collection", layout: .twoColumn, card: .grid, itemIds: ["b", "a"]),
+        ])
+        XCTAssertEqual(original.resolve(items: [item("a")]).map(\.id), ["old"])
+        let restored = try JSONDecoder().decode(HomeComposition.self, from: JSONEncoder().encode(replacement))
+        XCTAssertEqual(restored.resolve(items: [item("a"), item("b")]).map(\.id), ["new"])
+        XCTAssertEqual(restored.resolve(items: [item("a"), item("b")])[0].items.map(\.id), ["b", "a"])
+        let cleared = try JSONDecoder().decode(HomeComposition.self, from: Data(#"{"version":1,"sections":[]}"#.utf8))
+        XCTAssertTrue(cleared.isValid)
+        XCTAssertTrue(cleared.resolve(items: [item("a")]).isEmpty)
+    }
+
     func testCompositionUsesRealItemContentAndPreservesCrossSectionOverlap() throws {
         let first = item("a"), second = item("b")
         let composition = HomeComposition(sections: [
@@ -69,4 +125,24 @@ final class HomeCompositionTests: XCTestCase {
                  creatorId: nil, publisher: nil, summary: "Actual source excerpt", duration: nil,
                  publishedAt: nil, readingTimeMinutes: 8, bookmarkedAt: nil, lastOpenedAt: nil, progress: nil)
     }
+}
+
+private final class HomeCompositionAPIProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer fixture-session")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        let publishing = request.url!.path == "/api/v1/home/composition"
+        XCTAssertEqual(request.httpMethod, publishing ? "PUT" : "POST")
+        if !publishing { XCTAssertEqual(request.url!.path, "/api/v1/home/composition/preview") }
+        var body: [String: Any] = ["composition": ["version": 1, "sections": []]]
+        if publishing { body["published"] = true; body["verified"] = false }
+        else { body["valid"] = true }
+        let data = try! JSONSerialization.data(withJSONObject: body)
+        client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: data)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
 }

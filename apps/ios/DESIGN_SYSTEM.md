@@ -172,7 +172,11 @@ tests cover contrast across a sampled sRGB cube and stable saved-color identitie
 
 ## Agent-composed Home
 
-Home Lab uses `HomeView` with an optional composition of real account-owned items.
+Home Lab uses `HomeView` with one persisted composition of real account-owned items.
+Each section is a custom collection scoped to this page, not a permanent Library
+collection. Publishing replaces the entire arrangement. Missing or empty
+arrangements show a Home Lab empty state, without inserting regular Home sections.
+Named collection headings open the current collection in a native list.
 The seven card types are featured, landscape, cover, compact, tile, row and grid;
 containers are single, horizontal, two-column and vertical. Implementations live
 in `ZineNative/Features/Home/Components` and the existing Home view files.

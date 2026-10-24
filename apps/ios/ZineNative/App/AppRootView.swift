@@ -22,6 +22,7 @@ struct SearchCreatorRoute: Hashable {
 struct ZineTabNavigationActions {
     var home: ((HomeNavigationRoute) -> Void)?
     var homeSection: ((HomeSectionRoute) -> Void)?
+    var homeLabCollection: ((HomeLabCollectionRoute) -> Void)?
     var bookmark: ((Bookmark) -> Void)?
     var settings: ((SettingsRoute) -> Void)?
     var creator: ((SearchCreatorRoute) -> Void)?
@@ -349,6 +350,10 @@ struct AuthenticatedAppView: View {
                 homeSectionDestination(for: route)
                     .zinePushedDestinationChrome()
             }
+            .navigationDestination(for: HomeLabCollectionRoute.self) { route in
+                HomeLabCollectionView(route: route, store: homeStore, transitionNamespace: navigationTransition)
+                    .zinePushedDestinationChrome()
+            }
             .navigationDestination(for: Bookmark.self) { bookmark in
                 bookmarkDestination(for: bookmark)
                     .navigationTransition(
@@ -394,6 +399,7 @@ struct AuthenticatedAppView: View {
         }
         .task {
             commandSession.navigate = navigateCommand
+            commandSession.reloadHome = { await homeStore.reload() }
             commandSession.queryLibrary = { query in
                 let target: AppTab = query.search.isEmpty ? .library : .search
                 let route = query.search.isEmpty ? "library" : "search"
@@ -541,6 +547,7 @@ struct AuthenticatedAppView: View {
                     navigationPath.append(route)
                 }
             },
+            homeLabCollection: { navigationPath.append($0) },
             bookmark: { navigationPath.append($0) },
             settings: { navigationPath.append($0) },
             creator: { navigationPath.append($0) }

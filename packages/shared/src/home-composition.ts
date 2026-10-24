@@ -22,7 +22,6 @@ export const HomeCompositionSchema = z
           })
           .strict()
       )
-      .min(1)
       .max(12),
   })
   .strict()
@@ -54,6 +53,7 @@ export const HOME_NATIVE_COMPONENTS = {
   cards: ['featured', 'landscape', 'cover', 'compact', 'tile', 'row', 'grid'],
   layouts: ['single', 'horizontal', 'two_column', 'vertical'],
   rules: [
+    'Home Lab has one persisted arrangement. Sections are its current custom collections, not permanent Library collections. Publishing replaces the whole arrangement; removed collections do not accumulate. An empty sections array clears Home Lab without deleting saved items.',
     'Compose real Zine inbox/library user-item IDs. The server supplies current titles, covers, creators and metadata.',
     'Only short optional section headings are authored. No editorial stories, summaries, paragraphs, HTML, CSS or actions.',
     'Landscape and cover cards use horizontal; grid cards use two_column. Featured cards display articles and use single; rows use vertical; tiles use two_column or vertical; compact cards use horizontal or vertical.',

@@ -17,6 +17,7 @@ import {
   tags,
   userItemTags,
   creators,
+  collections,
   items,
   itemEnrichments,
   userPeople,
@@ -124,6 +125,102 @@ beforeEach(async () => {
 });
 
 describe('assembled Worker REST API with D1', () => {
+  it('previews, replaces and clears Home Lab through authenticated REST and the native Home read path', async () => {
+    const original = {
+      version: 1,
+      sections: [
+        {
+          id: 'watch',
+          title: 'Watch next',
+          layout: 'horizontal',
+          card: 'landscape',
+          itemIds: ['owner-bookmark'],
+        },
+        {
+          id: 'shortlist',
+          title: 'Shortlist',
+          layout: 'vertical',
+          card: 'row',
+          itemIds: ['owner-bookmark'],
+        },
+      ],
+    };
+    expect((await request('/home/components')).status).toBe(200);
+    expect(await (await request('/home/composition')).json()).toMatchObject({ composition: null });
+    const preview = await request('/home/composition/preview', 'POST', { composition: original });
+    expect(preview.status).toBe(200);
+    expect(await preview.json()).toMatchObject({ valid: true, composition: original });
+    expect(await (await request('/home/composition')).json()).toMatchObject({ composition: null });
+    expect(
+      await (await request('/home/composition', 'PUT', { composition: original })).json()
+    ).toMatchObject({ published: true, verified: true });
+    expect(await (await request('/home')).json()).toMatchObject({ composition: original });
+    const replacement = {
+      ...original,
+      sections: [
+        {
+          id: 'new',
+          title: 'New page',
+          layout: 'two_column',
+          card: 'grid',
+          itemIds: ['owner-bookmark'],
+        },
+      ],
+    };
+    expect((await request('/home/composition', 'PUT', { composition: replacement })).status).toBe(
+      200
+    );
+    expect(await (await request('/home')).json()).toMatchObject({ composition: replacement });
+    expect(
+      (
+        await request('/home/composition', 'PUT', {
+          composition: {
+            ...original,
+            sections: [{ ...original.sections[0], itemIds: ['other-bookmark'] }],
+          },
+        })
+      ).status
+    ).toBe(422);
+    expect(await (await request('/home/composition')).json()).toMatchObject({
+      composition: replacement,
+    });
+    await db
+      .update(apiTokens)
+      .set({ scopesJson: JSON.stringify(['bookmarks:read']) })
+      .where(eq(apiTokens.id, 'token'));
+    expect(
+      (await request('/home/composition/preview', 'POST', { composition: original })).status
+    ).toBe(200);
+    expect((await request('/home/composition', 'PUT', { composition: original })).status).toBe(403);
+    await db
+      .update(apiTokens)
+      .set({ scopesJson: JSON.stringify(['bookmarks:read', 'bookmarks:write']) })
+      .where(eq(apiTokens.id, 'token'));
+    expect(
+      (await request('/home/composition', 'PUT', { composition: { version: 1, sections: [] } }))
+        .status
+    ).toBe(200);
+    expect(await (await request('/home')).json()).toMatchObject({
+      composition: { version: 1, sections: [] },
+      compositionItems: [],
+    });
+    expect(await db.select().from(collections)).toEqual([]);
+    expect((await db.select().from(userItems)).length).toBe(2);
+  });
+
+  it('rejects unauthenticated or malformed Home Lab publication', async () => {
+    expect(
+      (await app.request('/api/v1/home/composition', { method: 'PUT' }, bindings)).status
+    ).toBe(401);
+    expect(
+      (
+        await request('/home/composition', 'PUT', {
+          composition: { version: 1, sections: [], userId: 'other' },
+        })
+      ).status
+    ).toBe(400);
+  });
+
   it('persists finish and unfinish, emits one event per change, and reads back through tRPC-backed REST', async () => {
     const finish = await request('/bookmarks/owner-bookmark', 'PATCH', { isFinished: true });
     expect(finish.status).toBe(200);

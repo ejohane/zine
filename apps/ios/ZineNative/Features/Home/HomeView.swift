@@ -130,6 +130,10 @@ struct HomeView: View {
                     }
                     .zinePushedDestinationChrome()
                 }
+                .navigationDestination(for: HomeLabCollectionRoute.self) { route in
+                    HomeLabCollectionView(route: route, store: store, transitionNamespace: bookmarkTransition)
+                        .zinePushedDestinationChrome()
+                }
         } else {
             screen
         }
@@ -171,11 +175,19 @@ struct HomeView: View {
                 }
             }
         } else if (dashboardSections.isEmpty && composedSections.isEmpty) {
-            ContentUnavailableView(
-                "Nothing to pick up yet",
-                systemImage: "sparkles.rectangle.stack",
-                description: Text("New inbox items and saved content will appear here.")
-            )
+            ScrollView {
+                ObservedListTitle(title: title, state: titleCollapseState)
+                    .padding(.horizontal, 18)
+                ContentUnavailableView(
+                    usesComposition ? (store.hasHomeComposition ? "No items in these collections" : "Build your Home Lab") : "Nothing to pick up yet",
+                    systemImage: "sparkles.rectangle.stack",
+                    description: Text(usesComposition
+                        ? (store.hasHomeComposition ? "Your saved items stay in Library. An agent can update your collections whenever you’re ready." : "An agent can organize your saved items into collections here.")
+                        : "New inbox items and saved content will appear here.")
+                )
+            }
+            .background(ZineTheme.canvas)
+            .refreshable { await store.reload() }
         } else {
             ScrollView {
                 LazyVStack(spacing: density.sectionSpacing) {
@@ -215,7 +227,7 @@ struct HomeView: View {
     private var composedSections: [HomeComposedSection] { usesComposition ? store.composedSections : [] }
 
     private var dashboardSections: [HomeDashboardSection] {
-        density.visibleSections(from: store.sections)
+        usesComposition ? [] : density.visibleSections(from: store.sections)
     }
 
     @ViewBuilder

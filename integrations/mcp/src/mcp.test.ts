@@ -26,6 +26,7 @@ import {
   tags,
   userItemTags,
   creators,
+  collections,
 } from '../../../apps/worker/src/db/schema';
 import { LIBRARY_UI_URI, ARTWORK_ORIGINS } from './ui';
 
@@ -728,6 +729,93 @@ describe('official MCP transport and discovery', () => {
       authorization_servers: [cfg.MCP_OAUTH_ISSUER],
     });
   });
+  it('previews, replaces and clears custom Home Lab collections through the authenticated MCP tools', async () => {
+    fetchMock.activate();
+    fetchMock.disableNetConnect();
+    fetchMock
+      .get('https://identity.example')
+      .intercept({ path: '/composition-jwks' })
+      .reply(200, JSON.stringify({ keys: [jwk] }))
+      .persist();
+    const compositionBindings = {
+      ...bindings,
+      MCP_OAUTH_JWKS_URL: 'https://identity.example/composition-jwks',
+    };
+    const signed = await token();
+    const readOnly = await token({ scope: 'bookmarks:read' });
+    const bob = await token({ sub: 'user_bob' });
+    const call = async (name: string, args: unknown = {}, auth = signed) => {
+      const response = await rpc(
+        'tools/call',
+        { name, arguments: args },
+        auth,
+        compositionBindings
+      );
+      const body = (await response.json()) as {
+        result: { isError?: boolean; structuredContent?: { data: Record<string, unknown> } };
+      };
+      return body.result;
+    };
+    const original = {
+      version: 1,
+      sections: [
+        {
+          id: 'reads',
+          title: 'Read this weekend',
+          card: 'landscape',
+          layout: 'horizontal',
+          itemIds: ['a-public'],
+        },
+        {
+          id: 'ideas',
+          title: 'Ideas to revisit',
+          card: 'row',
+          layout: 'vertical',
+          itemIds: ['a-public'],
+        },
+      ],
+    };
+    expect((await call('get_home_candidates')).structuredContent?.data).toHaveProperty('items');
+    expect(
+      (await call('create_home_composition', { composition: original })).structuredContent?.data
+    ).toMatchObject({ valid: true });
+    expect((await call('get_home_composition')).structuredContent?.data).toMatchObject({
+      composition: null,
+    });
+    expect(
+      (await call('publish_home_composition', { composition: original }, readOnly)).isError
+    ).toBe(true);
+    expect(
+      (await call('publish_home_composition', { composition: original })).structuredContent?.data
+    ).toMatchObject({ published: true, verified: true });
+    const replacement = {
+      version: 1,
+      sections: [
+        {
+          id: 'new',
+          title: 'New arrangement',
+          card: 'grid',
+          layout: 'two_column',
+          itemIds: ['a-public'],
+        },
+      ],
+    };
+    await call('publish_home_composition', { composition: replacement });
+    expect((await call('get_home_composition')).structuredContent?.data).toMatchObject({
+      composition: replacement,
+    });
+    expect((await call('get_home_composition', {}, bob)).structuredContent?.data).toMatchObject({
+      composition: null,
+    });
+    expect(
+      (await call('publish_home_composition', { composition: { version: 1, sections: [] } }))
+        .structuredContent?.data
+    ).toMatchObject({ published: true, verified: true });
+    expect((await call('get_home_composition')).structuredContent?.data).toMatchObject({
+      composition: { version: 1, sections: [] },
+      compositionItems: [],
+    });
+  });
   type HomeToolResponse = {
     result: {
       isError?: boolean;
@@ -1048,6 +1136,46 @@ describe('official MCP transport and discovery', () => {
 });
 
 describe('native Home card composition', () => {
+  it('replaces the whole page and clears it without creating Library collections or deleting items', async () => {
+    const home = new McpHome(bindings, 'user_alice');
+    const first = HomeCompositionSchema.parse({
+      version: 1,
+      sections: [
+        {
+          id: 'old',
+          title: 'Old collection',
+          card: 'row',
+          layout: 'vertical',
+          itemIds: ['a-public'],
+        },
+      ],
+    });
+    const next = HomeCompositionSchema.parse({
+      version: 1,
+      sections: [
+        {
+          id: 'new',
+          title: 'New collection',
+          card: 'grid',
+          layout: 'two_column',
+          itemIds: ['a-public'],
+        },
+      ],
+    });
+    await home.publishComposition({ composition: first });
+    const preview = await home.prepareComposition({ composition: next });
+    expect(preview.valid).toBe(true);
+    expect((await home.composition()).composition).toEqual(first);
+    await home.publishComposition({ composition: next });
+    expect((await new McpHome(bindings, 'user_alice').composition()).composition).toEqual(next);
+    await home.publishComposition({ composition: { version: 1, sections: [] } });
+    expect(await home.composition()).toEqual({
+      composition: { version: 1, sections: [] },
+      compositionItems: [],
+    });
+    expect((await home.candidates()).items.map((i) => i.id)).toEqual(['a-public']);
+    expect(await db.select().from(collections)).toEqual([]);
+  });
   const composition = {
     version: 1,
     sections: [
