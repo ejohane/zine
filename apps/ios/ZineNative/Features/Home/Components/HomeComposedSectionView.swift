@@ -105,7 +105,7 @@ struct HomeLabCollectionView: View {
         .background(ZineTheme.surface)
         .navigationTitle(collection?.section.title ?? "Collection")
         .navigationBarTitleDisplayMode(.inline)
-        .zineScreenChrome()
+        .contentTypeFilterChrome(background: ZineTheme.surface)
         .refreshable { await store.reload() }
     }
 }

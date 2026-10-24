@@ -179,7 +179,7 @@ struct HomeView: View {
                 ObservedListTitle(title: title, state: titleCollapseState)
                     .padding(.horizontal, 18)
                 ContentUnavailableView(
-                    usesComposition ? (store.hasHomeComposition ? "No items in these collections" : "Build your Home Lab") : "Nothing to pick up yet",
+                    usesComposition ? (store.hasHomeComposition ? "Your Home Lab is empty" : "Build your Home Lab") : "Nothing to pick up yet",
                     systemImage: "sparkles.rectangle.stack",
                     description: Text(usesComposition
                         ? (store.hasHomeComposition ? "Your saved items stay in Library. An agent can update your collections whenever you’re ready." : "An agent can organize your saved items into collections here.")
