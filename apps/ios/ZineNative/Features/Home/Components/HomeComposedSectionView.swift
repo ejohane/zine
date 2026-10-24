@@ -11,7 +11,7 @@ struct HomeComposedSectionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let title = section.title {
-                HomeCompactSectionHeader(title: title).padding(.horizontal, 16)
+                HomeCompactSectionHeader(title: title, homeLabCollectionID: section.id).padding(.horizontal, 16)
             }
             switch section.layout {
             case .single:
@@ -68,5 +68,44 @@ struct HomeComposedSectionView: View {
                 }
             }
         }
+    }
+}
+
+struct HomeLabCollectionRoute: Hashable {
+    let id: String
+}
+
+/// Resolves by ID against the current page so replacement and item mutations stay visible.
+struct HomeLabCollectionView: View {
+    let route: HomeLabCollectionRoute
+    let store: HomeStore
+    let transitionNamespace: Namespace.ID
+
+    private var collection: HomeComposedSection? {
+        store.composedSections.first { $0.id == route.id }
+    }
+
+    var body: some View {
+        List {
+            if let collection {
+                ForEach(collection.items) { item in
+                    HomeNavigationLink(route: .item(item, sectionID: "composition-list-\(route.id)"),
+                                       transitionNamespace: transitionNamespace) {
+                        HomeItemRow(item: item)
+                    }
+                    .listRowBackground(ZineTheme.surface)
+                }
+            } else {
+                ContentUnavailableView("Collection is empty", systemImage: "rectangle.stack",
+                                       description: Text("Its items may have been completed or the Home Lab arrangement updated."))
+                    .listRowBackground(ZineTheme.surface)
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(ZineTheme.surface)
+        .navigationTitle(collection?.section.title ?? "Collection")
+        .navigationBarTitleDisplayMode(.inline)
+        .contentTypeFilterChrome(background: ZineTheme.surface)
+        .refreshable { await store.reload() }
     }
 }

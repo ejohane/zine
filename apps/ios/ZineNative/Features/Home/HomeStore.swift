@@ -30,6 +30,8 @@ enum HomeDashboardSection: Identifiable {
 @MainActor
 @Observable
 final class HomeStore {
+    var hasHomeComposition: Bool { home?.composition?.isValid == true }
+
     var composedSections: [HomeComposedSection] {
         home?.composition?.resolve(items: home?.compositionItems ?? [],
                                    hiddenIDs: effectiveHiddenItemIDs) ?? []

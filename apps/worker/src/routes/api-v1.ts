@@ -9,6 +9,7 @@ import creators from './api-v1/creators';
 import today from './api-v1/today';
 import editorialExperiments from './api-v1/editorial-experiments';
 import editorial from './api-v1/editorial';
+import homeComposition from './api-v1/home-composition';
 
 const apiV1Routes = new Hono<Env>();
 apiV1Routes.get('/openapi.json', (c) => c.json(openApiSpec));
@@ -20,5 +21,6 @@ apiV1Routes.route('/', creators);
 apiV1Routes.route('/', today);
 apiV1Routes.route('/', editorialExperiments);
 apiV1Routes.route('/', editorial);
+apiV1Routes.route('/', homeComposition);
 
 export default apiV1Routes;

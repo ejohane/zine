@@ -13,6 +13,7 @@ struct NativeCommand: Codable {
     var url: String?
     var jobID: String?
     var timeout: Double?
+    var composition: HomeComposition?
 }
 
 struct NativeEvent: Codable {
@@ -33,6 +34,8 @@ struct NativeCommandResult: Codable {
 }
 
 struct NativeCommandState: Codable {
+    let home: HomeResponse?
+    let homeCompositionResult: HomeCompositionResult?
     let syncJob: NativeSyncStatus?
     let syncJobID: String?
     let syncExisting: Bool
@@ -73,6 +76,9 @@ final class NativeCommandSession {
     var route = "root"
     var bookmarkID: String?
     var navigate: ((String, String?) async throws -> Void)?
+    var reloadHome: (() async -> Void)?
+    private var home: HomeResponse?
+    private var homeCompositionResult: HomeCompositionResult?
     var queryLibrary: ((LibraryQuery) async throws -> Void)?
     var applyLibraryQuery: ((LibraryQuery) async -> Void)?
     var openReader: (() -> Void)?
@@ -108,6 +114,22 @@ final class NativeCommandSession {
             var status = "completed"
             switch command.name {
             case "state.get", "events.get": break
+            case "home.get":
+                home = try await client.getHome()
+                await reloadHome?()
+            case "home.composition.preview", "home.composition.publish":
+                guard let composition = command.composition, composition.isValid else {
+                    throw CommandError("valid_composition_required")
+                }
+                homeCompositionResult = nil
+                let publishing = command.name == "home.composition.publish"
+                let response = try await client.prepareHomeComposition(composition, publish: publishing)
+                homeCompositionResult = response
+                if publishing {
+                    guard response.published == true else { throw CommandError("composition_not_published") }
+                    status = "server_committed"
+                    await reloadHome?()
+                }
             case "library.open", "bookmark.open", "reader.open":
                 guard let navigate else { throw CommandError("navigation_unavailable") }
                 articleBody = nil
@@ -266,6 +288,7 @@ final class NativeCommandSession {
         NativeCommandResult(
             version: 1, requestID: command.requestID, revision: revision, status: status,
             state: NativeCommandState(
+                home: home, homeCompositionResult: homeCompositionResult,
                 syncJob: sync.status, syncJobID: sync.jobID, syncExisting: sync.existing,
                 savedBookmarkID: savedBookmarkID, saveStatus: saveStatus,
                 articleBody: articleBody, detail: route == "bookmark" ? detailBookmark?() : nil,

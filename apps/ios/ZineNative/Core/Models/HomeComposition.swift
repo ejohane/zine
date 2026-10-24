@@ -20,12 +20,18 @@ struct HomeComposition: Codable, Hashable {
     }
     private enum CodingKeys: String, CodingKey { case version, sections }
     init(from decoder: Decoder) throws {
-        let container = try? decoder.container(keyedBy: CodingKeys.self)
-        version = (try? container?.decode(Int.self, forKey: .version)) ?? 0
-        sections = (try? container?.decode([Section].self, forKey: .sections)) ?? []
+        if let container = try? decoder.container(keyedBy: CodingKeys.self),
+           let decodedVersion = try? container.decode(Int.self, forKey: .version),
+           let decodedSections = try? container.decode([Section].self, forKey: .sections) {
+            version = decodedVersion
+            sections = decodedSections
+        } else {
+            version = 0
+            sections = []
+        }
     }
     var isValid: Bool {
-        guard version == 1, (1...12).contains(sections.count),
+        guard version == 1, sections.count <= 12,
               Set(sections.map(\.id)).count == sections.count,
               sections.reduce(0, { $0 + $1.itemIds.count }) <= 100 else { return false }
         return sections.allSatisfy { s in
@@ -59,4 +65,14 @@ struct HomeComposedSection: Identifiable {
     let section: HomeComposition.Section
     let items: [HomeItem]
     var id: String { section.id }
+}
+
+struct HomeCompositionResult: Codable {
+    let composition: HomeComposition
+    let compositionItems: [HomeItem]?
+    let valid: Bool?
+    let unavailableItemIds: [String]?
+    let incompatibleItemIds: [String]?
+    let published: Bool?
+    let verified: Bool?
 }

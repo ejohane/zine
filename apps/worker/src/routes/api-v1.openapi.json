@@ -151,6 +151,199 @@
         }
       }
     },
+    "/api/v1/home/components": {
+      "get": {
+        "tags": ["Home"],
+        "operationId": "getHomeComponents",
+        "summary": "Get native Home cards, layouts and collection constraints",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "responses": {
+          "200": {
+            "description": "Current resolved arrangement or operation result."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/home/candidates": {
+      "get": {
+        "tags": ["Home"],
+        "operationId": "getHomeCandidates",
+        "summary": "Get up to 100 eligible account-owned saved items",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "responses": {
+          "200": {
+            "description": "Current resolved arrangement or operation result."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/home/composition": {
+      "get": {
+        "tags": ["Home"],
+        "operationId": "getHomeComposition",
+        "summary": "Read the current Home Lab arrangement",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "responses": {
+          "200": {
+            "description": "Current resolved arrangement or operation result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["composition", "compositionItems"],
+                  "properties": {
+                    "composition": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/HomeComposition"
+                        }
+                      ],
+                      "nullable": true
+                    },
+                    "compositionItems": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/HomeItem"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "put": {
+        "tags": ["Home"],
+        "operationId": "publishHomeComposition",
+        "summary": "Replace the entire current Home Lab arrangement",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "responses": {
+          "200": {
+            "description": "Current resolved arrangement or operation result."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "400": {
+            "description": "Invalid manifest or request body."
+          },
+          "422": {
+            "description": "Unavailable or incompatible items; current arrangement unchanged."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["composition"],
+                "properties": {
+                  "composition": {
+                    "$ref": "#/components/schemas/HomeComposition"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/home/composition/preview": {
+      "post": {
+        "tags": ["Home"],
+        "operationId": "previewHomeComposition",
+        "summary": "Validate and resolve a Home Lab arrangement without writing",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "responses": {
+          "200": {
+            "description": "Current resolved arrangement or operation result."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "400": {
+            "description": "Invalid manifest or request body."
+          },
+          "422": {
+            "description": "Unavailable or incompatible items; current arrangement unchanged."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["composition"],
+                "properties": {
+                  "composition": {
+                    "$ref": "#/components/schemas/HomeComposition"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/inbox": {
       "get": {
         "tags": ["Inbox"],
@@ -3419,6 +3612,60 @@
           }
         ]
       },
+      "HomeComposition": {
+        "type": "object",
+        "nullable": false,
+        "description": "The one current Home Lab arrangement. Sections are custom collections scoped to this page. Publishing replaces it; an empty sections array clears it without deleting saved items.",
+        "required": ["version", "sections"],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "enum": [1]
+          },
+          "sections": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 12,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "layout", "card", "itemIds"],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "layout": {
+                  "type": "string",
+                  "enum": ["single", "horizontal", "two_column", "vertical"]
+                },
+                "card": {
+                  "type": "string",
+                  "enum": ["featured", "landscape", "cover", "compact", "tile", "row", "grid"]
+                },
+                "itemIds": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 20,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                }
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "HomeResponse": {
         "allOf": [
           { "$ref": "#/components/schemas/RequestMetadata" },
@@ -3435,13 +3682,13 @@
               "composition": {
                 "type": "object",
                 "nullable": true,
-                "description": "Optional version 1 native Home Lab card arrangement. Regular Home ignores it.",
+                "description": "Optional current Home Lab arrangement. Regular Home ignores it; Home Lab shows an empty state when absent.",
                 "required": ["version", "sections"],
                 "properties": {
                   "version": { "type": "integer", "enum": [1] },
                   "sections": {
                     "type": "array",
-                    "minItems": 1,
+                    "minItems": 0,
                     "maxItems": 12,
                     "items": {
                       "type": "object",
