@@ -46,7 +46,7 @@ describe('unapplied MCP production configuration', () => {
       expect(production[key]).toBeUndefined();
     expect(production.main).toBe('src/server.ts');
   });
-  it('pins the approved public client and issuer without storing a credential', () => {
+  it('admits instance-verified clients and retains the rollback allowlist without credentials', () => {
     expect(production.vars).toEqual({
       ENVIRONMENT: 'production',
       MCP_AUTH_MODE: 'clerk-opaque',
@@ -54,6 +54,7 @@ describe('unapplied MCP production configuration', () => {
       MCP_OAUTH_ISSUER: 'https://clerk.myzine.app',
       MCP_OAUTH_JWKS_URL: 'https://clerk.myzine.app/.well-known/jwks.json',
       MCP_CLERK_CLIENT_IDS: '["5gNCO8oX8tGw0eA5"]',
+      MCP_CLERK_CLIENT_POLICY: 'instance',
     });
   });
   it('declares an early verification limit instead of unbounded Clerk API traffic', () => {
