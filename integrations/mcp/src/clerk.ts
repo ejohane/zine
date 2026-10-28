@@ -29,7 +29,7 @@ const verifiedToken = z
   .object({
     object: z.literal('clerk_idp_oauth_access_token'),
     subject: z.string().regex(/^user_[A-Za-z0-9]+$/),
-    client_id: z.string(),
+    client_id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/),
     scopes: z.array(z.string().min(1).max(200)).max(100),
     aud: z.array(z.string().url()).length(1),
     revoked: z.literal(false),
@@ -97,7 +97,7 @@ export async function authenticateClerkOpaque(token: string, cfg: McpConfig): Pr
   // Do not infer an audience from the OAuth client ID or from the requested URL.
   if (
     record.aud[0] !== cfg.MCP_RESOURCE ||
-    !clerkClients(cfg).includes(record.client_id) ||
+    !(cfg.MCP_CLERK_CLIENT_POLICY === 'instance' || clerkClients(cfg).includes(record.client_id)) ||
     record.expiration <= now ||
     record.expiration > now + 86400
   )

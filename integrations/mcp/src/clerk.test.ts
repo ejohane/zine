@@ -48,6 +48,42 @@ afterEach(() => {
 });
 
 describe('Clerk opaque OAuth adapter', () => {
+  const dynamicConfig: McpConfig = {
+    ...cfg,
+    MCP_CLERK_CLIENT_POLICY: 'instance',
+    MCP_CLERK_CLIENT_IDS: undefined,
+  };
+  it('admits a new client only with authoritative instance verification and an explicit policy', async () => {
+    expect(config(dynamicConfig)).toEqual(dynamicConfig);
+    reply({ ...valid(), client_id: 'newlyRegisteredAgent' });
+    expect(await authenticate(bearer, dynamicConfig)).toEqual({
+      userId: 'user_alice',
+      scopes: ['bookmarks:read'],
+    });
+  });
+  it.each([
+    { aud: ['https://other.example/mcp'] },
+    { aud: [cfg.MCP_RESOURCE, 'https://other.example'] },
+    { revoked: true },
+    { expired: true },
+    { expiration: 1 },
+    { subject: 'mch_service' },
+    { client_id: '' },
+    { client_id: 'https://unverified.example' },
+    { object: 'session' },
+    { act: { sub: 'client_delegate' } },
+  ])('retains token and account restrictions with dynamic admission %j', async (change) => {
+    reply({ ...valid(), client_id: 'newlyRegisteredAgent', ...change });
+    await expect(authenticate(bearer, dynamicConfig)).rejects.toThrow('UNAUTHORIZED');
+  });
+  it('rejects unknown policies and dynamic admission without opaque instance verification', () => {
+    expect(() => config({ ...dynamicConfig, MCP_AUTH_MODE: 'clerk-jwt' })).toThrow(
+      'MCP_NOT_CONFIGURED'
+    );
+    expect(() => config({ ...cfg, MCP_CLERK_CLIENT_POLICY: 'typo' as 'instance' })).toThrow(
+      'MCP_NOT_CONFIGURED'
+    );
+  });
   it('verifies the existing instance, approved client and resource audience without mapping by email', async () => {
     expect(config(cfg)).toEqual(cfg);
     reply(valid());

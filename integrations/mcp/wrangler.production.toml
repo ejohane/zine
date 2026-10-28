@@ -24,6 +24,9 @@ MCP_RESOURCE = "https://mcp.myzine.app/mcp"
 MCP_OAUTH_ISSUER = "https://clerk.myzine.app"
 MCP_OAUTH_JWKS_URL = "https://clerk.myzine.app/.well-known/jwks.json"
 MCP_CLERK_CLIENT_IDS = '["5gNCO8oX8tGw0eA5"]'
+# Accept instance-verified OAuth clients after Clerk consent, including DCR clients.
+# Remove this setting (or use "allowlist") to restore manual client admission.
+MCP_CLERK_CLIENT_POLICY = "instance"
 
 [[d1_databases]]
 binding = "DB"
