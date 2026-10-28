@@ -7,6 +7,7 @@ export interface McpConfig {
   MCP_OAUTH_JWKS_URL: string;
   MCP_AUTH_MODE?: 'jwt' | 'clerk-jwt' | 'clerk-opaque';
   MCP_CLERK_CLIENT_IDS?: string;
+  MCP_CLERK_CLIENT_POLICY?: 'allowlist' | 'instance';
   MCP_CLERK_SECRET_KEY?: string;
 }
 export const scopes = ['bookmarks:read', 'bookmarks:write'] as const;
@@ -30,7 +31,14 @@ export function config(env: Partial<McpConfig>): McpConfig {
       (env.MCP_AUTH_MODE === 'clerk-opaque' && !env.MCP_CLERK_SECRET_KEY)
     )
       throw new Error('MCP_NOT_CONFIGURED');
-    clerkClients(env as McpConfig);
+    if (env.MCP_CLERK_CLIENT_POLICY === 'instance') {
+      // Dynamic admission requires authoritative verification by this Clerk instance.
+      if (env.MCP_AUTH_MODE !== 'clerk-opaque') throw new Error('MCP_NOT_CONFIGURED');
+    } else {
+      if (env.MCP_CLERK_CLIENT_POLICY && env.MCP_CLERK_CLIENT_POLICY !== 'allowlist')
+        throw new Error('MCP_NOT_CONFIGURED');
+      clerkClients(env as McpConfig);
+    }
   }
   return env as McpConfig;
 }
