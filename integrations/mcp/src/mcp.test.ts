@@ -715,9 +715,13 @@ describe('official MCP transport and discovery', () => {
     );
     expect(list.result.tools[0]).toHaveProperty('securitySchemes');
     expect(list.result.tools[0]._meta).toHaveProperty('securitySchemes');
-    const result = (await (
-      await rpc('tools/call', { name: 'search_saved', arguments: {} })
-    ).json()) as { result: { isError: boolean; _meta: unknown } };
+    const denied = await rpc('tools/call', { name: 'search_saved', arguments: {} });
+    expect(denied.status).toBe(401);
+    expect(denied.headers.get('WWW-Authenticate')).toContain(
+      `resource_metadata="https://zine.example/.well-known/oauth-protected-resource/mcp"`
+    );
+    expect(denied.headers.get('WWW-Authenticate')).toContain('scope="bookmarks:read"');
+    const result = (await denied.json()) as { result: { isError: boolean; _meta: unknown } };
     expect(result.result.isError).toBe(true);
     expect(result.result._meta).toHaveProperty('mcp/www_authenticate');
     const metadata = await handleMcp(
@@ -1083,13 +1087,19 @@ describe('official MCP transport and discovery', () => {
     ).json();
     expect(notFound).toHaveProperty('result.isError', true);
     const readOnly = await token({ scope: 'bookmarks:read' });
-    const denied = (await (
-      await rpc(
-        'tools/call',
-        { name: 'save_link', arguments: { url: 'https://example.com/no' } },
-        readOnly
-      )
-    ).json()) as { result: { isError: boolean; _meta: unknown } };
+    const writeDenied = await rpc(
+      'tools/call',
+      { name: 'save_link', arguments: { url: 'https://example.com/no' } },
+      readOnly
+    );
+    expect(writeDenied.status).toBe(403);
+    expect(writeDenied.headers.get('WWW-Authenticate')).toContain('error="insufficient_scope"');
+    expect(writeDenied.headers.get('WWW-Authenticate')).toContain(
+      'scope="bookmarks:read bookmarks:write"'
+    );
+    const denied = (await writeDenied.json()) as {
+      result: { isError: boolean; _meta: unknown };
+    };
     expect(denied.result.isError).toBe(true);
     expect(denied.result._meta).toHaveProperty('mcp/www_authenticate');
     expect((await rpc('tools/list', {}, await token({ aud: 'wrong' }))).status).toBe(401);

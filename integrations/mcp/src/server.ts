@@ -101,7 +101,15 @@ export function createMcpServer(env: Bindings, principal: Principal | null, cfg:
           return {
             isError: true,
             content: [{ type: 'text', text: 'Link Zine with the required permission.' }],
-            _meta: { 'mcp/www_authenticate': [challenge(cfg, scope, Boolean(principal))] },
+            _meta: {
+              'mcp/www_authenticate': [
+                challenge(
+                  cfg,
+                  scopes.filter((s) => s === scope || principal?.scopes.includes(s)).join(' '),
+                  Boolean(principal)
+                ),
+              ],
+            },
           };
         try {
           const parsed = schema.parse(input);
@@ -399,6 +407,22 @@ export async function handleMcp(
   } catch {
     return Response.json({ error: 'INVALID_JSON' }, { status: 400 });
   }
+  // Start OAuth during connection setup, before a host can cache an anonymous
+  // connection as signed in. Public tool/resource catalog inspection remains available.
+  if (
+    !principal &&
+    body &&
+    typeof body === 'object' &&
+    'method' in body &&
+    body.method === 'initialize'
+  )
+    return Response.json(
+      { error: 'UNAUTHORIZED' },
+      {
+        status: 401,
+        headers: { 'WWW-Authenticate': challenge(cfg), 'Cache-Control': 'no-store' },
+      }
+    );
   const server = createMcpServer(env, principal, cfg);
   const transport = new WebStandardStreamableHTTPServerTransport({ enableJsonResponse: true });
   try {
@@ -410,13 +434,21 @@ export async function handleMcp(
       const payload = (await response.json()) as {
         result?: {
           tools?: Array<{ _meta?: { securitySchemes?: unknown }; securitySchemes?: unknown }>;
+          _meta?: { 'mcp/www_authenticate'?: string[] };
         };
       };
       if (payload.result?.tools)
         for (const tool of payload.result.tools) tool.securitySchemes = tool._meta?.securitySchemes;
+      // ChatGPT consumes the tool-result hint; standard MCP transports need the
+      // HTTP challenge to start OAuth or request an additional scope.
+      const authChallenge = payload.result?._meta?.['mcp/www_authenticate']?.[0];
       return Response.json(payload, {
-        status: response.status,
-        headers: { 'Cache-Control': 'no-store', Vary: 'Authorization' },
+        status: authChallenge ? (principal ? 403 : 401) : response.status,
+        headers: {
+          'Cache-Control': 'no-store',
+          Vary: 'Authorization',
+          ...(authChallenge ? { 'WWW-Authenticate': authChallenge } : {}),
+        },
       });
     }
     return response;

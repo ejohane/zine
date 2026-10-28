@@ -82,3 +82,22 @@ registered successfully with bookmark read/write scopes. Existing authenticated
 MCP reads and the unchanged 17-tool catalog passed after deployment. No account
 grant was created for the verification client. Fresh authorization and token
 exchange in the user's other harness remain to be exercised there.
+
+### Standard-client sign-in correction
+
+The initial DCR activation missed an HTTP interoperability bug: an anonymous
+tool call returned HTTP 200 with only ChatGPT's `mcp/www_authenticate` hint, so
+standard MCP transports never started OAuth. Initialization now returns HTTP
+401 when unauthenticated; tool calls return 401 for missing authentication and
+403 for insufficient scopes, with a standard `WWW-Authenticate` header as well
+as the retained ChatGPT hint. Scope upgrades include existing bookmark scopes
+so granting write does not discard read. Public catalogs remain inspectable.
+
+Version `d7dfeb5e-3636-4069-aff2-ecda36eca569` includes this correction. The
+isolated release passed 117 tests, typecheck, lint, and its production build.
+Regression tests use the real MCP SDK transport to verify OAuth startup from
+both initialization and a tool call. Live probes reproduced the old failure,
+then generated Clerk S256 authorization URLs with the exact resource and read
+scope after deployment. Existing authenticated MCP reads also passed. These
+checks reach the sign-in redirect; they do not prove the other harness completed
+user consent or exchanged its authorization code.
