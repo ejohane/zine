@@ -427,6 +427,7 @@ struct ArticleHTMLView: UIViewRepresentable {
         private var lastJumpRequest = 0
         private var ready = false
         private var latestPosition: ArticleReadingPosition?
+        private var recoveryOffset: CGPoint?
 
         init(_ parent: ArticleHTMLView) { self.parent = parent }
 
@@ -495,6 +496,14 @@ struct ArticleHTMLView: UIViewRepresentable {
             )
         }
 
+        func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+            // iOS can discard WebKit while the app is suspended without destroying
+            // this view. Rebuild from retained HTML; reload() may revisit the base
+            // URL instead, and SwiftUI's unchanged content hash won't trigger a load.
+            recoveryOffset = recoveryOffset ?? webView.scrollView.contentOffset
+            load(parent.document, in: webView)
+        }
+
         func update(_ next: ArticleHTMLView, in webView: WKWebView) {
             let appearanceChanged = parent.fontScale != next.fontScale || parent.fontFamily != next.fontFamily
             let layoutChanged = parent.topContentInset != next.topContentInset
@@ -547,7 +556,11 @@ struct ArticleHTMLView: UIViewRepresentable {
             } else {
                 json = "{nodeIndex:-1, fraction:\(fallback)}"
             }
-            if parent.bookmarkHeader == nil || parent.bookmarkHeader?.resumesReading == true {
+            let recoveredOffset = recoveryOffset
+            recoveryOffset = nil
+            if let recoveredOffset, parent.bookmarkHeader != nil, recoveredOffset.y < 0 {
+                webView.scrollView.setContentOffset(recoveredOffset, animated: false)
+            } else if parent.bookmarkHeader == nil || parent.bookmarkHeader?.resumesReading == true || recoveredOffset != nil {
                 run("window.zineReader.restore(\(json));", in: webView)
                 if parent.bookmarkHeader == nil { applyAppearance(in: webView) }
             } else {
@@ -583,6 +596,8 @@ struct ArticleHTMLView: UIViewRepresentable {
         }
 
         private func acceptPosition(_ body: [String: Any]) {
+            // Ignore transient positions while replacing a discarded document.
+            guard ready else { return }
             guard parent.bookmarkHeader == nil || (webView?.scrollView.contentOffset.y ?? -1) >= 0 else { return }
             guard let nodeIndex = body["nodeIndex"] as? Int,
                   let offset = body["offset"] as? Int,

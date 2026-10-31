@@ -138,7 +138,17 @@ final class ArticleReaderTests: XCTestCase {
     }
 
     @MainActor
-    private func verifyMergedReaderEntry(resumesReading: Bool) async throws {
+    func testReaderRecoversDiscardedContentAtHeader() async throws {
+        try await verifyMergedReaderEntry(resumesReading: false, recover: true)
+    }
+
+    @MainActor
+    func testReaderRecoversDiscardedContentAtCurrentPassage() async throws {
+        try await verifyMergedReaderEntry(resumesReading: false, recover: true, scrollBeforeRecovery: true)
+    }
+
+    @MainActor
+    private func verifyMergedReaderEntry(resumesReading: Bool, recover: Bool = false, scrollBeforeRecovery: Bool = false) async throws {
         let response = try JSONDecoder().decode(
             ArticleContentResponse.self, from: Data(Self.availableJSON.replacingOccurrences(of: "Readable body", with: String(repeating: "Readable body with enough article text to scroll. ", count: 400)).utf8)
         )
@@ -197,6 +207,32 @@ final class ArticleReaderTests: XCTestCase {
             -0.5,
             "Even a short article must allow its complete 180pt bookmark header to scroll away"
         )
+        if recover {
+            let coordinator = try XCTUnwrap(webView.navigationDelegate as? ArticleHTMLView.Coordinator)
+            if scrollBeforeRecovery {
+                _ = try await webView.evaluateJavaScript("window.zineReader.release(); window.scrollTo(0, 1800);", in: nil, in: ArticleReaderScript.world)
+                try await Task.sleep(for: .milliseconds(200))
+                coordinator.capturePosition(in: webView)
+                try await Task.sleep(for: .milliseconds(200))
+            }
+            let offset = webView.scrollView.contentOffset.y
+            // Simulate WebKit's lost DOM and deliver its public termination callback.
+            // The same coordinator and content hash must recover without reopening.
+            _ = try await webView.evaluateJavaScript("document.querySelector('main').textContent = '';", in: nil, in: ArticleReaderScript.world)
+            coordinator.webViewWebContentProcessDidTerminate(webView)
+            var restored = false
+            for _ in 0..<100 {
+                if !webView.isLoading,
+                   let text = try? await webView.evaluateJavaScript("document.querySelector('main').textContent") as? String,
+                   text.contains("Readable body"),
+                   abs(webView.scrollView.contentOffset.y - offset) < 3 {
+                    restored = true
+                    break
+                }
+                try await Task.sleep(for: .milliseconds(50))
+            }
+            XCTAssertTrue(restored, "Retained article and current position must recover after WebKit termination")
+        }
         let nativeHeader = webView.scrollView.subviews.first { $0.frame.minY < 0 }
         XCTAssertNotNil(nativeHeader, "Bookmark header must be inside the reader's existing scroll surface")
         XCTAssertEqual(host.children.count, 1, "The hosted header must have view-controller containment")
