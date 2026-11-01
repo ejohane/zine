@@ -668,7 +668,7 @@ function getFirstExternalUrl(tweet: FxTwitterTweet): string | null {
 
 function getTweetTitle(tweet: FxTwitterTweet, creator: string): string {
   const textTitle = tweet.text?.trim();
-  if (textTitle) return textTitle;
+  if (textTitle && !/^https?:\/\/[^\s]+$/i.test(textTitle)) return textTitle;
 
   const articleTitle = tweet.article?.title?.trim();
   if (articleTitle) return articleTitle;
