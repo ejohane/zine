@@ -79,6 +79,8 @@ exports[`apiV1Routes > preserves the mounted HTTP route contract 1`] = `
   "GET /api/v1/subscriptions/gmail",
   "GET /api/v1/subscriptions/rss",
   "GET /api/v1/subscriptions/rss",
+  "GET /api/v1/subscriptions/rss/discover",
+  "GET /api/v1/subscriptions/rss/discover",
   "GET /api/v1/subscriptions/spotify",
   "GET /api/v1/subscriptions/spotify",
   "GET /api/v1/subscriptions/x",

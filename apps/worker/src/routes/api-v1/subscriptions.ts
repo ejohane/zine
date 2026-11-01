@@ -909,6 +909,20 @@ apiV1Routes.get('/subscriptions/rss', apiAuth('sync:read'), async (c) => {
   }
 });
 
+apiV1Routes.get('/subscriptions/rss/discover', apiAuth('sync:read'), async (c) => {
+  const parsed = z.object({ url: z.string().url() }).safeParse(c.req.query());
+  if (!parsed.success) {
+    return c.json({ error: 'A valid source URL is required', code: 'INVALID_QUERY' }, 400);
+  }
+  const caller = appRouter.createCaller(await createContext(c));
+  try {
+    const result = await caller.subscriptions.rss.discover(parsed.data);
+    return c.json({ ...result, requestId: c.get('requestId'), traceId: c.get('traceId') });
+  } catch (error) {
+    return trpcErrorResponse(c, error);
+  }
+});
+
 apiV1Routes.post('/subscriptions/rss', apiAuth('sync:write'), async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsedBody = AddRssFeedBodySchema.safeParse(body);

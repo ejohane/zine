@@ -67,6 +67,22 @@ describe('rss discovery', () => {
     expect(links).toHaveLength(2);
   });
 
+  it('does not reuse another author page feed from the same site', async () => {
+    const { db } = createMockDb({
+      cachedRow: {
+        sourceUrl: 'https://example.com/author-a/post',
+        expiresAt: Date.now() + 60_000,
+        candidatesJson: JSON.stringify([{ feedUrl: 'https://example.com/author-a/feed' }]),
+      },
+    });
+    const fetchSpy = vi.fn().mockResolvedValue(new Response('', { status: 404 }));
+    vi.stubGlobal('fetch', fetchSpy);
+    const result = await discoverFeedsForUrl(db, 'https://example.com/author-b/post');
+    expect(result.cached).toBe(false);
+    expect(result.candidates).toEqual([]);
+    expect(fetchSpy).toHaveBeenCalled();
+  });
+
   it('returns cached discovery result when cache is fresh', async () => {
     const { db } = createMockDb({
       cachedRow: {

@@ -55,6 +55,7 @@ const {
   mockNewslettersUpdateStatus,
   mockNewslettersUnsubscribe,
   mockNewslettersSyncNow,
+  mockRssDiscover,
   mockRssList,
   mockRssStats,
   mockRssAdd,
@@ -145,6 +146,7 @@ const {
   mockNewslettersUpdateStatus: vi.fn(),
   mockNewslettersUnsubscribe: vi.fn(),
   mockNewslettersSyncNow: vi.fn(),
+  mockRssDiscover: vi.fn(),
   mockRssList: vi.fn(),
   mockRssStats: vi.fn(),
   mockRssAdd: vi.fn(),
@@ -716,6 +718,7 @@ describe('apiV1Routes', () => {
           syncNow: mockNewslettersSyncNow,
         },
         rss: {
+          discover: mockRssDiscover,
           list: mockRssList,
           stats: mockRssStats,
           add: mockRssAdd,
@@ -1609,6 +1612,41 @@ describe('apiV1Routes', () => {
     });
     expect(mockNewslettersUnsubscribe).toHaveBeenCalledWith({ feedId: 'feed-1' });
     expect(mockNewslettersSyncNow).toHaveBeenCalled();
+  });
+
+  it('discovers RSS feeds with account subscription status through REST', async () => {
+    const candidates = [
+      {
+        feedUrl: 'https://example.com/feed.xml',
+        title: 'Author',
+        subscription: { feedId: 'rss-1', status: 'ACTIVE' },
+      },
+    ];
+    mockRssDiscover.mockResolvedValue({ candidates });
+    const response = await createTestApp().fetch(
+      new Request(
+        'http://localhost/api/v1/subscriptions/rss/discover?url=https%3A%2F%2Fexample.com%2Farticle',
+        {
+          headers: { Authorization: 'Bearer clerk-session-jwt' },
+        }
+      ),
+      createMockEnv()
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { candidates: unknown[] };
+    expect(body.candidates).toEqual(candidates);
+    expect(mockRssDiscover).toHaveBeenCalledWith({ url: 'https://example.com/article' });
+  });
+
+  it('rejects invalid RSS discovery URLs before discovery', async () => {
+    const response = await createTestApp().fetch(
+      new Request('http://localhost/api/v1/subscriptions/rss/discover?url=invalid', {
+        headers: { Authorization: 'Bearer clerk-session-jwt' },
+      }),
+      createMockEnv()
+    );
+    expect(response.status).toBe(400);
+    expect(mockRssDiscover).not.toHaveBeenCalled();
   });
 
   it('manages RSS feeds through REST', async () => {
