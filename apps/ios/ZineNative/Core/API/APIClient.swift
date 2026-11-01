@@ -1043,6 +1043,11 @@ struct APIClient {
         let _: EmptyResponse = try await send(request)
     }
 
+    func discoverRssFeeds(url: URL) async throws -> RssDiscovery {
+        try await request(url: baseURL.appending(path: "/api/v1/subscriptions/rss/discover")
+            .appending(queryItems: [URLQueryItem(name: "url", value: url.absoluteString)]))
+    }
+
     func listRssFeeds() async throws -> RssSubscriptionsResponse {
         try await request(url: baseURL.appending(path: "/api/v1/subscriptions/rss"))
     }

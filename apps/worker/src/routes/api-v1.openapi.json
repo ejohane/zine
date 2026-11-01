@@ -2036,6 +2036,30 @@
         }
       }
     },
+    "/api/v1/subscriptions/rss/discover": {
+      "get": {
+        "tags": ["Subscriptions"],
+        "operationId": "discoverRssSubscriptions",
+        "summary": "Discover feeds for an article and their subscription status",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:read"],
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "format": "uri" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Discovered feed candidates with title, feedUrl, and the current user's subscription status."
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
     "/api/v1/subscriptions/rss": {
       "get": {
         "tags": ["Subscriptions"],

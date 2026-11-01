@@ -16,6 +16,13 @@ struct CreatorView: View {
     let onExternalOpen: (Bookmark) -> Void
 
     @State private var store: CreatorStore
+    @State private var rssDiscovery: RssDiscovery?
+    @State private var isCheckingRssSubscription = true
+    @State private var isSubscribingToRss = false
+    @State private var didSubscribeToRss = false
+    @State private var showsRssFeedPicker = false
+    @State private var subscriptionMessage: String?
+    @State private var subscriptionError: String?
     @State private var selectedSection: ContentSection = .bookmarked
     @State private var renderedSection: ContentSection = .bookmarked
     @State private var extractedArtworkPalette = ZineTheme.ArtworkPalette.fallback
@@ -92,7 +99,35 @@ struct CreatorView: View {
         .onChange(of: avatarURL) { _, _ in extractedArtworkPalette = .fallback }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: artworkPalette)
         .task { await store.reload() }
-        .refreshable { await store.reload() }
+        .task(id: rssSourceURL) { await loadRssSubscription() }
+        .refreshable {
+            await store.reload()
+            await loadRssSubscription()
+        }
+        .confirmationDialog("Choose a feed", isPresented: $showsRssFeedPicker, titleVisibility: .visible) {
+            ForEach(rssDiscovery?.candidates ?? []) { feed in
+                Button(feed.displayName) { Task { await subscribeToRss(feed) } }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This site publishes several feeds. Choose the one you want to subscribe to.")
+        }
+        .alert("Subscribed", isPresented: Binding(
+            get: { subscriptionMessage != nil },
+            set: { if !$0 { subscriptionMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(subscriptionMessage ?? "")
+        }
+        .alert("Couldn’t subscribe", isPresented: Binding(
+            get: { subscriptionError != nil },
+            set: { if !$0 { subscriptionError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(subscriptionError ?? "Please try again.")
+        }
     }
 
     private var creatorHeader: some View {
@@ -132,6 +167,31 @@ struct CreatorView: View {
                     .lineLimit(5)
             }
 
+            if rssSourceURL != nil {
+                if didSubscribeToRss || rssDiscovery?.isSubscribed == true {
+                    Label("Subscribed", systemImage: "checkmark.circle")
+                        .font(.subheadline)
+                        .foregroundStyle(artworkPalette.secondaryText)
+                        .accessibilityIdentifier("creator-rss-subscribed")
+                } else {
+                    Button {
+                        Task { await beginRssSubscription() }
+                    } label: {
+                        Label(
+                            isCheckingRssSubscription ? "Checking subscription…" : (isSubscribingToRss ? "Subscribing…" : "Subscribe"),
+                            systemImage: "dot.radiowaves.left.and.right"
+                        )
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .foregroundStyle(artworkPalette.actionForeground)
+                        .background(artworkPalette.actionBackground, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isCheckingRssSubscription || isSubscribingToRss)
+                    .accessibilityIdentifier("creator-subscribe-rss")
+                }
+            }
+
             if let externalUrl = store.profile?.externalUrl {
                 Link(destination: externalUrl) {
                     Label(
@@ -156,6 +216,62 @@ struct CreatorView: View {
             }
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private var rssSourceURL: URL? {
+        guard let profile = store.profile,
+              [.web, .rss, .substack].contains(profile.provider) else { return nil }
+        return profile.rssSourceURL
+            ?? (store.bookmarks + store.completedBookmarks).first { $0.contentType == .article }?.canonicalUrl
+    }
+
+    private func loadRssSubscription() async {
+        guard let url = rssSourceURL else { return }
+        isCheckingRssSubscription = true
+        defer { isCheckingRssSubscription = false }
+        do {
+            let discovery = try await client.discoverRssFeeds(url: url)
+            guard !Task.isCancelled else { return }
+            rssDiscovery = discovery
+            didSubscribeToRss = discovery.isSubscribed
+        } catch {
+            // Keep Subscribe available so a transient discovery failure can be retried.
+            if !Task.isCancelled { rssDiscovery = nil }
+        }
+    }
+
+    private func beginRssSubscription() async {
+        guard let url = rssSourceURL, !isSubscribingToRss else { return }
+        isSubscribingToRss = true
+        defer { isSubscribingToRss = false }
+        do {
+            let discovery = try await client.discoverRssFeeds(url: url)
+            rssDiscovery = discovery
+            guard !discovery.isSubscribed else { return }
+            guard let feed = discovery.candidates.first else {
+                subscriptionError = "No public RSS feed was found for this creator."
+                return
+            }
+            if discovery.candidates.count > 1 {
+                showsRssFeedPicker = true
+            } else {
+                await subscribeToRss(feed)
+            }
+        } catch {
+            subscriptionError = error.localizedDescription
+        }
+    }
+
+    private func subscribeToRss(_ feed: RssFeedCandidate) async {
+        isSubscribingToRss = true
+        defer { isSubscribingToRss = false }
+        do {
+            try await client.addRssFeed(url: feed.feedUrl)
+            didSubscribeToRss = true
+            subscriptionMessage = "New posts from \(feed.displayName) will appear in your Inbox."
+        } catch {
+            subscriptionError = error.localizedDescription
+        }
     }
 
     private var contentSwitcher: some View {

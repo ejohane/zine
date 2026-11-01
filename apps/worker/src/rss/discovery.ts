@@ -295,7 +295,7 @@ export async function discoverFeedsForUrl(
     where: eq(rssDiscoveryCache.sourceOrigin, sourceOrigin),
   });
 
-  if (cached && !options.refresh && cached.expiresAt > now) {
+  if (cached && cached.sourceUrl === sourceUrl && !options.refresh && cached.expiresAt > now) {
     return {
       sourceUrl,
       sourceOrigin,

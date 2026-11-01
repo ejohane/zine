@@ -148,6 +148,12 @@ struct BookmarkDetailView: View {
     @State private var finishedState: OptimisticFinishedState
     @State private var subscriptionSettings: BookmarkSubscriptionSettings?
     @State private var isSavingSubscriptionSettings = false
+    @State private var rssDiscovery: RssDiscovery?
+    @State private var isCheckingRssSubscription = true
+    @State private var isSubscribingToRss = false
+    @State private var didSubscribeToRss = false
+    @State private var showsRssFeedPicker = false
+    @State private var subscribedFeedName: String?
     @State private var errorMessage: String?
     @State private var isOpeningExternal = false
     @State private var artworkPalette: ZineTheme.ArtworkPalette?
@@ -441,6 +447,26 @@ struct BookmarkDetailView: View {
         .onChange(of: content.creatorImageUrl) { _, _ in artworkPalette = nil }
         .task(id: content.id) {
             await hydrateSubscriptionSettings()
+            if canOfferRssSubscription {
+                rssDiscovery = try? await client.discoverRssFeeds(url: content.canonicalUrl)
+            }
+            isCheckingRssSubscription = false
+        }
+        .confirmationDialog("Choose a feed", isPresented: $showsRssFeedPicker, titleVisibility: .visible) {
+            ForEach(rssDiscovery?.candidates ?? []) { feed in
+                Button(feed.displayName) { Task { await subscribeToRss(feed) } }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This site publishes several feeds. Choose the one you want to subscribe to.")
+        }
+        .alert("Subscribed", isPresented: Binding(
+            get: { subscribedFeedName != nil },
+            set: { if !$0 { subscribedFeedName = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("New posts from \(subscribedFeedName ?? "this feed") will appear in your Inbox.")
         }
         .task(id: articleWarmupID) {
             guard let articleWarmupID else { return }
@@ -859,6 +885,18 @@ struct BookmarkDetailView: View {
                 Label("Copy Link", systemImage: "doc.on.doc")
             }
 
+            if canOfferRssSubscription && !isCheckingRssSubscription && !didSubscribeToRss && rssDiscovery?.isSubscribed != true {
+                Divider()
+                Button {
+                    ActionRowHaptics.play(style: .heavy)
+                    Task { await beginRssSubscription() }
+                } label: {
+                    Label(isSubscribingToRss ? "Subscribing…" : "Subscribe", systemImage: "dot.radiowaves.left.and.right")
+                }
+                .disabled(isSubscribingToRss)
+                .accessibilityIdentifier("bookmark-subscribe-rss")
+            }
+
             if let subscriptionSettings {
                 Divider()
                 Button {
@@ -1104,6 +1142,46 @@ struct BookmarkDetailView: View {
             return false
         } catch {
             return false
+        }
+    }
+
+    private var canOfferRssSubscription: Bool {
+        content.contentType == .article && [.web, .rss, .substack].contains(content.provider)
+    }
+
+    private func beginRssSubscription() async {
+        guard !isSubscribingToRss else { return }
+        isSubscribingToRss = true
+        defer { isSubscribingToRss = false }
+        do {
+            // Refresh account status before writing, including subscriptions made elsewhere.
+            let discovery = try await client.discoverRssFeeds(url: content.canonicalUrl)
+            rssDiscovery = discovery
+            guard !discovery.isSubscribed else { return }
+            guard let feed = discovery.candidates.first else {
+                errorMessage = "No public RSS feed was found for this article."
+                return
+            }
+            if discovery.candidates.count > 1 {
+                showsRssFeedPicker = true
+            } else {
+                await subscribeToRss(feed)
+            }
+        } catch {
+            errorMessage = "Couldn’t find this creator’s feed. \(error.localizedDescription)"
+        }
+    }
+
+    private func subscribeToRss(_ feed: RssFeedCandidate) async {
+        isSubscribingToRss = true
+        defer { isSubscribingToRss = false }
+        do {
+            try await client.addRssFeed(url: feed.feedUrl)
+            didSubscribeToRss = true
+            subscribedFeedName = feed.displayName
+            await hydrateSubscriptionSettings()
+        } catch {
+            errorMessage = "Couldn’t subscribe. \(error.localizedDescription)"
         }
     }
 

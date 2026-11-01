@@ -11,6 +11,16 @@ struct CreatorProfile: Codable, Hashable, Identifiable {
     let externalUrl: URL?
     let createdAt: Int64
     let updatedAt: Int64
+
+    var rssSourceURL: URL? {
+        guard [.web, .rss, .substack].contains(provider) else { return nil }
+        for candidate in [externalUrl, URL(string: providerCreatorId)] {
+            if let candidate, ["http", "https"].contains(candidate.scheme?.lowercased() ?? "") {
+                return candidate
+            }
+        }
+        return nil
+    }
 }
 
 struct CreatorContentItem: Codable, Hashable, Identifiable {
