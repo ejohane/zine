@@ -4,6 +4,7 @@ struct RssDiscovery: Decodable {
     var candidates: [RssFeedCandidate]
 
     var isSubscribed: Bool { candidates.contains { $0.isSubscribed } }
+    var canSubscribe: Bool { !candidates.isEmpty && !isSubscribed }
 }
 
 struct RssFeedCandidate: Decodable, Identifiable {

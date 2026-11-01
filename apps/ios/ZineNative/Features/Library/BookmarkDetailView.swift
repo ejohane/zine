@@ -885,7 +885,7 @@ struct BookmarkDetailView: View {
                 Label("Copy Link", systemImage: "doc.on.doc")
             }
 
-            if canOfferRssSubscription && !isCheckingRssSubscription && !didSubscribeToRss && rssDiscovery?.isSubscribed != true {
+            if canOfferRssSubscription && !isCheckingRssSubscription && !didSubscribeToRss && rssDiscovery?.canSubscribe == true {
                 Divider()
                 Button {
                     ActionRowHaptics.play(style: .heavy)

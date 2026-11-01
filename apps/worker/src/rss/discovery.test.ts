@@ -90,16 +90,19 @@ describe('rss discovery', () => {
         sourceOrigin: 'https://example.com',
         sourceOriginHash: 'hash',
         sourceUrl: 'https://example.com/article',
-        candidatesJson: JSON.stringify([
-          {
-            feedUrl: 'https://example.com/feed.xml',
-            title: 'Example Feed',
-            description: null,
-            siteUrl: 'https://example.com/',
-            discoveredFrom: 'page_link',
-            score: 100,
-          },
-        ]),
+        candidatesJson: JSON.stringify({
+          version: 2,
+          candidates: [
+            {
+              feedUrl: 'https://example.com/feed.xml',
+              title: 'Example Feed',
+              description: null,
+              siteUrl: 'https://example.com/',
+              discoveredFrom: 'page_link',
+              score: 100,
+            },
+          ],
+        }),
         status: 'SUCCESS',
         lastError: null,
         checkedAt: 123,
@@ -117,6 +120,40 @@ describe('rss discovery', () => {
     expect(result.candidates).toHaveLength(1);
     expect(result.candidates[0]?.feedUrl).toBe('https://example.com/feed.xml');
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('uses the same canonical URL as subscription sync and deduplicates redirect aliases', async () => {
+    const { db, mocks } = createMockDb({
+      cachedRow: {
+        sourceUrl: 'https://example.com/article',
+        expiresAt: Date.now() + 60_000,
+        candidatesJson: JSON.stringify([{ feedUrl: 'https://example.com/feed' }]),
+      },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: unknown) => {
+        const url = String(input);
+        if (url === 'https://example.com/article') {
+          return new Response('<link rel="alternate" type="application/rss+xml" href="/feed">');
+        }
+        if (url === 'https://example.com/feed' || url === 'https://example.com/rss') {
+          return new Response(null, {
+            status: 301,
+            headers: { location: 'https://feeds.example.com/author.xml' },
+          });
+        }
+        if (url === 'https://feeds.example.com/author.xml') return new Response(VALID_FEED_XML);
+        return new Response('Not Found', { status: 404 });
+      })
+    );
+    const result = await discoverFeedsForUrl(db, 'https://example.com/article');
+    expect(result.cached).toBe(false);
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0]?.feedUrl).toBe('https://feeds.example.com/author.xml');
+    const cached = JSON.parse(mocks.values.mock.calls[0][0].candidatesJson);
+    expect(cached.version).toBe(2);
+    expect(cached.candidates[0].feedUrl).toBe('https://feeds.example.com/author.xml');
   });
 
   it('discovers feeds from page links and writes cache', async () => {

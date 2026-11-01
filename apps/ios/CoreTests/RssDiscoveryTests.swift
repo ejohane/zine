@@ -7,19 +7,23 @@ final class RssDiscoveryTests: XCTestCase {
         for status in ["ACTIVE", "PAUSED", "ERROR"] {
             let discovery = try decode(status: status)
             XCTAssertTrue(discovery.isSubscribed)
+            XCTAssertFalse(discovery.canSubscribe)
         }
     }
 
     func testRemovedFeedCanBeSubscribedAgain() throws {
         XCTAssertFalse(try decode(status: "UNSUBSCRIBED").isSubscribed)
+        XCTAssertTrue(try decode(status: "UNSUBSCRIBED").canSubscribe)
     }
 
     func testNewFeedAndEmptyDiscoveryAreNotSubscribed() throws {
         let data = Data(#"{"candidates":[{"feedUrl":"https://example.com/feed","title":null,"subscription":null}]}"#.utf8)
         let result = try JSONDecoder().decode(RssDiscovery.self, from: data)
         XCTAssertFalse(result.isSubscribed)
+        XCTAssertTrue(result.canSubscribe)
         XCTAssertEqual(result.candidates.first?.displayName, "https://example.com/feed")
         XCTAssertFalse(RssDiscovery(candidates: []).isSubscribed)
+        XCTAssertFalse(RssDiscovery(candidates: []).canSubscribe)
     }
 
     @MainActor

@@ -4,7 +4,7 @@ import type { Database } from '../db';
 import { rssDiscoveryCache } from '../db/schema';
 import { logger } from '../lib/logger';
 import { parseRssFeedXml } from './parser';
-import { hashString, normalizeFeedUrl } from './url';
+import { fetchPublicFeedUrl, hashString, normalizeFeedUrl } from './url';
 
 const discoveryLogger = logger.child('rss-discovery');
 
@@ -134,13 +134,14 @@ export function extractFeedLinksFromHtml(html: string, baseUrl: string): string[
   return [...links];
 }
 
-function parseCachedCandidates(value: string): DiscoveredFeedCandidate[] {
+function parseCachedCandidates(value: string): DiscoveredFeedCandidate[] | null {
   try {
     const parsed = JSON.parse(value);
-    if (!Array.isArray(parsed)) return [];
+    // Older cache entries retain pre-redirect URLs and cannot identify subscriptions.
+    if (parsed.version !== 2 || !Array.isArray(parsed.candidates)) return null;
 
-    return parsed
-      .map((entry) => {
+    return parsed.candidates
+      .map((entry: unknown) => {
         if (!entry || typeof entry !== 'object') return null;
         const candidate = entry as Partial<DiscoveredFeedCandidate>;
         if (
@@ -162,22 +163,30 @@ function parseCachedCandidates(value: string): DiscoveredFeedCandidate[] {
           siteUrl: typeof candidate.siteUrl === 'string' ? candidate.siteUrl : null,
         } satisfies DiscoveredFeedCandidate;
       })
-      .filter((candidate): candidate is DiscoveredFeedCandidate => candidate !== null);
+      .filter(
+        (candidate: DiscoveredFeedCandidate | null): candidate is DiscoveredFeedCandidate =>
+          candidate !== null
+      );
   } catch {
-    return [];
+    return null;
   }
 }
 
-async function fetchText(url: string, accept: string, maxBytes: number): Promise<string> {
-  const response = await fetch(url, {
+async function fetchText(url: string, accept: string, maxBytes: number, isFeed = false) {
+  const init: RequestInit = {
     method: 'GET',
     headers: {
       Accept: accept,
       'User-Agent': 'ZineRSSDiscoveryBot/1.0 (+https://myzine.app)',
     },
-    redirect: 'follow',
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
+  };
+  const { response, resolvedUrl } = isFeed
+    ? await fetchPublicFeedUrl(url, init)
+    : await fetch(url, { ...init, redirect: 'follow' }).then((response) => ({
+        response,
+        resolvedUrl: response.url || url,
+      }));
 
   if (!response.ok) {
     throw new Error(`Request failed (${response.status})`);
@@ -188,7 +197,7 @@ async function fetchText(url: string, accept: string, maxBytes: number): Promise
     throw new Error(`Payload too large (${payload.byteLength} bytes)`);
   }
 
-  return new TextDecoder().decode(payload);
+  return { text: new TextDecoder().decode(payload), resolvedUrl };
 }
 
 function addCandidate(
@@ -218,11 +227,16 @@ async function validateFeedCandidate(
   seed: DiscoveryCandidateSeed
 ): Promise<DiscoveredFeedCandidate | null> {
   try {
-    const xml = await fetchText(seed.feedUrl, FEED_ACCEPT_HEADER, MAX_FEED_BYTES);
-    const parsed = parseRssFeedXml(xml, seed.feedUrl);
+    const { text: xml, resolvedUrl } = await fetchText(
+      seed.feedUrl,
+      FEED_ACCEPT_HEADER,
+      MAX_FEED_BYTES,
+      true
+    );
+    const parsed = parseRssFeedXml(xml, resolvedUrl);
 
     return {
-      feedUrl: seed.feedUrl,
+      feedUrl: resolvedUrl,
       title: parsed.title ?? null,
       description: parsed.description ?? null,
       siteUrl: parsed.siteUrl ?? null,
@@ -259,7 +273,7 @@ async function upsertDiscoveryCache(params: {
       sourceOrigin,
       sourceOriginHash,
       sourceUrl,
-      candidatesJson: JSON.stringify(candidates),
+      candidatesJson: JSON.stringify({ version: 2, candidates }),
       status,
       lastError,
       checkedAt,
@@ -272,7 +286,7 @@ async function upsertDiscoveryCache(params: {
       set: {
         sourceOriginHash,
         sourceUrl,
-        candidatesJson: JSON.stringify(candidates),
+        candidatesJson: JSON.stringify({ version: 2, candidates }),
         status,
         lastError,
         checkedAt,
@@ -295,13 +309,20 @@ export async function discoverFeedsForUrl(
     where: eq(rssDiscoveryCache.sourceOrigin, sourceOrigin),
   });
 
-  if (cached && cached.sourceUrl === sourceUrl && !options.refresh && cached.expiresAt > now) {
+  const cachedCandidates = cached ? parseCachedCandidates(cached.candidatesJson) : null;
+  if (
+    cached &&
+    cachedCandidates &&
+    cached.sourceUrl === sourceUrl &&
+    !options.refresh &&
+    cached.expiresAt > now
+  ) {
     return {
       sourceUrl,
       sourceOrigin,
       checkedAt: cached.checkedAt,
       cached: true,
-      candidates: parseCachedCandidates(cached.candidatesJson),
+      candidates: cachedCandidates,
     };
   }
 
@@ -311,7 +332,7 @@ export async function discoverFeedsForUrl(
   try {
     try {
       const sourceHtml = await fetchText(sourceUrl, HTML_ACCEPT_HEADER, MAX_HTML_BYTES);
-      const pageLinks = extractFeedLinksFromHtml(sourceHtml, sourceUrl);
+      const pageLinks = extractFeedLinksFromHtml(sourceHtml.text, sourceHtml.resolvedUrl);
       for (const link of pageLinks) {
         addCandidate(candidateSeeds, link, 'page_link', 100);
       }
@@ -327,7 +348,7 @@ export async function discoverFeedsForUrl(
     if (homepageUrl !== sourceUrl) {
       try {
         const homepageHtml = await fetchText(homepageUrl, HTML_ACCEPT_HEADER, MAX_HTML_BYTES);
-        const homepageLinks = extractFeedLinksFromHtml(homepageHtml, homepageUrl);
+        const homepageLinks = extractFeedLinksFromHtml(homepageHtml.text, homepageHtml.resolvedUrl);
         for (const link of homepageLinks) {
           addCandidate(candidateSeeds, link, 'site_link', 80);
         }
@@ -356,7 +377,8 @@ export async function discoverFeedsForUrl(
     const candidates: DiscoveredFeedCandidate[] = [];
     for (const seed of rankedCandidates) {
       const validated = await validateFeedCandidate(seed);
-      if (!validated) continue;
+      if (!validated || candidates.some((candidate) => candidate.feedUrl === validated.feedUrl))
+        continue;
       candidates.push(validated);
       if (candidates.length >= MAX_VALIDATED_CANDIDATES) {
         break;

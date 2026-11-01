@@ -173,7 +173,15 @@ struct CreatorView: View {
                         .font(.subheadline)
                         .foregroundStyle(artworkPalette.secondaryText)
                         .accessibilityIdentifier("creator-rss-subscribed")
-                } else {
+                } else if isCheckingRssSubscription {
+                    ProgressView("Checking subscription…")
+                        .tint(artworkPalette.secondaryText)
+                } else if rssDiscovery == nil {
+                    Button("Retry subscription check") {
+                        Task { await loadRssSubscription() }
+                    }
+                    .accessibilityIdentifier("creator-retry-rss-check")
+                } else if rssDiscovery?.canSubscribe == true {
                     Button {
                         Task { await beginRssSubscription() }
                     } label: {
@@ -235,7 +243,7 @@ struct CreatorView: View {
             rssDiscovery = discovery
             didSubscribeToRss = discovery.isSubscribed
         } catch {
-            // Keep Subscribe available so a transient discovery failure can be retried.
+            // An unavailable status is unknown, not permission to offer Subscribe.
             if !Task.isCancelled { rssDiscovery = nil }
         }
     }
