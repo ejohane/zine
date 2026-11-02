@@ -26,9 +26,9 @@ R2 is written before D1 metadata. If D1 publication fails, the result is an unre
 
 ## Lifecycle contract
 
-`article_body_states` contains one mutable row per canonical item. `article_body_versions` is append-only in normal operation. A state may report available or degraded to clients only when it resolves to a current version and R2 key; otherwise the API reports unavailable and adds `MISSING_CURRENT_VERSION`. A failed refresh does not hide the last good version: it remains readable as degraded with `LATEST_ACQUISITION_FAILED_USING_CURRENT_VERSION`.
+`article_body_states` contains one mutable row per canonical item. `article_body_versions` is append-only in normal operation. Without a legacy fallback, a state may report available or degraded to clients only when it resolves to a current version and R2 key; otherwise the API reports unavailable and adds `MISSING_CURRENT_VERSION`. A failed refresh does not hide the last good version: it remains readable as degraded with `LATEST_ACQUISITION_FAILED_USING_CURRENT_VERSION`.
 
-Legacy `items.article_content_key` content remains readable. It is labeled `LEGACY` and `LEGACY_UNNORMALIZED` rather than being presented as equivalent to a verified versioned artifact. If a current version points to a missing R2 object but legacy HTML exists, the API serves the fallback as degraded and reports `CURRENT_ARTIFACT_MISSING_FALLBACK_LEGACY`.
+Legacy `items.article_content_key` content remains readable, including while a replacement is pending or after acquisition fails. When a pipeline record exists without a current version, the API reports degraded availability with `NO_CURRENT_VERSION_FALLBACK_LEGACY`, preserves pipeline status and error diagnostics, and reports legacy provenance instead of versioned-artifact metadata. It is labeled `LEGACY` and `LEGACY_UNNORMALIZED` rather than being presented as equivalent to a verified versioned artifact. If a current version points to a missing R2 object but legacy HTML exists, the API serves the fallback as degraded and reports `CURRENT_ARTIFACT_MISSING_FALLBACK_LEGACY`.
 
 ## Queue contract
 

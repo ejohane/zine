@@ -93,6 +93,28 @@ describe('article-body public status', () => {
     });
   });
 
+  it.each(['PENDING', 'PROCESSING', 'UNAVAILABLE', 'AVAILABLE', 'DEGRADED'] as const)(
+    'keeps saved legacy content readable when the pipeline is %s without a current version',
+    (status) => {
+      expect(
+        toArticleBodyPublicStatus(
+          record({ status, versionId: null, r2Key: null, lastErrorCode: 'HTTP_403' }),
+          true
+        )
+      ).toMatchObject({
+        availability: 'DEGRADED',
+        pipelineStatus: status,
+        sourceKind: 'LEGACY',
+        schemaVersion: 0,
+        extractorVersion: null,
+        contentHash: null,
+        qualityScore: null,
+        lastErrorCode: 'HTTP_403',
+        qualityWarnings: ['LEGACY_UNNORMALIZED', 'NO_CURRENT_VERSION_FALLBACK_LEGACY'],
+      });
+    }
+  );
+
   it('keeps the last good body readable as degraded when refresh is exhausted', () => {
     expect(
       toArticleBodyPublicStatus(
