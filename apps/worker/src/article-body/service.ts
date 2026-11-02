@@ -165,6 +165,24 @@ export function toArticleBodyPublicStatus(
   }
 
   const hasCurrentVersion = record.versionId !== null && record.r2Key !== null;
+  // Enrollment and failed refreshes must not hide an already saved legacy body.
+  // Keep pipeline diagnostics, but describe the content actually being served.
+  if (!hasCurrentVersion && legacyContentPresent) {
+    return {
+      availability: 'DEGRADED',
+      pipelineStatus: record.status,
+      schemaVersion: 0,
+      extractorVersion: null,
+      sourceKind: 'LEGACY',
+      contentHash: null,
+      wordCount: null,
+      readingTimeMinutes: null,
+      qualityScore: null,
+      qualityWarnings: ['LEGACY_UNNORMALIZED', 'NO_CURRENT_VERSION_FALLBACK_LEGACY'],
+      lastErrorCode: record.lastErrorCode,
+      updatedAt: new Date(record.updatedAt).toISOString(),
+    };
+  }
   const qualityWarnings = parseWarnings(record.qualityWarningsJson);
   let availability: ArticleBodyPublicStatus['availability'];
 

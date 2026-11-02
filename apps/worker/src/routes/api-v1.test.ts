@@ -3269,7 +3269,57 @@ describe('apiV1Routes', () => {
         pipelineStatus: 'AVAILABLE',
         sourceKind: 'LEGACY',
         lastErrorCode: 'ARTIFACT_MISSING',
-        qualityWarnings: ['MISSING_CURRENT_VERSION', 'CURRENT_ARTIFACT_MISSING_FALLBACK_LEGACY'],
+        qualityWarnings: [
+          'LEGACY_UNNORMALIZED',
+          'NO_CURRENT_VERSION_FALLBACK_LEGACY',
+          'CURRENT_ARTIFACT_MISSING_FALLBACK_LEGACY',
+        ],
+      },
+    });
+  });
+
+  it('keeps a saved Medium article readable after HTTP 403 during extraction', async () => {
+    mockGetItem.mockResolvedValue({ id: 'ui_1', itemId: 'item_1', title: 'Article' });
+    mockGetArticleContent.mockResolvedValue({ content: '<article>Legacy fallback</article>' });
+    mockGetArticleBodyStatus.mockResolvedValue({
+      status: 'UNAVAILABLE',
+      targetExtractorVersion: 1,
+      attemptCount: 1,
+      lastErrorCode: 'HTTP_403',
+      lastHttpStatus: 403,
+      lastAttemptAt: 1700000000000,
+      nextAttemptAt: null,
+      updatedAt: 1700000000000,
+      versionId: null,
+      schemaVersion: 1,
+      extractorVersion: 1,
+      sourceKind: 'PUBLIC_WEB',
+      contentHash: `sha256:${'b'.repeat(64)}`,
+      r2Key: null,
+      wordCount: 100,
+      readingTimeMinutes: 1,
+      qualityScore: 0.9,
+      qualityWarningsJson: '[]',
+    });
+    mockGetArticleBodyArtifact.mockResolvedValue(null);
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/bookmarks/ui_1/article-content', {
+        headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect((await res.json()) as JsonBody).toMatchObject({
+      content: '<article>Legacy fallback</article>',
+      articleBody: {
+        availability: 'DEGRADED',
+        pipelineStatus: 'UNAVAILABLE',
+        sourceKind: 'LEGACY',
+        lastErrorCode: 'HTTP_403',
+        qualityWarnings: ['LEGACY_UNNORMALIZED', 'NO_CURRENT_VERSION_FALLBACK_LEGACY'],
       },
     });
   });

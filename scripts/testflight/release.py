@@ -108,10 +108,13 @@ def guard_audience():
     require(app['id'] == APP and app['attributes']['bundleId'] == BUNDLE, 'ASC app mismatch')
     group = get(f'/v1/betaGroups/{GROUP}')['data']
     attrs = group['attributes']
+    public_link_disabled = attrs.get('publicLinkEnabled') is False or all(
+        key in attrs and attrs[key] is None
+        for key in ('publicLinkEnabled', 'publicLink', 'publicLinkId'))
     require(group['id'] == GROUP and attrs['name'] == 'Erik Internal'
             and attrs.get('isInternalGroup') is True
             and attrs.get('hasAccessToAllBuilds') is False
-            and attrs.get('publicLinkEnabled') is False, 'Internal group settings changed')
+            and public_link_disabled, 'Internal group settings changed')
     all_groups = collection(f'/v1/apps/{APP}/betaGroups?limit=200')
     require(GROUP in {group['id'] for group in all_groups}, 'Approved group missing from app')
     require(all(group['attributes'].get('hasAccessToAllBuilds') is False
@@ -236,7 +239,7 @@ def profile_check(profile, bundle, uuid):
             expected.get('com.apple.security.application-groups', []), 'Profile App Group mismatch')
     if bundle == BUNDLE:
         require(ent.get('com.apple.developer.applesignin') == ['Default']
-                and ent.get('com.apple.developer.associated-domains') == ['*'],
+                and ent.get('com.apple.developer.associated-domains') in ('*', ['*']),
                 'Profile auth capabilities mismatch')
 
 
@@ -416,7 +419,7 @@ def export_archive(directory, manifest):
 
 
 def guard_build_groups(build_id):
-    groups = collection(f'/v1/builds/{build_id}/betaGroups?limit=200')
+    groups = collection('/v1/betaGroups?' + urlencode({'filter[builds]': build_id, 'limit': 200}))
     require(all(group['id'] == GROUP for group in groups),
             'Exact build has unexpected testing groups; distribution stopped')
 
