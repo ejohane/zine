@@ -205,6 +205,15 @@ class ReleaseTests(unittest.TestCase):
                                     'keychain-access-groups': [r.TEAM + '.*', 'com.apple.token']}}
         with patch.object(r, 'CERT', r.hashlib.sha1(b'fixture certificate').hexdigest().upper()):
             r.profile_check(profile, r.BUNDLE, r.PROFILES['ZineNative'])
+            for domains in ('*', ['*']):
+                changed = copy.deepcopy(profile)
+                changed['Entitlements']['com.apple.developer.associated-domains'] = domains
+                r.profile_check(changed, r.BUNDLE, r.PROFILES['ZineNative'])
+            for domains in (None, [], ['example.com'], ['*', 'example.com']):
+                changed = copy.deepcopy(profile)
+                changed['Entitlements']['com.apple.developer.associated-domains'] = domains
+                with self.assertRaises(r.ReleaseError):
+                    r.profile_check(changed, r.BUNDLE, r.PROFILES['ZineNative'])
             for key, value in [('UUID', 'other'), ('TeamIdentifier', ['OTHER']),
                                ('ExpirationDate', r.dt.datetime(2000, 1, 1)),
                                ('DeveloperCertificates', [b'other cert']), ('ProvisionedDevices', ['device'])]:
@@ -212,6 +221,37 @@ class ReleaseTests(unittest.TestCase):
                 changed[key] = value
                 with self.assertRaises(r.ReleaseError):
                     r.profile_check(changed, r.BUNDLE, r.PROFILES['ZineNative'])
+
+    def test_internal_group_accepts_only_explicit_disabled_public_link_shapes(self):
+        for fields, allowed in [
+            ({'publicLinkEnabled': None, 'publicLink': None, 'publicLinkId': None}, True),
+            ({'publicLinkEnabled': None}, False),
+            ({'publicLinkEnabled': None, 'publicLink': 'https://example.com', 'publicLinkId': None}, False),
+            ({'publicLinkEnabled': True, 'publicLink': None, 'publicLinkId': None}, False),
+        ]:
+            def response(path):
+                value = self.audience_response(path)
+                if path == f'/v1/betaGroups/{r.GROUP}':
+                    value['data']['attributes'].update(fields)
+                return value
+            def collection(path):
+                if '/betaGroups?' in path:
+                    return [response(f'/v1/betaGroups/{r.GROUP}')['data']]
+                return [{'attributes': {'email': 'ejohane@gmail.com'}}]
+            with self.subTest(fields=fields), patch.object(r, 'get', side_effect=response), patch.object(r, 'collection', side_effect=collection):
+                if allowed:
+                    r.guard_audience()
+                else:
+                    with self.assertRaises(r.ReleaseError):
+                        r.guard_audience()
+
+    def test_exact_build_membership_uses_filtered_beta_groups(self):
+        with patch.object(r, 'collection', return_value=[{'id': r.GROUP}]) as read:
+            r.guard_build_groups('exact-build')
+            read.assert_called_once_with('/v1/betaGroups?filter%5Bbuilds%5D=exact-build&limit=200')
+        with patch.object(r, 'collection', return_value=[{'id': 'unexpected'}]):
+            with self.assertRaises(r.ReleaseError):
+                r.guard_build_groups('exact-build')
 
     def test_status_cannot_adopt_a_build_without_upload_intent(self):
         with patch.object(r, 'guard_audience'), patch.object(r, 'exact_build', return_value=self.row()), patch.object(r, 'bridge') as external:
@@ -414,7 +454,7 @@ class ReleaseTests(unittest.TestCase):
                     r.save(self.path, m)
                     assigned = []
                     def collection(path):
-                        if '/builds/exact-build/betaGroups?' in path:
+                        if path == '/v1/betaGroups?filter%5Bbuilds%5D=exact-build&limit=200':
                             return [{'id': r.GROUP}] if assigned else []
                         return [{'id': 'exact-build'}] if assigned else []
                     def external(action, **kwargs):
