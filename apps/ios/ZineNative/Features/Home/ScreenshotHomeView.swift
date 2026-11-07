@@ -157,37 +157,41 @@ struct ScreenshotHomeView: View {
     @State private var titleCollapseProgress: CGFloat = 0
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(spacing: density.sectionSpacing) {
-                    CollapsingListTitle(title: "Home", progress: titleCollapseProgress)
-                        .padding(.horizontal, 18)
+        GeometryReader { geometry in
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: density.sectionSpacing) {
+                        CollapsingListTitle(title: "Home", progress: titleCollapseProgress)
+                            .padding(.horizontal, 18)
 
-                    ForEach(density.visibleSections(from: ScreenshotHomeFixtures.sections)) { section in
-                        HomeDashboardSectionView(
-                            section: section,
-                            density: density,
-                            transitionNamespace: bookmarkTransition
-                        )
-                        .id(section.id)
+                        ForEach(density.visibleSections(from: ScreenshotHomeFixtures.sections)) { section in
+                            HomeDashboardSectionView(
+                                section: section,
+                                density: density,
+                                transitionNamespace: bookmarkTransition
+                            )
+                            .id(section.id)
+                        }
+                    }
+                    .padding(.vertical, density == .compact ? 6 : 10)
+                    .padding(.bottom, density == .compact ? 16 : 24)
+                }
+                .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                    let offset = geometry.contentOffset.y + geometry.contentInsets.top
+                    return CollapsingListTitle.collapseProgress(scrollOffset: offset)
+                } action: { _, progress in
+                    titleCollapseProgress = progress
+                    onTitleCollapseProgressChanged(progress)
+                }
+                .task {
+                    if ProcessInfo.processInfo.arguments.contains("-screenshot-scrolled-fixture") {
+                        try? await Task.sleep(for: .milliseconds(300))
+                        proxy.scrollTo("inbox", anchor: .top)
                     }
                 }
-                .padding(.vertical, density == .compact ? 6 : 10)
-                .padding(.bottom, density == .compact ? 16 : 24)
             }
-            .onScrollGeometryChange(for: CGFloat.self) { geometry in
-                let offset = geometry.contentOffset.y + geometry.contentInsets.top
-                return CollapsingListTitle.collapseProgress(scrollOffset: offset)
-            } action: { _, progress in
-                titleCollapseProgress = progress
-                onTitleCollapseProgressChanged(progress)
-            }
-            .task {
-                if ProcessInfo.processInfo.arguments.contains("-screenshot-scrolled-fixture") {
-                    try? await Task.sleep(for: .milliseconds(300))
-                    proxy.scrollTo("inbox", anchor: .top)
-                }
-            }
+            .environment(\.homeUsesWideLayout,
+                         geometry.size.width >= 800 && geometry.size.width > geometry.size.height)
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
@@ -418,14 +422,15 @@ enum ScreenshotHomeFixtures {
         bookmarkedAt: String = "2026-07-18T12:00:00Z",
         progress: BookmarkProgress? = nil
     ) -> HomeItem {
-        HomeItem(
+        let mediaResume = id == "resume" && ProcessInfo.processInfo.arguments.contains("-screenshot-home-media-resume")
+        return HomeItem(
             id: id,
             itemId: "item-\(id)",
             title: title,
-            thumbnailUrl: nil,
+            thumbnailUrl: mediaResume ? URL(string: "https://i.ytimg.com/vi/-BhcQURVjJg/hqdefault.jpg") : nil,
             canonicalUrl: URL(string: "https://example.com/\(id)")!,
-            contentType: contentType,
-            provider: provider,
+            contentType: mediaResume ? .video : contentType,
+            provider: mediaResume ? .youtube : provider,
             creator: creator,
             creatorImageUrl: creatorImageUrl,
             creatorId: nil,

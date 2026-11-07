@@ -189,40 +189,49 @@ struct HomeView: View {
             .background(ZineTheme.canvas)
             .refreshable { await store.reload() }
         } else {
-            ScrollView {
-                LazyVStack(spacing: density.sectionSpacing) {
-                    ObservedListTitle(title: title, state: titleCollapseState)
-                        .padding(.horizontal, 18)
-
-                    if !composedSections.isEmpty {
-                        ForEach(composedSections) { section in
-                            HomeComposedSectionView(resolved: section,
-                                                    transitionNamespace: bookmarkTransition, client: client)
-                        }
-                    } else {
-                        ForEach(dashboardSections) { section in
-                            HomeDashboardSectionView(section: section, density: density,
-                                                     transitionNamespace: bookmarkTransition, client: client)
-                        }
-                    }
-                }
-                .environment(\.homeTabReselection, tabReselection)
-                .padding(.vertical, density == .compact ? 6 : 10)
-                .padding(.bottom, density == .compact ? 16 : 24)
-            }
-            .background(ZineTheme.canvas)
-            .onScrollGeometryChange(for: CGFloat.self) { geometry in
-                let offset = geometry.contentOffset.y + geometry.contentInsets.top
-                return CollapsingListTitle.collapseProgress(scrollOffset: offset)
-            } action: { _, progress in
-                titleCollapseState.progress = progress
-                onTitleCollapseProgressChanged(progress)
-            }
-            .refreshable {
-                await store.reload()
+            GeometryReader { geometry in
+                singleColumnContent
+                    .environment(\.homeUsesWideLayout,
+                                 geometry.size.width >= 800 && geometry.size.width > geometry.size.height)
             }
         }
     }
+
+    private var singleColumnContent: some View {
+        ScrollView {
+            LazyVStack(spacing: density.sectionSpacing) {
+                ObservedListTitle(title: title, state: titleCollapseState)
+                    .padding(.horizontal, 18)
+
+                if !composedSections.isEmpty {
+                    ForEach(composedSections) { section in
+                        HomeComposedSectionView(resolved: section,
+                                                transitionNamespace: bookmarkTransition, client: client)
+                    }
+                } else {
+                    ForEach(dashboardSections) { section in
+                        HomeDashboardSectionView(section: section, density: density,
+                                                 transitionNamespace: bookmarkTransition, client: client)
+                    }
+                }
+            }
+            .environment(\.homeTabReselection, tabReselection)
+            .padding(.vertical, density == .compact ? 6 : 10)
+            .padding(.bottom, density == .compact ? 16 : 24)
+        }
+        .background(ZineTheme.canvas)
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            let offset = geometry.contentOffset.y + geometry.contentInsets.top
+            return CollapsingListTitle.collapseProgress(scrollOffset: offset)
+        } action: { _, progress in
+            titleCollapseState.progress = progress
+            onTitleCollapseProgressChanged(progress)
+        }
+        .refreshable {
+            await store.reload()
+        }
+    }
+
 
     private var composedSections: [HomeComposedSection] { usesComposition ? store.composedSections : [] }
 

@@ -21,6 +21,9 @@ struct HomeHorizontalScrollView<Content: View>: View {
         ScrollView(.horizontal, showsIndicators: false, content: content)
             // A value, rather than an onChange scroll command, also resets rails
             // retained offscreen by LazyVStack or first realized after the tap.
+            .contentMargins(.trailing, 24, for: .scrollContent)
+            .clipped()
+            .defaultScrollAnchor(.leading, for: .sizeChanges)
             .id(tabReselection)
     }
 }

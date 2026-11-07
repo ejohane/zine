@@ -148,7 +148,108 @@ final class ArticleReaderTests: XCTestCase {
     }
 
     @MainActor
-    private func verifyMergedReaderEntry(resumesReading: Bool, recover: Bool = false, scrollBeforeRecovery: Bool = false) async throws {
+    func testDetachedReaderKeepsBodyScrollableWithoutHostingTheBookmarkHeader() async throws {
+        try await verifyMergedReaderEntry(resumesReading: false, detached: true)
+    }
+
+    @MainActor
+    func testLandscapeOverviewStaysFixedInsideTheArticleScrollView() async throws {
+        try await verifyMergedReaderEntry(resumesReading: false, leadingColumn: true)
+    }
+
+    @MainActor
+    func testExpandedMediaOverviewIsAnchoredAndShortDescriptionsDoNotScroll() {
+        for height: CGFloat in [100, 1800] {
+            let controller = ExpandedBookmarkScrollController(
+                overview: AnyView(Text("Fixed overview")),
+                detail: AnyView(Color.clear.frame(height: height)),
+                columnWidth: 400
+            )
+            let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 840, height: 500))
+            window.rootViewController = controller
+            window.makeKeyAndVisible()
+            controller.view.layoutIfNeeded()
+            let scroll = controller.scrollView
+            let before = controller.overview.view.convert(controller.overview.view.bounds, to: window)
+            if height > 500 {
+                XCTAssertGreaterThan(scroll.contentSize.height, scroll.bounds.height)
+                scroll.setContentOffset(CGPoint(x: 0, y: 150), animated: false)
+                controller.view.layoutIfNeeded()
+                let after = controller.overview.view.convert(controller.overview.view.bounds, to: window)
+                XCTAssertEqual(before.minY, after.minY, accuracy: 0.5)
+                XCTAssertEqual(scroll.contentOffset.y, 150, accuracy: 0.5)
+            } else {
+                XCTAssertEqual(scroll.contentSize.height, scroll.bounds.height, accuracy: 0.5,
+                               "A short description must not gain scroll travel from the overview")
+            }
+            XCTAssertFalse(scroll.bounces)
+            if #available(iOS 26.0, *) {
+                XCTAssertTrue(scroll.topEdgeEffect.isHidden,
+                              "The expanded page must not blur artwork behind a top-edge strip")
+            }
+            XCTAssertTrue(controller.overview.view.isDescendant(of: scroll))
+            window.isHidden = true
+            window.rootViewController = nil
+        }
+    }
+
+    @MainActor
+    func testExpandedOverviewDoesNotMoveWhenNavigationTopInsetCollapses() async throws {
+        let item = HomeItem(
+            id: "inset-test", itemId: "inset-test", title: "A fixed media overview",
+            thumbnailUrl: URL(string: "https://example.invalid/cover.jpg"),
+            canonicalUrl: URL(string: "https://example.invalid/video")!,
+            contentType: .video, provider: .youtube, creator: "Author", creatorImageUrl: nil,
+            creatorId: nil, publisher: nil, summary: String(repeating: "Description text. ", count: 400),
+            duration: 1080, publishedAt: nil, readingTimeMinutes: nil, bookmarkedAt: nil,
+            lastOpenedAt: nil, progress: nil
+        )
+        let client = APIClient(baseURL: URL(string: "https://example.invalid")!, tokenProvider: {
+            throw URLError(.userAuthenticationRequired)
+        })
+        func screen(topInset: CGFloat) -> some View {
+            NavigationStack {
+                BookmarkDetailView(item: item, client: client, onUpdate: { _ in })
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        Color.clear.frame(height: topInset)
+                    }
+            }
+            .frame(width: 1000, height: 600)
+        }
+        let host = UIHostingController(rootView: screen(topInset: 52))
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 1000, height: 700))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil }
+        func findOverview(in controller: UIViewController) -> ExpandedBookmarkScrollController? {
+            if let match = controller as? ExpandedBookmarkScrollController { return match }
+            return controller.children.compactMap { findOverview(in: $0) }.first
+        }
+        var expanded: ExpandedBookmarkScrollController?
+        for _ in 0..<100 {
+            host.view.layoutIfNeeded()
+            expanded = findOverview(in: host)
+            if expanded != nil { break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        let controller = try XCTUnwrap(expanded, "Expected wide detail within \(host.view.bounds)")
+        try await Task.sleep(for: .milliseconds(100))
+        host.view.layoutIfNeeded()
+        let before = controller.overview.view.convert(controller.overview.view.bounds, to: window)
+        host.rootView = screen(topInset: 0)
+        host.view.setNeedsLayout()
+        host.view.layoutIfNeeded()
+        try await Task.sleep(for: .milliseconds(100))
+        host.view.layoutIfNeeded()
+        let after = controller.overview.view.convert(controller.overview.view.bounds, to: window)
+        XCTAssertEqual(before.minY, after.minY, accuracy: 1,
+                       "System navigation inset collapse must not shift the fixed overview")
+        XCTAssertEqual(before.height, after.height, accuracy: 1,
+                       "The overview viewport must not resize as scrolling collapses top chrome")
+    }
+
+    @MainActor
+    private func verifyMergedReaderEntry(resumesReading: Bool, recover: Bool = false, scrollBeforeRecovery: Bool = false, detached: Bool = false, leadingColumn: Bool = false) async throws {
         let response = try JSONDecoder().decode(
             ArticleContentResponse.self, from: Data(Self.availableJSON.replacingOccurrences(of: "Readable body", with: String(repeating: "Readable body with enough article text to scroll. ", count: 400)).utf8)
         )
@@ -160,11 +261,11 @@ final class ArticleReaderTests: XCTestCase {
             onChromeVisibilityChanged: { _ in }, onPositionChanged: { _ in }, onOpenURL: { _ in },
             bookmarkHeader: ArticleBookmarkReaderHeader(
                 content: AnyView(Text("Bookmark header").frame(height: 180)),
-                palette: .fallback, jumpRequest: 0, resumesReading: resumesReading, minimumScrollTravel: 180, onScroll: { _, _ in }
+                palette: .fallback, jumpRequest: 0, resumesReading: resumesReading, minimumScrollTravel: 180, isDetached: detached, leadingColumnWidth: leadingColumn ? 400 : nil, onScroll: { _, _ in }
             )
         )
         let host = UIHostingController(rootView: reader)
-        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: leadingColumn ? 840 : 390, height: leadingColumn ? 500 : 844))
         window.rootViewController = host
         window.makeKeyAndVisible()
         defer { window.isHidden = true; window.rootViewController = nil }
@@ -178,7 +279,8 @@ final class ArticleReaderTests: XCTestCase {
         for _ in 0..<100 {
             host.view.layoutIfNeeded()
             web = webView(in: host.view)
-            if let web, !web.isLoading, web.scrollView.contentInset.top > 0,
+            if let web, !web.isLoading, web.scrollView.contentSize.height > web.bounds.height,
+               (detached || leadingColumn || web.scrollView.contentInset.top > 0),
                (!resumesReading || web.scrollView.contentOffset.y > 0) { break }
             try await Task.sleep(for: .milliseconds(50))
         }
@@ -188,6 +290,35 @@ final class ArticleReaderTests: XCTestCase {
             host.view.layoutIfNeeded()
             XCTAssertEqual(webView.scrollView.indicatorStyle, .white,
                            "Contextual article backgrounds need a light indicator in either appearance")
+        }
+        if leadingColumn {
+            if #available(iOS 26.0, *) {
+                XCTAssertTrue(webView.scrollView.topEdgeEffect.isHidden)
+            }
+            XCTAssertEqual(webView.scrollView.contentInset.top, 0, accuracy: 1)
+            let overview = try XCTUnwrap(host.children.first?.view)
+            XCTAssertEqual(overview.frame.minY, 0, accuracy: 1)
+            XCTAssertEqual(overview.frame.width, 400, accuracy: 1)
+            let bodyLeft = try await webView.evaluateJavaScript("document.querySelector('main').getBoundingClientRect().left")
+            XCTAssertGreaterThan(try XCTUnwrap(bodyLeft as? Double), 400)
+            let before = overview.convert(overview.bounds, to: window).minY
+            webView.scrollView.setContentOffset(CGPoint(x: 0, y: 120), animated: false)
+            let after = overview.convert(overview.bounds, to: window).minY
+            XCTAssertEqual(before, after, accuracy: 1,
+                           "The native overview must stay fixed while the article scrolls")
+            XCTAssertEqual(webView.scrollView.contentOffset.y, 120, accuracy: 1)
+            XCTAssertTrue(overview.isDescendant(of: webView.scrollView),
+                          "Swipes over the overview must reach the article's shared scroll surface")
+            return
+        }
+        if detached {
+            XCTAssertEqual(webView.scrollView.contentInset.top, 0, accuracy: 1)
+            XCTAssertEqual(host.children.count, 0, "The bookmark header belongs to the separate left pane")
+            let body = try await webView.evaluateJavaScript("document.querySelector('main').innerText")
+            XCTAssertTrue((body as? String)?.contains("Readable body") == true)
+            webView.scrollView.setContentOffset(CGPoint(x: 0, y: 500), animated: false)
+            XCTAssertEqual(webView.scrollView.contentOffset.y, 500, accuracy: 1)
+            return
         }
         XCTAssertEqual(webView.scrollView.contentInset.top, 180, accuracy: 1)
         if resumesReading {
@@ -378,6 +509,104 @@ final class ArticleReaderTests: XCTestCase {
         XCTAssertTrue(secondResult)
         XCTAssertEqual(writes, [0.2, 0.8])
         XCTAssertEqual(maximumActiveWrites, 1)
+    }
+
+    @MainActor
+    func testPortraitReaderPropagatesImmersionAndTapRestoresShellChrome() async throws {
+        let response = try JSONDecoder().decode(
+            ArticleContentResponse.self,
+            from: Data(Self.availableJSON.replacingOccurrences(of: "Readable body", with:
+                String(repeating: "A long article passage for immersive reading. ", count: 400)).utf8)
+        )
+        var immersive = false
+        let reader = ArticleReaderView(
+            metadata: Self.metadata(), client: Self.client { _ in (500, "{}") },
+            initialPhase: .ready(ArticleReaderDocument(metadata: Self.metadata(), response: response)),
+            loadsOnAppear: false
+        )
+        .environment(\.articleReaderImmersion, ArticleReaderImmersionAction { _, value in immersive = value })
+        let host = UIHostingController(rootView: reader.environment(\.articleReaderWindowIsPortrait, true))
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil }
+        func findWebView(_ view: UIView) -> WKWebView? {
+            if let web = view as? WKWebView { return web }
+            return view.subviews.lazy.compactMap { findWebView($0) }.first
+        }
+        var web: WKWebView?
+        for _ in 0..<100 {
+            host.view.layoutIfNeeded()
+            web = findWebView(host.view)
+            if let web, !web.isLoading, web.scrollView.contentSize.height > web.bounds.height { break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        let webView = try XCTUnwrap(web)
+        let coordinator = try XCTUnwrap(webView.navigationDelegate as? ArticleHTMLView.Coordinator)
+        // Allow WebKit's asynchronous initial-position restore to finish before
+        // emulating the user entering immersive reading at a stable passage.
+        try await Task.sleep(for: .milliseconds(300))
+        webView.scrollView.setContentOffset(CGPoint(x: 0, y: 300), animated: false)
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertGreaterThan(webView.scrollView.contentOffset.y, 1)
+        _ = coordinator.toggleChrome()
+        for _ in 0..<40 where !immersive { try await Task.sleep(for: .milliseconds(50)) }
+        XCTAssertTrue(immersive, "Portrait immersion must reach the surrounding navigation and tab shell")
+        // A narrow detail pane in a landscape window must not hide the sidebar,
+        // expand into landscape, and oscillate between those layouts.
+        host.rootView = reader.environment(\.articleReaderWindowIsPortrait, false)
+        for _ in 0..<40 where immersive { try await Task.sleep(for: .milliseconds(50)) }
+        XCTAssertFalse(immersive, "The complete window determines portrait immersion")
+        host.rootView = reader.environment(\.articleReaderWindowIsPortrait, true)
+        for _ in 0..<40 where !immersive { try await Task.sleep(for: .milliseconds(50)) }
+        XCTAssertTrue(immersive)
+        _ = coordinator.toggleChrome()
+        for _ in 0..<40 where immersive { try await Task.sleep(for: .milliseconds(50)) }
+        XCTAssertFalse(immersive, "Tapping the article must restore shell navigation")
+    }
+
+    @MainActor
+    func testLibraryTabContainerHidesAndRestoresTheActualBottomBar() async throws {
+        let response = try JSONDecoder().decode(ArticleContentResponse.self, from: Data(Self.availableJSON.utf8))
+        let reader = ArticleReaderView(
+            metadata: Self.metadata(), client: Self.client { _ in (500, "{}") },
+            initialPhase: .ready(ArticleReaderDocument(metadata: Self.metadata(), response: response)),
+            loadsOnAppear: false
+        )
+        var action: ArticleReaderImmersionAction?
+        let host = UIHostingController(rootView: ReaderLibraryTabShellHarness(reader: reader) { action = $0 }
+            .environment(\.articleReaderWindowIsPortrait, true))
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 900, height: 1280)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil }
+        func tabController(_ controller: UIViewController) -> UITabBarController? {
+            if let tab = controller as? UITabBarController { return tab }
+            return controller.children.lazy.compactMap { tabController($0) }.first
+        }
+        func isVisible(_ tabBar: UITabBar) -> Bool {
+            !tabBar.isHidden && tabBar.alpha > 0.01 && tabBar.window != nil &&
+                tabBar.convert(tabBar.bounds, to: window).intersects(window.bounds)
+        }
+        for _ in 0..<100 {
+            host.view.layoutIfNeeded()
+            if tabController(host) != nil, action != nil { break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        let tabBar = try XCTUnwrap(tabController(host)?.tabBar)
+        let send = try XCTUnwrap(action)
+        let readerID = UUID()
+        XCTAssertTrue(isVisible(tabBar), "Library tabs should be visible before immersive reading")
+        // Reader dispatch is tested separately above. This test exercises the
+        // native tab container through the same environment action across split navigation.
+        send.update(readerID, true)
+        for _ in 0..<60 where isVisible(tabBar) { try await Task.sleep(for: .milliseconds(50)) }
+        XCTAssertFalse(isVisible(tabBar), "The real Library tab bar must hide through nested split navigation")
+        send.update(readerID, false)
+        for _ in 0..<60 where !isVisible(tabBar) { try await Task.sleep(for: .milliseconds(50)) }
+        XCTAssertTrue(isVisible(tabBar), "Revealing reader controls restores the Library tabs")
     }
 
     func testChromeStartsVisibleAndStaysVisibleAtTop() {
@@ -974,6 +1203,42 @@ private struct BookmarkEndpointTestView: View {
             }
             .navigationTitle("Episode title")
             .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+}
+
+@MainActor
+private struct ReaderLibraryTabShellHarness: View {
+    let reader: ArticleReaderView
+    var onActionReady: (ArticleReaderImmersionAction) -> Void
+    @State private var immersive = false
+    @State private var columns = NavigationSplitViewVisibility.automatic
+    @State private var compactColumn = NavigationSplitViewColumn.sidebar
+
+    private var immersionAction: ArticleReaderImmersionAction {
+        ArticleReaderImmersionAction { _, value in immersive = value }
+    }
+
+    var body: some View {
+        NavigationStack {
+            TabView {
+                Tab("Library", systemImage: "books.vertical") {
+                    NavigationSplitView(columnVisibility: $columns, preferredCompactColumn: $compactColumn) {
+                        Text("Library")
+                    } detail: {
+                        NavigationStack { reader }
+                    }
+                    .toolbarVisibility(immersive ? .hidden : .visible, for: .tabBar)
+                    .task {
+                        compactColumn = .detail
+                        columns = .detailOnly
+                    }
+                }
+                Tab("Home", systemImage: "house") { Text("Home") }
+            }
+            .toolbarVisibility(immersive ? .hidden : .visible, for: .navigationBar)
+            .environment(\.articleReaderImmersion, immersionAction)
+            .onAppear { onActionReady(immersionAction) }
         }
     }
 }

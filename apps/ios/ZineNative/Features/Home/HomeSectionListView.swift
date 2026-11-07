@@ -12,6 +12,9 @@ struct HomeSectionListView: View {
     let refreshRevision: Int
     let onTitleCollapseProgressChanged: ((CGFloat) -> Void)?
 
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     @State private var store: HomeSectionListStore
     @State private var contentType: ContentType?
     @State private var localTitleCollapseState = ListTitleCollapseState()
@@ -118,19 +121,37 @@ struct HomeSectionListView: View {
 
     private var content: some View {
         ScrollViewReader { proxy in
-            List {
-                ObservedListTitle(title: title, state: titleCollapseState, background: background)
-                .id(ScrollAnchor.top)
+            Group {
+                if usesTwoColumns {
+                    ScrollView {
+                        LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                            ObservedListTitle(title: title, state: titleCollapseState, background: background)
+                                .padding(.horizontal, 18)
+                                .id(ScrollAnchor.top)
 
-                Section {
-                    resultRows
-                } header: {
-                    ContentTypeFilterBar(
-                        selection: filterSelection,
-                        background: background
-                    )
-                        .textCase(nil)
-                        .listRowInsets(EdgeInsets())
+                            Section {
+                                resultRows
+                            } header: {
+                                ContentTypeFilterBar(selection: filterSelection, background: background)
+                            }
+                        }
+                    }
+                } else {
+                    List {
+                        ObservedListTitle(title: title, state: titleCollapseState, background: background)
+                        .id(ScrollAnchor.top)
+
+                        Section {
+                            resultRows
+                        } header: {
+                            ContentTypeFilterBar(
+                                selection: filterSelection,
+                                background: background
+                            )
+                                .textCase(nil)
+                                .listRowInsets(EdgeInsets())
+                        }
+                    }
                 }
             }
             .listStyle(.plain)
@@ -159,6 +180,10 @@ struct HomeSectionListView: View {
             }
             .foregroundStyle(ZineTheme.primaryText)
         }
+    }
+
+    private var usesTwoColumns: Bool {
+        route == .inbox && horizontalSizeClass == .regular && !dynamicTypeSize.isAccessibilitySize
     }
 
     private struct ReloadKey: Equatable {
@@ -229,6 +254,38 @@ struct HomeSectionListView: View {
             .frame(maxWidth: .infinity, minHeight: 320)
             .listRowBackground(background)
             .listRowSeparator(.hidden)
+        } else if usesTwoColumns {
+            LazyVGrid(
+                columns: [GridItem(.flexible(), spacing: 32), GridItem(.flexible())],
+                spacing: 12
+            ) {
+                ForEach(store.items) { bookmark in
+                    NavigationLink(value: bookmark) {
+                        BookmarkRow(bookmark: bookmark)
+                            .padding(.vertical, 6)
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .matchedTransitionSource(id: bookmark.id, in: bookmarkTransition)
+                    .contextMenu {
+                        Button {
+                            bookmarkInboxItem(bookmark)
+                        } label: {
+                            Label("Bookmark", systemImage: "bookmark.fill")
+                        }
+                        Button(role: .destructive) {
+                            archiveInboxItem(bookmark)
+                        } label: {
+                            Label("Archive", systemImage: "archivebox.fill")
+                        }
+                    }
+                    .accessibilityAction(named: "Bookmark") { bookmarkInboxItem(bookmark) }
+                    .accessibilityAction(named: "Archive") { archiveInboxItem(bookmark) }
+                    .task { await store.loadMoreIfNeeded(current: bookmark) }
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 6)
         } else {
             ForEach(store.items) { bookmark in
                 NavigationLink(value: bookmark) {

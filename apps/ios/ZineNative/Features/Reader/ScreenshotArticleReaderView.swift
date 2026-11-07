@@ -7,6 +7,7 @@ struct ScreenshotArticleReaderView: View {
 
     let unavailable: Bool
 
+    @State private var isImmersive = false
     @State private var path: [Destination] = [.reader]
 
     private let metadata = ArticleReaderMetadata(
@@ -27,6 +28,33 @@ struct ScreenshotArticleReaderView: View {
     )
 
     var body: some View {
+        if ProcessInfo.processInfo.arguments.contains("-screenshot-reader-tab-shell") {
+            NavigationStack {
+                TabView {
+                    Tab("Library", systemImage: "books.vertical") {
+                        NavigationSplitView(columnVisibility: .constant(.detailOnly), preferredCompactColumn: .constant(.detail)) {
+                            Text("Library")
+                        } detail: {
+                            readerNavigation
+                        }
+                        .toolbarVisibility(isImmersive ? .hidden : .visible, for: .tabBar)
+                    }
+                    Tab("Home Lab", systemImage: "flask") { Text("Home Lab") }
+                    Tab("Search", systemImage: "magnifyingglass") { Text("Search") }
+                    Tab("Inbox", systemImage: "tray") { Text("Inbox") }
+                    Tab("Home", systemImage: "house") { Text("Home") }
+                }
+                .toolbarVisibility(isImmersive ? .hidden : .visible, for: .navigationBar)
+                .environment(\.articleReaderImmersion, ArticleReaderImmersionAction { _, immersive in
+                    isImmersive = immersive
+                })
+            }
+        } else {
+            readerNavigation
+        }
+    }
+
+    private var readerNavigation: some View {
         NavigationStack(path: $path) {
             Text("Reader fixture root")
                 .accessibilityIdentifier("article-reader-fixture-root")
@@ -56,7 +84,9 @@ struct ScreenshotArticleReaderView: View {
                 <p>The interface can recede when hierarchy, spacing, and typography do their jobs. A calm product does not remove useful controls; it places them where they are needed and nowhere else.</p>
                 <blockquote><p>Clarity is not the absence of detail. It is detail arranged around a purpose.</p></blockquote>
                 <p>That principle applies to the system behind the page too. Reliable state, explicit failure, and a safe path back to the original source make the reading surface trustworthy.</p>
-                """,
+                """ + (ProcessInfo.processInfo.arguments.contains("-screenshot-reader-tab-shell")
+                    ? String(repeating: "<p>The interface can recede when hierarchy, spacing, and typography do their jobs. A calm product does not remove useful controls; it places them where they are needed.</p>", count: 24)
+                    : ""),
                 articleBody: ArticleBodyStatus(
                     availability: .available,
                     pipelineStatus: .available,

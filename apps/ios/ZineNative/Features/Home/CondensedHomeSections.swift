@@ -1,5 +1,16 @@
 import SwiftUI
 
+private struct HomeWideLayoutKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var homeUsesWideLayout: Bool {
+        get { self[HomeWideLayoutKey.self] }
+        set { self[HomeWideLayoutKey.self] = newValue }
+    }
+}
+
 struct CondensedHomeDashboardSectionView: View {
     let section: HomeDashboardSection
     let transitionNamespace: Namespace.ID
@@ -85,15 +96,11 @@ private struct CondensedJumpBackInSection: View {
     var client: APIClient? = nil
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.homeUsesWideLayout) private var usesWideLayout
 
     private var columns: [GridItem] {
-        if dynamicTypeSize.isAccessibilitySize {
-            return [GridItem(.flexible())]
-        }
-        return [
-            GridItem(.flexible(), spacing: 8),
-            GridItem(.flexible(), spacing: 8),
-        ]
+        Array(repeating: GridItem(.flexible(), spacing: 8),
+              count: dynamicTypeSize.isAccessibilitySize ? 1 : 2)
     }
 
     var body: some View {
@@ -101,40 +108,58 @@ private struct CondensedJumpBackInSection: View {
             HomeCompactSectionHeader(title: "Jump Back In", route: .jumpBackIn)
                 .padding(.horizontal, 16)
 
-            if let latest = items.first {
-                if latest.contentType == .article {
-                    HomeFeaturedArticleSection(
-                        item: latest,
-                        sectionID: "\(sectionID)-featured",
-                        horizontalPadding: 16,
-                        transitionNamespace: transitionNamespace,
-                        compactHeight: HomeResumeCard.height,
-                        eyebrow: "LAST OPENED",
-                        showsSavedLabel: false,
-                        articleContentClient: client
-                    )
-                } else {
-                    HomeNavigationLink(
-                        route: .item(latest, sectionID: "\(sectionID)-featured"),
-                        transitionNamespace: transitionNamespace
-                    ) {
-                        HomeResumeCard(item: latest)
-                    }
+            if usesWideLayout && !dynamicTypeSize.isAccessibilitySize && items.count > 1 {
+                HStack(alignment: .top, spacing: 24) {
+                    featuredItem
+                        .frame(maxWidth: .infinity)
+                    itemGrid
+                        .frame(maxWidth: .infinity)
+                }
+                .padding(.horizontal, 16)
+            } else {
+                featuredItem
                     .padding(.horizontal, 16)
-                }
+                itemGrid
+                    .padding(.horizontal, 16)
             }
+        }
+    }
 
-            LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
-                ForEach(items.dropFirst().prefix(6)) { item in
-                    HomeNavigationLink(
-                        route: .item(item, sectionID: sectionID),
-                        transitionNamespace: transitionNamespace
-                    ) {
-                        HomeCompactItemTile(item: item)
-                    }
+    @ViewBuilder
+    private var featuredItem: some View {
+        if let latest = items.first {
+            if latest.contentType == .article {
+                HomeFeaturedArticleSection(
+                    item: latest,
+                    sectionID: "\(sectionID)-featured",
+                    horizontalPadding: 0,
+                    transitionNamespace: transitionNamespace,
+                    compactHeight: HomeResumeCard.height,
+                    eyebrow: "LAST OPENED",
+                    showsSavedLabel: false,
+                    articleContentClient: client
+                )
+            } else {
+                HomeNavigationLink(
+                    route: .item(latest, sectionID: "\(sectionID)-featured"),
+                    transitionNamespace: transitionNamespace
+                ) {
+                    HomeResumeCard(item: latest)
                 }
             }
-            .padding(.horizontal, 16)
+        }
+    }
+
+    private var itemGrid: some View {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+            ForEach(items.dropFirst().prefix(6)) { item in
+                HomeNavigationLink(
+                    route: .item(item, sectionID: sectionID),
+                    transitionNamespace: transitionNamespace
+                ) {
+                    HomeCompactItemTile(item: item)
+                }
+            }
         }
     }
 }

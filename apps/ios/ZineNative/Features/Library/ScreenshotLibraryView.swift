@@ -150,6 +150,8 @@ private enum ScreenshotFixtures {
             creatorImageUrl: URL(string: "https://i.scdn.co/image/ab6765630000ba8a116b917b6fbd4a810de9a368"),
             canonicalUrl: URL(string: "https://open.spotify.com/episode/5GfE3SOjEXEQZNUpFG4T61"),
             summary: "A conversation about building software with taste, making room for careful thought, and using AI without losing your own point of view."
+                + (ProcessInfo.processInfo.arguments.contains("-screenshot-bookmark-detail-long")
+                    ? String(repeating: "\n\nA conversation about building software with taste, making room for careful thought, and using AI without losing your own point of view.", count: 12) : "")
         ),
         make(
             id: "2",

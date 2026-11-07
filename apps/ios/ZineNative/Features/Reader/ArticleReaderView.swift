@@ -12,7 +12,36 @@ struct ArticleReaderBookmarkControl {
     let toggle: () -> Void
 }
 
+/// Navigation containers can stop SwiftUI preferences at their content boundary.
+/// Send immersion directly to the owning shell instead of relying on preference propagation.
+struct ArticleReaderImmersionAction {
+    var update: (UUID, Bool) -> Void = { _, _ in }
+}
+
+private struct ArticleReaderImmersionActionKey: EnvironmentKey {
+    static var defaultValue: ArticleReaderImmersionAction { ArticleReaderImmersionAction() }
+}
+
+private struct ArticleReaderWindowOrientationKey: EnvironmentKey {
+    static var defaultValue: Bool? { nil }
+}
+
+extension EnvironmentValues {
+    var articleReaderImmersion: ArticleReaderImmersionAction {
+        get { self[ArticleReaderImmersionActionKey.self] }
+        set { self[ArticleReaderImmersionActionKey.self] = newValue }
+    }
+
+    var articleReaderWindowIsPortrait: Bool? {
+        get { self[ArticleReaderWindowOrientationKey.self] }
+        set { self[ArticleReaderWindowOrientationKey.self] = newValue }
+    }
+}
+
 struct ArticleReaderView: View {
+    @Environment(\.articleReaderImmersion) private var immersion
+    @State private var immersionID = UUID()
+    @Environment(\.articleReaderWindowIsPortrait) private var windowIsPortrait
     @Environment(\.nativeCommandSession) private var commandSession
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
@@ -92,17 +121,45 @@ struct ArticleReaderView: View {
 
     var body: some View {
         GeometryReader { geometry in
+            let isPortrait = windowIsPortrait ?? (geometry.size.height >= geometry.size.width)
             ZStack(alignment: .top) {
                 readerBackground
                     .ignoresSafeArea()
 
-                phaseContent(topInset: geometry.safeAreaInsets.top)
+                let region = isPortrait
+                    ? CGRect(origin: .zero, size: geometry.size)
+                    : geometry.zineReadingRegion
+                if bookmarkHeader?.usesFullWidth == true {
+                    phaseContent(topInset: 0)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    phaseContent(topInset: geometry.safeAreaInsets.top)
+                        .frame(width: region.width, height: region.height)
+                        .position(x: region.midX, y: region.midY)
+                }
+                if !isPortrait, bookmarkHeader?.usesFullWidth != true,
+                   let companion = AdaptiveContentLayout.companionRegion(
+                    size: geometry.size, division: geometry.zineDivision
+                ), companion.width >= 220, companion.height >= 140 {
+                    readerReferences
+                        .frame(width: companion.width, height: companion.height)
+                        .position(x: companion.midX, y: companion.midY)
+                }
             }
-            .overlay(alignment: .bottom) {
+            .onChange(of: isPortrait && !showsNavigation, initial: true) { _, immersive in
+                immersion.update(immersionID, immersive)
+            }
+            .onDisappear { immersion.update(immersionID, false) }
+            .overlay(alignment: .bottomLeading) {
                 if store.readyDocument != nil {
-                    readerActionBar
+                    let region = isPortrait
+                        ? CGRect(origin: .zero, size: geometry.size)
+                        : geometry.zineReadingRegion
+                    readerActionBar(vertical: region.width < 280)
                         .padding(.horizontal, 12)
                         .padding(.bottom, 8)
+                        .frame(width: region.width)
+                        .offset(x: region.minX)
                         .opacity(showsChrome ? 1 : 0)
                         .offset(y: showsChrome || reduceMotion ? 0 : 12)
                         .allowsHitTesting(showsChrome)
@@ -115,7 +172,7 @@ struct ArticleReaderView: View {
         .sensoryFeedback(.impact(weight: .heavy, intensity: 1), trigger: completionHapticTrigger)
         .accessibilityAction(.escape) { dismiss() }
         .statusBarHidden(!showsChrome && (bookmarkHeader == nil || !bookmarkHeaderVisible))
-        .toolbarVisibility(showsNavigation ? .visible : .hidden, for: .navigationBar)
+        .toolbarVisibility(bookmarkHeader?.usesFullWidth == true || showsNavigation ? .visible : .hidden, for: .navigationBar)
         .onChange(of: showsNavigation, initial: true) { _, visible in
             onNavigationVisibilityChanged(visible)
         }
@@ -299,7 +356,7 @@ struct ArticleReaderView: View {
                 }
             }
         )
-        .ignoresSafeArea(.container, edges: .vertical)
+        .ignoresSafeArea(.container, edges: bookmarkHeader?.usesFullWidth == true ? [] : .vertical)
         .accessibilityIdentifier("article-reader-content")
     }
 
@@ -324,22 +381,57 @@ struct ArticleReaderView: View {
         }
     }
 
+    private var readerReferences: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text(store.metadata.title)
+                    .font(.title2.bold())
+                Text(store.metadata.creator)
+                    .font(.subheadline)
+                    .foregroundStyle(bookmarkHeader?.palette.secondaryText ?? ZineTheme.secondaryText)
+                if let articleLinks, !articleLinks.isEmpty {
+                    Text("Article links")
+                        .font(.headline)
+                    ForEach(Array(articleLinks.enumerated()), id: \.offset) { _, link in
+                        Button {
+                            openURL(link.url)
+                        } label: {
+                            Label(link.title, systemImage: "arrow.up.right")
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                .multilineTextAlignment(.leading)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } else {
+                    Button("Open Original", systemImage: "arrow.up.forward.app") { openOriginal() }
+                        .frame(minHeight: 44)
+                }
+            }
+            .padding(24)
+            .padding(.bottom, 72)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .foregroundStyle(readerForeground)
+        .accessibilityIdentifier("article-reader-references")
+    }
+
     @ViewBuilder
-    private var readerActionBar: some View {
+    private func readerActionBar(vertical: Bool) -> some View {
         if #available(iOS 26.0, *) {
-            readerActionBarContent
+            readerActionBarContent(vertical: vertical)
                 .glassEffect(.regular.interactive(), in: Capsule())
                 // Creator palettes use light controls over a dark reading surface.
                 .environment(\.colorScheme, bookmarkHeader != nil ? .dark : colorScheme)
         } else {
-            readerActionBarContent
+            readerActionBarContent(vertical: vertical)
                 .background(readerControlBackground, in: Capsule())
                 .overlay { Capsule().stroke(readerDivider, lineWidth: 1) }
         }
     }
 
-    private var readerActionBarContent: some View {
-        HStack(spacing: 0) {
+    private func readerActionBarContent(vertical: Bool) -> some View {
+        let layout = vertical ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
+        return layout {
             if let bookmarkControl {
                 Button {
                     bookmarkControl.toggle()
@@ -455,6 +547,8 @@ struct ArticleReaderView: View {
             coverImageURL: bookmarkHeader.coverImageURL,
             resumesReading: bookmarkHeader.resumesReading,
             minimumScrollTravel: bookmarkHeader.minimumScrollTravel,
+            isDetached: bookmarkHeader.isDetached,
+            leadingColumnWidth: bookmarkHeader.leadingColumnWidth,
             onScroll: { offset, height in
                 bookmarkHeader.onScroll(offset, height)
                 commandSession?.route = offset < 0 ? "bookmark" : "reader"

@@ -657,15 +657,19 @@ struct HomeResumeCard: View {
     let item: HomeItem
 
     var body: some View {
-        CachedRemoteImage(
-            url: item.thumbnailUrl,
-            targetSize: CGSize(width: 390, height: Self.height)
-        ) {
-            HomeImagePlaceholder(contentType: item.contentType, iconSize: 42)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: Self.height)
-        .clipped()
+        // Artwork fills the card without contributing its aspect ratio as a
+        // minimum width. The closed Duo can offer less than the image's width.
+        ZineTheme.raised
+            .frame(height: Self.height)
+            .overlay {
+                CachedRemoteImage(
+                    url: item.thumbnailUrl,
+                    targetSize: CGSize(width: 390, height: Self.height)
+                ) {
+                    HomeImagePlaceholder(contentType: item.contentType, iconSize: 42)
+                }
+            }
+            .clipped()
         .overlay {
             LinearGradient(
                 colors: [.clear, .black.opacity(0.78)],

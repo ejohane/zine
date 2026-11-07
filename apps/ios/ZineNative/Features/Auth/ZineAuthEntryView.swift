@@ -40,25 +40,40 @@ struct ZineAuthEntryView: View {
             GeometryReader { geometry in
                 let isCompact = geometry.size.height < 720
 
-                VStack(spacing: 0) {
-                    if isSignUp {
-                        signUpHeading(compact: isCompact)
-                    } else {
-                        signInHeading(compact: isCompact)
+                ScrollViewReader { scroll in
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            if isSignUp {
+                                signUpHeading(compact: isCompact)
+                            } else {
+                                signInHeading(compact: isCompact)
+                            }
+
+                            authenticationChoices
+
+                            Spacer(minLength: 24)
+
+                            accountSwitch
+                        }
+                        .padding(.horizontal, 25)
+                        .padding(.top, isSignUp || isCompact ? 10 : 68)
+                        .padding(.bottom, isCompact ? 16 : 32)
+                        .frame(maxWidth: 440)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: geometry.size.height, alignment: .top)
                     }
-
-                    authenticationChoices
-
-                    Spacer(minLength: 0)
-
-                    accountSwitch
+                    .scrollDismissesKeyboard(.interactively)
+                    .onChange(of: emailIsFocused) { _, focused in
+                        if focused {
+                            withAnimation { scroll.scrollTo("email-continue", anchor: .bottom) }
+                        }
+                    }
+                    .onChange(of: geometry.size.height) { _, _ in
+                        if emailIsFocused {
+                            withAnimation { scroll.scrollTo("email-continue", anchor: .bottom) }
+                        }
+                    }
                 }
-                .padding(.horizontal, 25)
-                .padding(.top, isSignUp || isCompact ? 10 : 68)
-                .padding(.bottom, isCompact ? 16 : 32)
-                .frame(maxWidth: 440)
-                .frame(maxWidth: .infinity)
-                .frame(height: geometry.size.height, alignment: .top)
                 .background(ZineTheme.canvas.ignoresSafeArea())
             }
             .toolbar(isSignUp ? .visible : .hidden, for: .navigationBar)
@@ -227,6 +242,7 @@ struct ZineAuthEntryView: View {
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .padding(.top, 4)
             .disabled(clerk.environment == nil)
+            .id("email-continue")
 
             if isAuthenticating {
                 ProgressView()

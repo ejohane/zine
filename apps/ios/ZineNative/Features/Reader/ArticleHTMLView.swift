@@ -38,6 +38,10 @@ struct ArticleBookmarkReaderHeader {
     var coverImageURL: URL? = nil
     var resumesReading = false
     var minimumScrollTravel: CGFloat = 0
+    var isDetached = false
+    var leadingColumnWidth: CGFloat? = nil
+
+    var usesFullWidth: Bool { isDetached || leadingColumnWidth != nil }
     let onScroll: (CGFloat, CGFloat) -> Void
 }
 
@@ -45,13 +49,39 @@ private final class ArticleReaderWebView: WKWebView {
     var headerController: UIHostingController<AnyView>?
     var onHeaderLayout: ((CGFloat) -> Void)?
     var minimumHeaderScrollTravel: CGFloat = 0
+    var leadingColumnWidth: CGFloat?
     private var headerHeight: CGFloat = 0
+    private var leadingSize = CGSize.zero
+
+    func refreshHeaderLayout() {
+        leadingSize = .zero
+        setNeedsLayout()
+    }
+
+    func pinLeadingOverview() {
+        guard leadingColumnWidth != nil, let overview = headerController?.view else { return }
+        // Keep the overview inside the same pan-gesture surface as the article,
+        // but counteract its scroll offset so only the right column moves.
+        overview.frame.origin.y = scrollView.contentOffset.y
+    }
 
     override func layoutSubviews() {
         super.layoutSubviews()
         guard let host = headerController, bounds.width > 0 else { return }
-        let height = ceil(host.sizeThatFits(in: CGSize(width: bounds.width, height: .greatestFiniteMagnitude)).height)
+        let width = leadingColumnWidth ?? bounds.width
+        let height = ceil(host.sizeThatFits(in: CGSize(width: width, height: .greatestFiniteMagnitude)).height)
         guard height.isFinite, height > 0 else { return }
+        if let leadingColumnWidth {
+            host.view.frame = CGRect(x: 0, y: scrollView.contentOffset.y, width: leadingColumnWidth, height: height)
+            scrollView.contentInset.top = 0
+            scrollView.contentInset.bottom = 0
+            let size = CGSize(width: leadingColumnWidth, height: height)
+            if leadingSize != size {
+                leadingSize = size
+                onHeaderLayout?(height)
+            }
+            return
+        }
         host.view.frame = CGRect(x: 0, y: -height, width: bounds.width, height: height)
         if abs(height - headerHeight) > 0.5 {
             let wasAtHeader = scrollView.contentOffset.y <= -headerHeight + 1
@@ -145,7 +175,8 @@ enum ArticleHTMLDocumentBuilder {
         fontFamily: ArticleReaderFontFamily = .system,
         topContentInset: CGFloat = 0,
         bookmarkPalette: ZineTheme.ArtworkPalette? = nil,
-        coverImageURL: URL? = nil
+        coverImageURL: URL? = nil,
+        leadingColumnWidth: CGFloat? = nil
     ) -> String {
         let metadata = document.metadata
         let readingTime = metadata.readingTimeMinutes.map { "\($0) min read" }
@@ -315,6 +346,7 @@ enum ArticleHTMLDocumentBuilder {
               body { padding-left: 20px; padding-right: 20px; }
             }
             \(contextualStyle)
+            \(leadingColumnWidth.map { "body { max-width: none; margin: 0; padding-top: 12px; padding-left: calc(var(--reader-leading-width, \($0)px) + 32px); min-height: var(--reader-leading-height, 100vh); }" } ?? "")
           </style>
         </head>
         <body>
@@ -471,14 +503,27 @@ struct ArticleHTMLView: UIViewRepresentable {
             // Contextual article surfaces remain dark in both app appearances.
             // The default indicator follows appearance instead of that surface.
             view.scrollView.indicatorStyle = parent.bookmarkHeader == nil ? .default : .white
+            if #available(iOS 26.0, *) {
+                view.scrollView.topEdgeEffect.isHidden = parent.bookmarkHeader?.leadingColumnWidth != nil
+            }
             guard let view = view as? ArticleReaderWebView, let header = parent.bookmarkHeader else { return }
+            view.backgroundColor = header.palette.backgroundUIColor
+            view.scrollView.backgroundColor = header.palette.backgroundUIColor
+            if header.isDetached {
+                view.removeHeader()
+                return
+            }
+            view.leadingColumnWidth = header.leadingColumnWidth
             view.minimumHeaderScrollTravel = header.minimumScrollTravel
             view.installHeader(header.content)
             view.backgroundColor = header.palette.backgroundUIColor
             view.scrollView.backgroundColor = header.palette.backgroundUIColor
             view.onHeaderLayout = { [weak self, weak view] height in
                 guard let self, let view else { return }
-                headerHeight = height
+                headerHeight = header.leadingColumnWidth == nil ? height : 0
+                if let width = header.leadingColumnWidth {
+                    run("document.documentElement.style.setProperty('--reader-leading-width', '\(width)px'); document.documentElement.style.setProperty('--reader-leading-height', '\(height)px');", in: view)
+                }
                 DispatchQueue.main.async { [weak self, weak view] in
                     guard let self, let view else { return }
                     parent.bookmarkHeader?.onScroll(view.scrollView.contentOffset.y, height)
@@ -491,7 +536,7 @@ struct ArticleHTMLView: UIViewRepresentable {
             ready = false
             loadedHash = document.contentHash
             webView.loadHTMLString(
-                ArticleHTMLDocumentBuilder.makeHTML(for: document, fontScale: parent.fontScale, fontFamily: parent.fontFamily, topContentInset: parent.topContentInset, bookmarkPalette: parent.bookmarkHeader?.palette, coverImageURL: parent.bookmarkHeader?.coverImageURL),
+                ArticleHTMLDocumentBuilder.makeHTML(for: document, fontScale: parent.fontScale, fontFamily: parent.fontFamily, topContentInset: parent.topContentInset, bookmarkPalette: parent.bookmarkHeader?.palette, coverImageURL: parent.bookmarkHeader?.coverImageURL, leadingColumnWidth: parent.bookmarkHeader?.leadingColumnWidth),
                 baseURL: document.metadata.canonicalURL
             )
         }
@@ -508,10 +553,11 @@ struct ArticleHTMLView: UIViewRepresentable {
             let appearanceChanged = parent.fontScale != next.fontScale || parent.fontFamily != next.fontFamily
             let layoutChanged = parent.topContentInset != next.topContentInset
             let coverChanged = parent.bookmarkHeader?.coverImageURL != next.bookmarkHeader?.coverImageURL
+            let columnsChanged = (parent.bookmarkHeader?.leadingColumnWidth != nil) != (next.bookmarkHeader?.leadingColumnWidth != nil)
             let paletteChanged = parent.bookmarkHeader?.palette != next.bookmarkHeader?.palette
             parent = next
             configureHeader(in: webView)
-            if loadedHash != next.document.contentHash || coverChanged { load(next.document, in: webView); return }
+            if loadedHash != next.document.contentHash || coverChanged || columnsChanged { load(next.document, in: webView); return }
             guard ready else { return }
             if let header = parent.bookmarkHeader {
                 if paletteChanged {
@@ -535,6 +581,7 @@ struct ArticleHTMLView: UIViewRepresentable {
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation?) {
             ready = true
+            (webView as? ArticleReaderWebView)?.refreshHeaderLayout()
             let hash = loadedHash
             webView.evaluateJavaScript("window.zineReader.links()", in: nil, in: ArticleReaderScript.world) { [weak self] result in
                 guard let self, loadedHash == hash else { return }
@@ -558,8 +605,10 @@ struct ArticleHTMLView: UIViewRepresentable {
             }
             let recoveredOffset = recoveryOffset
             recoveryOffset = nil
-            if let recoveredOffset, parent.bookmarkHeader != nil, recoveredOffset.y < 0 {
+            if let recoveredOffset, parent.bookmarkHeader != nil, parent.bookmarkHeader?.usesFullWidth != true, recoveredOffset.y < 0 {
                 webView.scrollView.setContentOffset(recoveredOffset, animated: false)
+            } else if parent.bookmarkHeader?.usesFullWidth == true && parent.bookmarkHeader?.resumesReading != true && recoveredOffset == nil {
+                run("window.zineReader.restore({nodeIndex:-1, fraction:0});", in: webView)
             } else if parent.bookmarkHeader == nil || parent.bookmarkHeader?.resumesReading == true || recoveredOffset != nil {
                 run("window.zineReader.restore(\(json));", in: webView)
                 if parent.bookmarkHeader == nil { applyAppearance(in: webView) }
@@ -633,6 +682,7 @@ struct ArticleHTMLView: UIViewRepresentable {
         }
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            (webView as? ArticleReaderWebView)?.pinLeadingOverview()
             if let header = parent.bookmarkHeader {
                 let y = scrollView.contentOffset.y
                 DispatchQueue.main.async { header.onScroll(y, self.headerHeight) }

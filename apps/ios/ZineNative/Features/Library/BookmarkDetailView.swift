@@ -129,6 +129,7 @@ enum BookmarkArtworkLayout {
 
 struct BookmarkDetailView: View {
     @Environment(\.nativeCommandSession) private var commandSession
+    @State private var isExpandedDetail = false
     @State private var showsReader = false
     @State private var showsArticleCreator = false
     @State private var articleJumpRequest = 0
@@ -334,6 +335,7 @@ struct BookmarkDetailView: View {
 
     var body: some View {
         GeometryReader { viewport in
+            let readingViewport = viewport.zineReadingRegion.size
             let heroHeight = usesContextualDetail
                 ? (showsContextualArtwork ? mediaHeroHeight(in: viewport.size) : 116)
                 : heroHeight(in: viewport.size)
@@ -342,9 +344,12 @@ struct BookmarkDetailView: View {
                 (activeArtworkPalette?.background ?? ZineTheme.canvas)
                     .ignoresSafeArea()
 
-                if usesArticleDetail {
+                if usesContextualDetail && viewport.size.width >= 650 && viewport.size.width > viewport.size.height {
+                    expandedDetail(viewport: viewport.size)
+                        .modifier(BookmarkDetailTopEdgeEffect())
+                } else if usesArticleDetail {
                     readerView(bookmarkHeader: ArticleBookmarkReaderHeader(
-                        content: AnyView(articleBookmarkHeader(viewport: viewport.size)),
+                        content: AnyView(articleBookmarkHeader(viewport: readingViewport)),
                         palette: activeArtworkPalette ?? .fallback,
                         jumpRequest: articleJumpRequest,
                         coverImageURL: showsContextualArtwork ? content.thumbnailUrl : nil,
@@ -359,21 +364,12 @@ struct BookmarkDetailView: View {
                 } else {
                     BookmarkDetailCollapsingScrollView(headerBottom: headerBottom) {
                         VStack(spacing: 0) {
-                            if showsContextualArtwork {
-                                mediaHero(height: heroHeight, viewport: viewport.size)
-                            } else if usesContextualDetail {
-                                Color.clear.frame(height: heroHeight)
+                            if usesContextualDetail {
+                                contextualHeader(viewport: readingViewport)
                             } else {
                                 parallaxHero(height: heroHeight)
+                                details
                             }
-                            Group {
-                                if usesContextualDetail {
-                                    contextualDetails
-                                } else {
-                                    details
-                                }
-                            }
-                                .background(activeArtworkPalette?.background ?? ZineTheme.canvas)
                         }
                         .background(BookmarkDetailPopGestureBridge())
                     }
@@ -381,23 +377,40 @@ struct BookmarkDetailView: View {
                 }
 
             }
+            .onGeometryChange(for: Bool.self) { geometry in
+                usesContextualDetail && geometry.size.width >= 650 && geometry.size.width > geometry.size.height
+            } action: { isExpandedDetail = $0 }
             .onGeometryChange(for: CGFloat.self) { geometry in
                 geometry.frame(in: .global).minY
             } action: { headerBottom = $0 }
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: artworkPalette)
         }
+        // Duo's navigation chrome changes its top safe area as text scrolls.
+        // The expanded page must use a stable window viewport, otherwise even
+        // a viewport-pinned overview shifts with the entire hosting view.
+        .ignoresSafeArea(.container, edges: isExpandedDetail ? .top : [])
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarVisibility(usesArticleDetail && !articleNavigationVisible ? .hidden : .visible, for: .navigationBar)
+        .toolbarVisibility(!isExpandedDetail && usesArticleDetail && !articleNavigationVisible ? .hidden : .visible, for: .navigationBar)
         .toolbar {
+            if isExpandedDetail {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    ShareLink(item: content.canonicalUrl) {
+                        Image(systemName: "square.and.arrow.up")
+                            .frame(minWidth: 44, minHeight: 44)
+                    }
+                    .accessibilityLabel("Share")
+                    moreMenu
+                }
+            }
             ToolbarItem(placement: .principal) {
                 Text(content.title)
                     .font(.headline)
                     .foregroundStyle(detailPrimaryText)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                    .opacity(headerTitleProgress)
-                    .accessibilityHidden(headerTitleProgress < 0.5)
+                    .opacity(isExpandedDetail ? 0 : headerTitleProgress)
+                    .accessibilityHidden(isExpandedDetail || headerTitleProgress < 0.5)
             }
         }
         .tint(detailPrimaryText)
@@ -405,7 +418,6 @@ struct BookmarkDetailView: View {
         // Resolve the palette from app appearance, but keep native chrome legible.
         .toolbarColorScheme(usesContextualDetail ? .dark : nil, for: .navigationBar)
         .zinePushedDestinationChrome()
-        .zineNavigationBarContentBackdrop(activeArtworkPalette?.background ?? ZineTheme.canvas)
         .navigationDestination(isPresented: $showsReader) { readerDestination }
         .navigationDestination(isPresented: $showsArticleCreator) { creatorDestination }
         .onAppear {
@@ -482,28 +494,180 @@ struct BookmarkDetailView: View {
         }
     }
 
-    private func articleBookmarkHeader(viewport: CGSize) -> some View {
-        VStack(spacing: 0) {
-            if showsContextualArtwork {
-                mediaHero(height: mediaHeroHeight(in: viewport), viewport: viewport)
-            } else {
-                Color.clear.frame(height: 116)
-            }
-            contextualDetails
+    @ViewBuilder
+    private func expandedDetail(viewport: CGSize) -> some View {
+        let columnViewport = CGSize(width: (viewport.width - 32) / 2, height: viewport.height)
+        if usesArticleDetail {
+            readerView(bookmarkHeader: ArticleBookmarkReaderHeader(
+                content: AnyView(expandedOverview(viewport: columnViewport)
+                    .frame(minHeight: columnViewport.height, alignment: .top)
+                    .fixedSize(horizontal: false, vertical: true)),
+                palette: activeArtworkPalette ?? .fallback,
+                jumpRequest: articleJumpRequest,
+                coverImageURL: showsContextualArtwork ? content.thumbnailUrl : nil,
+                resumesReading: resumesArticleReading,
+                leadingColumnWidth: columnViewport.width,
+                onScroll: { _, _ in }
+            ))
+        } else {
+            ExpandedBookmarkScrollView(
+                overview: AnyView(expandedOverview(viewport: columnViewport)),
+                detail: AnyView(expandedDescription),
+                columnWidth: columnViewport.width
+            )
         }
+    }
+
+    private var expandedDescription: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            if let summary = content.summary, !summary.isEmpty {
+                Text(BookmarkDescription.attributedText(
+                    summary,
+                    youtubeURL: content.provider == .youtube ? content.canonicalUrl : nil,
+                    duration: content.duration,
+                    linkColor: detailPrimaryText
+                ))
+                .font(.body)
+                .lineSpacing(6)
+                .foregroundStyle(detailPrimaryText)
+                .tint(detailPrimaryText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if !content.tags.isEmpty {
+                ViewThatFits(in: .horizontal) {
+                    HStack { ForEach(content.tags) { tag in Text(tag.name) } }
+                    VStack(alignment: .leading) { ForEach(content.tags) { tag in Text(tag.name) } }
+                }
+                .font(.caption)
+                .foregroundStyle(detailSecondaryText)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, 32)
+        .padding(.top, 32)
+        .padding(.bottom, 48)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// A cover, its identity, and a single primary action form one quiet group.
+    /// The shared page and native trailing toolbar own everything else.
+    private func expandedOverview(viewport: CGSize) -> some View {
+        VStack(spacing: 0) {
+            Color.clear.frame(height: 32)
+
+            if showsContextualArtwork {
+                let ratio: CGFloat = content.provider == .spotify ? 1 : 9 / 16
+                let width = min(viewport.width - 64, 460, viewport.height * 0.52 / ratio)
+                heroImage
+                    .frame(width: width, height: width * ratio)
+                    .clipShape(.rect(cornerRadius: 12))
+                    .shadow(color: .black.opacity(0.18), radius: 16, x: 0, y: 8)
+                    .padding(.bottom, 20)
+            }
+
+            Text(content.title)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(detailPrimaryText)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+
+            creatorRow
+                .padding(.top, 6)
+
+            HStack(spacing: 6) {
+                Text(content.provider.title)
+                if let label = content.consumptionLabel {
+                    Text("·")
+                    Text(label)
+                }
+            }
+            .font(.subheadline)
+            .foregroundStyle(detailSecondaryText)
+            .padding(.top, 4)
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 16) {
+                    if bookmark != nil { bookmarkButton }
+                    expandedPrimaryAction.frame(width: min(220, viewport.width * 0.48))
+                    if isBookmarked { completionButton }
+                }
+                VStack(spacing: 16) {
+                    expandedPrimaryAction
+                    HStack(spacing: 16) {
+                        if bookmark != nil { bookmarkButton }
+                        if isBookmarked { completionButton }
+                    }
+                }
+            }
+            .padding(.top, 20)
+
+            Spacer(minLength: 16)
+        }
+        .padding(.horizontal, 32)
+        .frame(maxWidth: .infinity)
+        .accessibilityIdentifier("bookmark-expanded-overview")
+    }
+
+    @ViewBuilder
+    private var expandedPrimaryAction: some View {
+        if usesArticleDetail {
+            Button {
+                ActionRowHaptics.play(style: .heavy)
+                articleJumpRequest += 1
+            } label: {
+                Label(continueReadingPercent == nil ? "Read" : "Continue reading", systemImage: "book.pages")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .foregroundStyle(ZineTheme.onAccent)
+                    .background(activeArtworkPalette?.actionBackground ?? ZineTheme.surface, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Read the article in the right pane")
+        } else {
+            contextualOpenButton
+        }
+    }
+
+    private func articleBookmarkHeader(viewport: CGSize) -> some View {
+        contextualHeader(viewport: viewport)
         .coordinateSpace(name: "articleBookmarkHeader")
         .background(activeArtworkPalette?.background ?? ZineTheme.canvas)
     }
 
-    private var contextualDetails: some View {
+    @ViewBuilder
+    private func contextualHeader(viewport: CGSize, separatesBody: Bool = false) -> some View {
+        if viewport.width >= 650, viewport.width > viewport.height, showsContextualArtwork {
+            let artworkViewport = CGSize(width: viewport.width * 0.46, height: viewport.height)
+            HStack(alignment: .top, spacing: 0) {
+                mediaHero(height: mediaHeroHeight(in: artworkViewport, topInset: 24),
+                          viewport: artworkViewport, topInset: 24)
+                    .frame(width: artworkViewport.width)
+                contextualDetails(separatesBody: separatesBody)
+            }
+            .padding(.top, 24)
+        } else {
+            VStack(spacing: 0) {
+                if showsContextualArtwork {
+                    let topInset: CGFloat = separatesBody ? 24 : 64
+                    mediaHero(height: mediaHeroHeight(in: viewport, topInset: topInset), viewport: viewport,
+                              topInset: topInset, allowsParallax: !separatesBody)
+                } else {
+                    Color.clear.frame(height: 64)
+                }
+                contextualDetails(separatesBody: separatesBody)
+            }
+        }
+    }
+
+    private func contextualDetails(separatesBody: Bool = false) -> some View {
         VStack(spacing: 0) {
             Text(content.title)
                 .font(.title2.bold())
                 .multilineTextAlignment(.center)
                 .foregroundStyle(detailPrimaryText)
                 .frame(maxWidth: .infinity)
-                .opacity(1 - headerTitleProgress)
-                .accessibilityHidden(headerTitleProgress >= 0.5)
+                .opacity(separatesBody ? 1 : 1 - headerTitleProgress)
+                .accessibilityHidden(!separatesBody && headerTitleProgress >= 0.5)
                 .onGeometryChange(for: CGFloat.self) { geometry in
                     usesArticleDetail ? geometry.frame(in: .named("articleBookmarkHeader")).maxY : geometry.frame(in: .global).maxY
                 } action: { titleBottom = $0 }
@@ -573,11 +737,13 @@ struct BookmarkDetailView: View {
                     .padding(.top, 12)
                 }
 
-                Rectangle()
-                    .fill(activeArtworkPalette?.divider ?? ZineTheme.border)
-                    .frame(height: 1)
-                    .padding(.top, continueReadingPercent == nil ? 22 : 6)
-            } else if let summary = content.summary, !summary.isEmpty {
+                if !separatesBody {
+                    Rectangle()
+                        .fill(activeArtworkPalette?.divider ?? ZineTheme.border)
+                        .frame(height: 1)
+                        .padding(.top, continueReadingPercent == nil ? 22 : 6)
+                }
+            } else if !separatesBody, let summary = content.summary, !summary.isEmpty {
                 Rectangle()
                     .fill(activeArtworkPalette?.divider ?? ZineTheme.border)
                     .frame(height: 1)
@@ -596,7 +762,7 @@ struct BookmarkDetailView: View {
                 .padding(.top, 22)
             }
 
-            if !usesArticleDetail && !content.tags.isEmpty {
+            if !separatesBody && !usesArticleDetail && !content.tags.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack {
                         ForEach(content.tags) { tag in
@@ -871,6 +1037,15 @@ struct BookmarkDetailView: View {
 
     private var moreMenu: some View {
         Menu {
+            if isExpandedDetail, bookmark != nil {
+                Button {
+                    ActionRowHaptics.play(style: .heavy)
+                    showsTagEditor = true
+                } label: {
+                    Label("Edit tags", systemImage: "tag")
+                }
+                Divider()
+            }
             Button {
                 ActionRowHaptics.play(style: .heavy)
                 openURL(content.canonicalUrl)
@@ -913,7 +1088,12 @@ struct BookmarkDetailView: View {
                 .disabled(isSavingSubscriptionSettings)
             }
         } label: {
-            actionIcon(systemName: "ellipsis")
+            if isExpandedDetail {
+                Image(systemName: "ellipsis")
+                    .frame(minWidth: 44, minHeight: 44)
+            } else {
+                actionIcon(systemName: "ellipsis")
+            }
         }
         .accessibilityLabel("More actions")
         .buttonStyle(ActionRowHapticButtonStyle())
@@ -927,7 +1107,7 @@ struct BookmarkDetailView: View {
             .font(.system(size: 21, weight: .medium))
             .symbolRenderingMode(.monochrome)
             .foregroundStyle(color ?? detailSecondaryText)
-            .frame(width: 42, height: 44)
+            .frame(width: 44, height: 44)
             .background(activeArtworkPalette?.controlBackground ?? .clear, in: Circle())
             .contentShape(Rectangle())
     }
@@ -949,7 +1129,7 @@ struct BookmarkDetailView: View {
     @ViewBuilder
     private var creatorRow: some View {
         if content.creatorId != nil {
-            if usesArticleDetail {
+            if usesArticleDetail || isExpandedDetail {
                 Button {
                     ActionRowHaptics.play(style: .heavy)
                     showsArticleCreator = true
@@ -985,7 +1165,7 @@ struct BookmarkDetailView: View {
             )
 
             Text(content.creator)
-                .font(.headline)
+                .font(isExpandedDetail ? .body : .headline)
                 .foregroundStyle(detailPrimaryText)
 
             if showsDisclosure {
@@ -1024,12 +1204,15 @@ struct BookmarkDetailView: View {
         .frame(height: height)
     }
 
-    private func mediaHero(height: CGFloat, viewport: CGSize) -> some View {
-        let imageWidth = max(0, viewport.width - 72)
-        let imageHeight = content.provider == .spotify ? imageWidth : imageWidth * 9 / 16
+    private func mediaHero(height: CGFloat, viewport: CGSize, topInset: CGFloat = 64, allowsParallax: Bool = true) -> some View {
+        let artwork = AdaptiveContentLayout.artworkSize(viewport: viewport, square: content.provider == .spotify)
+        let imageWidth = artwork.width
+        let imageHeight = artwork.height
 
         return GeometryReader { geometry in
-            let offset = usesArticleDetail ? -articleScrollOffset : geometry.frame(in: .named("bookmarkDetailScroll")).minY
+            let offset = allowsParallax
+                ? (usesArticleDetail ? -articleScrollOffset : geometry.frame(in: .named("bookmarkDetailScroll")).minY)
+                : 0
             let stretch = max(offset, 0)
 
             ZStack(alignment: .top) {
@@ -1043,7 +1226,7 @@ struct BookmarkDetailView: View {
                             .stroke(.white.opacity(0.10), lineWidth: 1)
                     }
                     .scaleEffect(1 + min(stretch / 800, 0.08))
-                    .padding(.top, 116 + stretch * 0.25)
+                    .padding(.top, topInset + stretch * 0.25)
             }
             .frame(width: geometry.size.width, height: height + stretch)
             .offset(y: BookmarkArtworkLayout.parallaxOffset(for: offset))
@@ -1089,10 +1272,9 @@ struct BookmarkDetailView: View {
         }
     }
 
-    private func mediaHeroHeight(in viewport: CGSize) -> CGFloat {
-        let imageWidth = max(0, viewport.width - 72)
-        let imageHeight = content.provider == .spotify ? imageWidth : imageWidth * 9 / 16
-        return alignedToDisplayPixel(116 + imageHeight + BookmarkArtworkLayout.bottomSpacing)
+    private func mediaHeroHeight(in viewport: CGSize, topInset: CGFloat = 64) -> CGFloat {
+        let artwork = AdaptiveContentLayout.artworkSize(viewport: viewport, square: content.provider == .spotify)
+        return alignedToDisplayPixel(topInset + artwork.height + BookmarkArtworkLayout.bottomSpacing)
     }
 
     private func heroHeight(in viewport: CGSize) -> CGFloat {
@@ -1342,6 +1524,88 @@ private struct BookmarkDetailTopEdgeEffect: ViewModifier {
 private struct BookmarkDetailScrollTargetPreference: PreferenceKey {
     static let defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+/// Both columns share the scroll view's pan recognizer. The overview is anchored
+/// to its viewport guide, so it never follows content movement or rubber-banding.
+struct ExpandedBookmarkScrollView: UIViewControllerRepresentable {
+    let overview: AnyView
+    let detail: AnyView
+    let columnWidth: CGFloat
+
+    func makeUIViewController(context: Context) -> ExpandedBookmarkScrollController {
+        ExpandedBookmarkScrollController(overview: overview, detail: detail, columnWidth: columnWidth)
+    }
+
+    func updateUIViewController(_ controller: ExpandedBookmarkScrollController, context: Context) {
+        controller.overview.rootView = overview
+        controller.detail.rootView = detail
+        controller.columnWidthConstraint?.constant = columnWidth
+        controller.overview.view.invalidateIntrinsicContentSize()
+        controller.detail.view.invalidateIntrinsicContentSize()
+    }
+}
+
+final class ExpandedBookmarkScrollController: UIViewController {
+    let scrollView = UIScrollView()
+    let overview: UIHostingController<AnyView>
+    let detail: UIHostingController<AnyView>
+    var columnWidthConstraint: NSLayoutConstraint?
+    private let columnWidth: CGFloat
+
+    init(overview: AnyView, detail: AnyView, columnWidth: CGFloat) {
+        self.overview = UIHostingController(rootView: overview)
+        self.detail = UIHostingController(rootView: detail)
+        self.columnWidth = columnWidth
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("Use init(overview:detail:columnWidth:)") }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .clear
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.contentInsetAdjustmentBehavior = .never
+        scrollView.bounces = false
+        if #available(iOS 26.0, *) {
+            scrollView.topEdgeEffect.isHidden = true
+        }
+        scrollView.verticalScrollIndicatorInsets.right = 4
+        view.addSubview(scrollView)
+        NSLayoutConstraint.activate([
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        for host in [overview, detail] {
+            addChild(host)
+            host.view.backgroundColor = .clear
+            host.view.translatesAutoresizingMaskIntoConstraints = false
+            host.sizingOptions = .intrinsicContentSize
+            host.safeAreaRegions = []
+            scrollView.addSubview(host.view)
+            host.didMove(toParent: self)
+        }
+        let viewport = scrollView.frameLayoutGuide
+        let content = scrollView.contentLayoutGuide
+        let width = overview.view.widthAnchor.constraint(equalToConstant: columnWidth)
+        columnWidthConstraint = width
+        NSLayoutConstraint.activate([
+            content.widthAnchor.constraint(equalTo: viewport.widthAnchor),
+            overview.view.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            overview.view.topAnchor.constraint(equalTo: viewport.topAnchor),
+            overview.view.heightAnchor.constraint(equalTo: viewport.heightAnchor),
+            width,
+            detail.view.leadingAnchor.constraint(equalTo: overview.view.trailingAnchor, constant: 32),
+            detail.view.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            detail.view.topAnchor.constraint(equalTo: content.topAnchor),
+            detail.view.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            detail.view.heightAnchor.constraint(greaterThanOrEqualTo: viewport.heightAnchor)
+        ])
+    }
 }
 
 struct BookmarkDetailScrollTarget: View {
