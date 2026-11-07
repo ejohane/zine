@@ -188,3 +188,57 @@ use editorial story blocks or generate prose to fill the Home screen. The page
 title, sans-serif typography, 16pt gutters, 18pt section spacing, neutral card
 surfaces, Dynamic Type and interaction behavior remain owned by native Home.
 See [the composition contract](../../docs/home-composition.md).
+
+## Adaptive reading and browsing
+
+Library and Search use system split navigation inside the shared tab shell,
+retaining the selected bookmark when a window collapses. The tab bar spans the
+whole window; Library’s Add Bookmark action lives in the shared top trailing
+toolbar, matching Home’s Settings position. Home uses one continuous vertical feed at every size. Wide landscape windows
+place the featured Jump Back In item beside its two-column tile grid within the
+same section, followed by full-width Inbox and saved-content rails. Portrait
+and compact windows stack the featured item and grid. Jump Back In keeps
+its two-column, three-row tile grid, with one column at accessibility text sizes.
+
+On iOS 27.1, active division reserved regions define a reading face and a
+supplementary references face. Reader controls stay within the reading face in
+book pose and on the stable lower face in seated pose. Article links remain
+available through More at every size. Artwork is bounded by both the current
+viewport width and height; wide detail headers can place artwork beside actions.
+Expanded landscape bookmark details place artwork, title, metadata and actions
+in the left column, with descriptions or article text in the right column. Both
+columns share one scroll surface: gestures anywhere scroll the right-hand text,
+while the left overview stays fixed. Short text does not require scrolling.
+Media overviews anchor directly to the scroll viewport and do not rubber-band.
+Expanded media and article scroll views hide the top-edge effect; no horizontal
+blur or fade strip overlays the artwork or text. Native trailing controls remain visible.
+The expanded page extends through the navigation bar's changing top safe area,
+with a fixed 32-point overview gutter, so collapsing chrome cannot move the overview.
+Artwork can fill the column's inner width, bounded by 52 percent of its height.
+Narrow detail panes retain the sequential layout.
+No layout checks identify a device model or infer pose from physical orientation.
+
+Expanded content details use a cover-led composition: bounded artwork, centered
+title and creator, quiet provider metadata, and one pill-shaped primary action
+flanked by bookmark and completion controls. Share and More use the native
+trailing toolbar; Edit tags remains available in More. Articles offer Read or
+Continue reading into the right column of the shared scrolling page. Artwork-derived palette
+resolution stays unchanged, and compact details keep the sequential layout.
+
+Portrait article reading fills the window across a division. Reader immersion
+hides the surrounding navigation and tab chrome and temporarily collapses the
+Library sidebar; revealing controls restores its previous visibility. This is
+a reading-state exception to the stable tab shell, not a push-depth toggle.
+Use the whole window's aspect ratio so narrow landscape detail columns do not
+trigger portrait immersion or oscillate as the sidebar expands and collapses.
+
+Reader immersion is sent to the owning shell through an environment action,
+with a separate lifetime token for each reader. Do not carry it through a
+PreferenceKey: nested navigation containers can stop that preference before
+it reaches the TabView. Apply Library/Search tab-bar visibility to their tab
+content so the native tab container receives the request.
+
+Bookmark detail content scrolls beneath the transparent navigation bar. Its
+artwork-derived background continues through the top safe area; do not overlay
+an opaque navigation backdrop that masks the scrolling article or description.
+Library’s Add Bookmark toolbar action is shown only while browsing its list.

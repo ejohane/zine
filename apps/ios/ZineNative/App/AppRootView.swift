@@ -143,6 +143,12 @@ struct AuthenticatedAppView: View {
     private var commandSession: NativeCommandSession { session.commandSession }
     private var homeStore: HomeStore { session.homeStore }
     @State private var sourcesPresentation: SourcesPresentation?
+    @State private var isShowingAddBookmark = false
+    @State private var librarySelection: Bookmark?
+    @State private var libraryColumn = NavigationSplitViewColumn.sidebar
+    @State private var libraryVisibility = NavigationSplitViewVisibility.automatic
+    @State private var libraryVisibilityBeforeReading = NavigationSplitViewVisibility.automatic
+    @State private var immersiveReaders: Set<UUID> = []
     @State private var search = ""
     @State private var searchTabReselection = 0
     @State private var selectedTab = AppTab.home
@@ -202,22 +208,69 @@ struct AuthenticatedAppView: View {
         }
     }
 
+    private var isReaderImmersive: Bool { !immersiveReaders.isEmpty }
+
+    private var usesLibraryBrowser: Bool {
+        selectedTab == .library || selectedTab == .search
+    }
+
     private var appShell: some View {
+        GeometryReader { geometry in
+            tabStack
+                .environment(\.articleReaderWindowIsPortrait, geometry.size.height >= geometry.size.width)
+        }
+        .environment(\.nativeCommandSession, commandSession)
+        .environment(\.articleReaderImmersion, ArticleReaderImmersionAction { id, immersive in
+            if immersive { immersiveReaders.insert(id) } else { immersiveReaders.remove(id) }
+        })
+    }
+
+    private func libraryBrowser<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        NavigationSplitView(columnVisibility: $libraryVisibility, preferredCompactColumn: $libraryColumn) {
+            content()
+                .zineRootNavigationChrome(
+                    compactTitle: selectedCompactRootTitle?.title,
+                    collapseProgress: selectedCompactRootTitle?.progress ?? 0,
+                    collapseState: selectedTitleCollapseState
+                )
+                .navigationSplitViewColumnWidth(min: 300, ideal: 350, max: 420)
+        } detail: {
+            NavigationStack {
+                Group {
+                    if let bookmark = librarySelection {
+                        bookmarkDestination(for: bookmark)
+                            .id(bookmark.id)
+                    } else {
+                        ContentUnavailableView("Select a bookmark", systemImage: "books.vertical",
+                            description: Text("Choose an item to read or view its details."))
+                            .background(ZineTheme.canvas)
+                    }
+                }
+                .navigationDestination(for: Bookmark.self) { bookmark in
+                    bookmarkDestination(for: bookmark)
+                }
+            }
+        }
+        .navigationSplitViewStyle(.balanced)
+        .toolbarVisibility(isReaderImmersive ? .hidden : .visible, for: .tabBar)
+    }
+
+    private var tabStack: some View {
         NavigationStack(path: $navigationPath) {
             TabView(selection: tabSelection) {
-                Tab("Home", systemImage: "house", value: AppTab.home) {
-                    HomeView(
-                        client: client,
-                        store: homeStore,
-                        density: .compact,
-                        onContentChanged: markBookmarkContentChanged,
-                        onExternalOpen: handleExternalOpen,
-                        onHomeItemExternalOpen: handleHomeItemExternalOpen,
-                        tabReselection: homeTabReselection,
-                        transitionNamespace: navigationTransition,
-                        registersNavigationDestinations: false,
-                        titleCollapseState: homeTitleCollapseState
-                    )
+                Tab("Library", systemImage: "books.vertical", value: AppTab.library) {
+                    libraryBrowser {
+                        LibraryView(
+                            client: client,
+                            cache: libraryCache,
+                            refreshRevision: libraryRevision,
+                            onContentChanged: markHomeChanged,
+                            onExternalOpen: handleExternalOpen,
+                            tabReselection: libraryTabReselection,
+                            transitionNamespace: navigationTransition,
+                            titleCollapseState: libraryTitleCollapseState
+                        )
+                    }
                     .tint(ZineTheme.brandAccent)
                 }
 
@@ -234,6 +287,34 @@ struct AuthenticatedAppView: View {
                         titleCollapseState: homeLabTitleCollapseState
                     )
                     .tint(ZineTheme.brandAccent)
+                }
+
+                Tab(value: AppTab.search) {
+                    libraryBrowser {
+                        LibraryView(
+                            client: client,
+                            cache: libraryCache,
+                            searchText: $search,
+                            searchHistoryKey: "zine.search.history.\(userID)",
+                            refreshRevision: libraryRevision,
+                            onContentChanged: markHomeChanged,
+                            onExternalOpen: handleExternalOpen,
+                            tabReselection: searchTabReselection,
+                            transitionNamespace: navigationTransition,
+                            titleCollapseState: searchTitleCollapseState
+                        )
+                    }
+                    .tint(ZineTheme.brandAccent)
+                } label: {
+                    Label {
+                        Text("Search")
+                    } icon: {
+                        Image(uiImage: UIImage(
+                            systemName: "magnifyingglass",
+                            withConfiguration: UIImage.SymbolConfiguration(weight: .medium)
+                        )!)
+                        .renderingMode(.template)
+                    }
                 }
 
                 Tab("Inbox", systemImage: "tray", value: AppTab.inbox) {
@@ -253,55 +334,56 @@ struct AuthenticatedAppView: View {
                     .tint(ZineTheme.brandAccent)
                 }
 
-                Tab("Library", systemImage: "books.vertical", value: AppTab.library) {
-                    LibraryView(
+                Tab("Home", systemImage: "house", value: AppTab.home) {
+                    HomeView(
                         client: client,
-                        cache: libraryCache,
-                        refreshRevision: libraryRevision,
-                        onContentChanged: markHomeChanged,
+                        store: homeStore,
+                        density: .compact,
+                        onContentChanged: markBookmarkContentChanged,
                         onExternalOpen: handleExternalOpen,
-                        tabReselection: libraryTabReselection,
+                        onHomeItemExternalOpen: handleHomeItemExternalOpen,
+                        tabReselection: homeTabReselection,
                         transitionNamespace: navigationTransition,
-                        titleCollapseState: libraryTitleCollapseState
+                        registersNavigationDestinations: false,
+                        titleCollapseState: homeTitleCollapseState
                     )
                     .tint(ZineTheme.brandAccent)
-                }
-
-                Tab(value: AppTab.search) {
-                    LibraryView(
-                        client: client,
-                        cache: libraryCache,
-                        searchText: $search,
-                        searchHistoryKey: "zine.search.history.\(userID)",
-                        refreshRevision: libraryRevision,
-                        onContentChanged: markHomeChanged,
-                        onExternalOpen: handleExternalOpen,
-                        tabReselection: searchTabReselection,
-                        transitionNamespace: navigationTransition,
-                        titleCollapseState: searchTitleCollapseState
-                    )
-                    .tint(ZineTheme.brandAccent)
-                } label: {
-                    Label {
-                        Text("Search")
-                    } icon: {
-                        Image(uiImage: UIImage(
-                            systemName: "magnifyingglass",
-                            withConfiguration: UIImage.SymbolConfiguration(weight: .medium)
-                        )!)
-                        .renderingMode(.template)
-                    }
                 }
             }
             .zineTabShellChrome()
             .navigationTitle(selectedRootTitle)
             .navigationBarTitleDisplayMode(.inline)
             .zineRootNavigationChrome(
-                compactTitle: selectedCompactRootTitle?.title,
+                compactTitle: usesLibraryBrowser ? nil : selectedCompactRootTitle?.title,
                 collapseProgress: selectedCompactRootTitle?.progress ?? 0,
                 collapseState: selectedTitleCollapseState
             )
+            .toolbarVisibility(isReaderImmersive ? .hidden : .visible, for: .navigationBar)
+            .onChange(of: isReaderImmersive) { _, immersive in
+                if immersive {
+                    libraryVisibilityBeforeReading = libraryVisibility
+                    libraryVisibility = .detailOnly
+                } else {
+                    libraryVisibility = libraryVisibilityBeforeReading
+                }
+            }
             .toolbar {
+                if selectedTab == .library && navigationPath.isEmpty && !isReaderImmersive
+                    && libraryColumn == .sidebar && libraryVisibility != .detailOnly {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            isShowingAddBookmark = true
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(ZineTheme.primaryText)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .accessibilityLabel("Add bookmark")
+                        .accessibilityIdentifier("library-add-bookmark")
+                    }
+                }
                 if selectedTab == .home && navigationPath.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
@@ -380,6 +462,16 @@ struct AuthenticatedAppView: View {
             }
         }
         .environment(\.nativeCommandSession, commandSession)
+        .sheet(isPresented: $isShowingAddBookmark) {
+            AddBookmarkSheet(
+                client: BookmarkShareClient.live(
+                    baseURL: client.baseURL,
+                    session: client.session,
+                    tokenProvider: { try await client.tokenProvider() }
+                ),
+                onSaved: markBookmarkContentChanged
+            )
+        }
         .task(id: pendingBookmarkLink?.id) {
             guard let request = pendingBookmarkLink else { return }
             do {
@@ -548,7 +640,14 @@ struct AuthenticatedAppView: View {
                 }
             },
             homeLabCollection: { navigationPath.append($0) },
-            bookmark: { navigationPath.append($0) },
+            bookmark: { bookmark in
+                if selectedTab == .library || selectedTab == .search {
+                    librarySelection = bookmark
+                    libraryColumn = .detail
+                } else {
+                    navigationPath.append(bookmark)
+                }
+            },
             settings: { navigationPath.append($0) },
             creator: { navigationPath.append($0) }
         )

@@ -28,7 +28,6 @@ struct LibraryView: View {
         suppliedTitleCollapseState ?? localTitleCollapseState
     }
     @State private var isVisible = false
-    @State private var isShowingAddBookmark = false
     @Environment(\.zineTabNavigationActions) private var navigation
 
     init(
@@ -86,19 +85,6 @@ struct LibraryView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .contentTypeFilterChrome()
-            .toolbar {
-                if !isSearchMode {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            isShowingAddBookmark = true
-                        } label: {
-                            Image(systemName: "plus")
-                        }
-                        .accessibilityLabel("Add bookmark")
-                        .accessibilityIdentifier("library-add-bookmark")
-                    }
-                }
-            }
             .zineScreenChrome()
             .task(id: LibraryReloadKey(query: query, revision: refreshRevision)) {
                 if isSearchMode && search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -124,19 +110,7 @@ struct LibraryView: View {
             } message: {
                 Text(store.actionErrorMessage ?? "Please try again.")
             }
-            .sheet(isPresented: $isShowingAddBookmark) {
-                AddBookmarkSheet(
-                    client: BookmarkShareClient.live(
-                        baseURL: client.baseURL,
-                        session: client.session,
-                        tokenProvider: { try await client.tokenProvider() }
-                    ),
-                    onSaved: {
-                        Task { await store.reload(query: query) }
-                        onContentChanged()
-                    }
-                )
-            }
+
     }
 
     @ViewBuilder
