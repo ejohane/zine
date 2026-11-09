@@ -1,0 +1,15 @@
+{
+  "name": "zine-api-next-webhook-proof",
+  "main": "receiver.ts",
+  "compatibility_date": "2026-07-30",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": false },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "zine-api-next-webhook-proof",
+      "database_id": "d587c386-93b1-4f2c-978a-b8726da8615b",
+    },
+  ],
+}

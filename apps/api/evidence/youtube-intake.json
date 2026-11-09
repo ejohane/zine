@@ -1,0 +1,98 @@
+{
+  "at": "2026-11-08T20:34:20.058Z",
+  "origin": "https://api-next.myzine.app",
+  "authentication": "real Clerk session",
+  "originalNeverAttemptedJobSucceeded": true,
+  "initialized": true,
+  "latestItems": 1,
+  "repeatNoDuplicates": true,
+  "feedMetadataRetained": ["title", "description", "creator", "publishedAt", "thumbnail"],
+  "summaryCoverage": "metadata_only",
+  "publicWatchCooldownPreserved": true,
+  "scope": "Actual public channel feed; this does not verify Google-authorized pagination or video captions",
+  "observations": [
+    {
+      "at": "2026-11-08T20:28:10.659Z",
+      "method": "GET",
+      "path": "/v1/subscriptions/:id",
+      "status": 200,
+      "requestId": "req_aa6fcb1a5b3d4f84ae4a795a30615f21",
+      "responseSha256": "d9d86be153102e268f916cc630490d20ee55ea01e8b8c049be110f87c95824fd",
+      "responseKeys": [
+        "id",
+        "sourceId",
+        "routeId",
+        "autoSave",
+        "filters",
+        "status",
+        "initialized",
+        "nextPollAt",
+        "lastSuccessAt",
+        "lastErrorCode",
+        "createdAt",
+        "updatedAt"
+      ],
+      "label": "youtube-live-feed-after-quota-split"
+    },
+    {
+      "at": "2026-11-08T20:28:10.720Z",
+      "method": "GET",
+      "path": "/v1/jobs/:id",
+      "status": 200,
+      "requestId": "req_41c81d3f2ba04b92a0c7b6826ab65351",
+      "responseSha256": "9867c11a586d6852c1b0f3d83c08b185c267ee510c628615a462e7c37bdbf45d",
+      "responseKeys": [
+        "id",
+        "kind",
+        "itemId",
+        "status",
+        "attempts",
+        "errorCode",
+        "availableAt",
+        "createdAt",
+        "updatedAt"
+      ],
+      "label": "youtube-original-job-after-quota-split"
+    },
+    {
+      "at": "2026-11-08T20:28:49.707Z",
+      "method": "GET",
+      "path": "/v1/jobs/:id",
+      "status": 200,
+      "requestId": "req_f4574133587e4563a1916d8f2ae4224f",
+      "responseSha256": "1c0d733e20c3959fd2f640c21205f85d6d37282eaf421f155bcaa6df300109af",
+      "responseKeys": [
+        "id",
+        "kind",
+        "itemId",
+        "status",
+        "attempts",
+        "errorCode",
+        "availableAt",
+        "createdAt",
+        "updatedAt"
+      ],
+      "label": "manual-youtube-repeat-job-outcome"
+    },
+    {
+      "at": "2026-11-08T20:28:26.812Z",
+      "method": "GET",
+      "path": "/v1/items",
+      "status": 200,
+      "requestId": "req_cb596da475f149f49ee9027ade79a0b9",
+      "responseSha256": "9b9b7461b2dff03f6bb407c3e1a63b8bb5fb7cfb57f41aaab514afae7848c90c",
+      "responseKeys": ["items", "nextCursor"],
+      "label": "manual-youtube-actual-arrival"
+    },
+    {
+      "at": "2026-11-08T20:30:13.909Z",
+      "method": "GET",
+      "path": "/v1/items",
+      "status": 200,
+      "requestId": "req_9f97370bae9e46dcaade9523952823e8",
+      "responseSha256": "9b9b7461b2dff03f6bb407c3e1a63b8bb5fb7cfb57f41aaab514afae7848c90c",
+      "responseKeys": ["items", "nextCursor"],
+      "label": "manual-youtube-repeat-arrivals"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+ALTER TABLE source_routes ADD COLUMN external_id TEXT;
+UPDATE source_routes SET external_id=(SELECT json_extract(d.value_json,'$.id') FROM sources s JOIN contributions d ON d.owner_id=s.owner_id AND d.field='source' AND json_extract(d.value_json,'$.url')=s.url WHERE s.id=source_routes.source_id AND json_extract(d.value_json,'$.kind')='account' ORDER BY d.created_at LIMIT 1) WHERE kind='x_account';
+UPDATE source_routes SET external_id=substr(url,instr(url,'/i/lists/')+9) WHERE kind='x_list';
+UPDATE sources SET identity_key='x:account:'||(SELECT external_id FROM source_routes WHERE source_id=sources.id AND kind='x_account') WHERE platform='x' AND EXISTS(SELECT 1 FROM source_routes WHERE source_id=sources.id AND kind='x_account' AND external_id IS NOT NULL);
+UPDATE sources SET identity_key='x:list:'||(SELECT external_id FROM source_routes WHERE source_id=sources.id AND kind='x_list') WHERE platform='x' AND EXISTS(SELECT 1 FROM source_routes WHERE source_id=sources.id AND kind='x_list' AND external_id IS NOT NULL);

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://unpkg.com/wrangler@4.158.0/config-schema.json",
+  "name": "zine-api-next-recovery",
+  "main": "../src/index.ts",
+  "compatibility_date": "2026-07-30",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "version_metadata": {
+    "binding": "DEPLOYMENT",
+  },
+  "routes": [],
+  "preview_urls": false,
+  "observability": {
+    "enabled": true,
+  },
+  "vars": {
+    "ENVIRONMENT": "recovery",
+    "AUTH_ISSUER": "https://clerk.myzine.app",
+    "CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsubXl6aW5lLmFwcCQ",
+    "AUTH_AUDIENCE": "",
+    "AUTH_AUTHORIZED_PARTIES": "https://api-next.myzine.app",
+    "ALLOWED_ORIGINS": "https://zine-api-next-recovery.yw9bvbwb9f.workers.dev",
+    "EMBEDDING_MODEL": "@cf/qwen/qwen3-embedding-0.6b",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "zine-api-next-recovery-20261109",
+      "database_id": "29df9a64-93a0-4ada-929e-43c057b2ead8",
+      "migrations_dir": "../migrations",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ARTIFACTS",
+      "bucket_name": "zine-api-next-recovery-artifacts",
+    },
+  ],
+  "ai": {
+    "binding": "AI",
+  },
+  "vectorize": [
+    {
+      "binding": "VECTORS",
+      "index_name": "zine-api-next-recovery-vectors",
+    },
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "JOBS",
+        "queue": "zine-api-next-recovery-jobs",
+      },
+    ],
+    "consumers": [
+      {
+        "queue": "zine-api-next-recovery-jobs",
+        "max_batch_size": 5,
+        "max_batch_timeout": 1,
+        "max_concurrency": 8,
+        "max_retries": 5,
+        "dead_letter_queue": "zine-api-next-recovery-dead",
+      },
+    ],
+  },
+  "triggers": {
+    "crons": ["*/5 * * * *"],
+  },
+}

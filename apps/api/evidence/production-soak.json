@@ -1,0 +1,17 @@
+{
+  "startedAt": "2026-11-09T04:33:29.961Z",
+  "completedAt": "2026-11-09T05:18:30.292Z",
+  "requestedMinutes": 45,
+  "observations": 46,
+  "failures": 0,
+  "authenticatedLibraryReads": 46,
+  "versions": ["02ecfb45-1cec-471f-ab7f-18303723c01f"],
+  "successfulPollAdvances": {
+    "spotify": 3,
+    "substack": 2,
+    "rss": 4
+  },
+  "observationSha256": "c364409be2735bd10e004b195599bceaf3a9aca60ea8cbc99cdf8e4f733d18c2",
+  "scope": "Timestamped live public health, real Clerk library reads and subscription-state observations across scheduled polling cycles. No manual syncs, source fetches or library mutations are performed by this observer.",
+  "limits": "A bounded observation window, not an uptime guarantee. Provider poll advances and errors reflect the subscriptions actually active during this run; unavailable Google authorization remains excluded."
+}

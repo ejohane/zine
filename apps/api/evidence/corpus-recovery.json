@@ -1,0 +1,223 @@
+{
+  "at": "2026-11-08T17:27:12.345Z",
+  "origin": "https://api-next.myzine.app",
+  "scope": "Real Clerk-authenticated retries of transient original-corpus failures; completion must be checked separately",
+  "retries": [
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_1d163366a0f14cc7bd1cb0c52ac95a68",
+      "jobId": "job_d4f9edfafb364abb91f880726f130e79"
+    },
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_db9bd0db304a42e091f259a1a42328b3",
+      "jobId": "job_ec4785c244434292a8aa6ef380b458ee"
+    },
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_cd63f1098eef4d7292a646431068739f",
+      "jobId": "job_82b6323ecbdd4574aa625cfda79a66ea"
+    },
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_ef4023d777be4a2ea506f7d40d22a1f0",
+      "jobId": "job_4e6ee0a0295c459582384a195319a916"
+    },
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_3b8510ac049041d9901a37ab8265e1aa",
+      "jobId": "job_e4cc858520f6427484763e2556a12318"
+    },
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_7f1e45bc2b2e4b0ca4f58cf89e6932dd",
+      "jobId": "job_a5a441d0e7a9447eb88e9ef19435ed85"
+    },
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_a8e0b84268e04feb8659345893696c9b",
+      "jobId": "job_ac1ab548306846b38541fdb4eedc3e37"
+    },
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_7efe18dffc994cb0a42a2e919bb8a4a0",
+      "jobId": "job_6687294a2f9545299ced22844241db73"
+    },
+    {
+      "provider": "SUBSTACK",
+      "httpStatus": 202,
+      "requestId": "req_97fee2cfe3df43eb9cd312120c6778b0",
+      "jobId": "job_988d96e98d444e7d86fa5252acf3460d"
+    },
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_51c36ba2482543b692c07a59c080b4eb",
+      "jobId": "job_9dccf84c4d0b4d95b1ded426b6109178"
+    },
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_573f98396a164f16939151f58a7524d1",
+      "jobId": "job_53191f2941d54ef9973034f1f5623775"
+    },
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_799b90ec7adf4fb0a0e6319070498e0f",
+      "jobId": "job_31e5de67ddc7402ba7b5f3be9b9847d4"
+    },
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_b7419d85ed854d0d8409bed4ac3f54f1",
+      "jobId": "job_a0f386d116e04c3aad2eeb6c65f85936"
+    },
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_12f8eb662da044ab8d68b1c8fddc5335",
+      "jobId": "job_a7b48cab43b64ffd9201b48c26ac2365"
+    },
+    {
+      "provider": "SUBSTACK",
+      "httpStatus": 202,
+      "requestId": "req_3363901a0f2444cb9e77373fcfdcc09a",
+      "jobId": "job_271a47aa6ea44dd581735f0406dd2270"
+    },
+    {
+      "provider": "SUBSTACK",
+      "httpStatus": 202,
+      "requestId": "req_901ed4b475a74262a9646d589a80439e",
+      "jobId": "job_0878829c6e3042c3bbad36d0fefaef5d"
+    },
+    {
+      "provider": "YOUTUBE",
+      "httpStatus": 202,
+      "requestId": "req_cffebfea90c94c47814454090f5a3b40",
+      "jobId": "job_d5143aa7b63b40afa0d0cf34d8418353"
+    },
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_e865a557eb68439989069bb433fd0a1d",
+      "jobId": "job_596151ff5bee45d4826b6fdb830af5a7"
+    },
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_c2741cc9eec34d27896c1180f89868fb",
+      "jobId": "job_401c11fdad17445caa349541001faf10"
+    },
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_664ca76fcb8649adae837cb149798fd4",
+      "jobId": "job_7611d745d9d048779f2388ce74df7944"
+    },
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_88aede3e146c4d09b98ac0ca752ae156",
+      "jobId": "job_cce3266cd02345b384ccadee629e3d85"
+    },
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_cc210cbfc44b4765a797850aee7d312f",
+      "jobId": "job_ca8c395014a74474b517451e03486fbf"
+    },
+    {
+      "provider": "YOUTUBE",
+      "httpStatus": 202,
+      "requestId": "req_920b4f1dace04ea7a6a904a7275a19ed",
+      "jobId": "job_88f66e42c61f46ed910c70aedc44a09e"
+    },
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_dda8a37817fc4413bf7552b46cb108d7",
+      "jobId": "job_f5dba958d8394bd9b46a741f1be0c764"
+    },
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_df9867585ccb4561adec00f28122b469",
+      "jobId": "job_4a371d95e3fb4db286a8d63fcc09d490"
+    },
+    {
+      "provider": "SUBSTACK",
+      "httpStatus": 202,
+      "requestId": "req_098aa238485549f79d4ebe1b1dde3667",
+      "jobId": "job_47d662665e1745b6911d6854411ad730"
+    },
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_0866dca3afe94483bcfc804295b7b287",
+      "jobId": "job_d1e35c14fe1246349aa403fb6335df48"
+    },
+    {
+      "provider": "X",
+      "httpStatus": 202,
+      "requestId": "req_e4d08d498d8e4720b411e970757c5a14",
+      "jobId": "job_82af46776dc74df583120203629766e6"
+    },
+    {
+      "provider": "SUBSTACK",
+      "httpStatus": 202,
+      "requestId": "req_0bddcbfda6f148bba15f96ca7bc48f5d",
+      "jobId": "job_b9159f2482ff42f8bc85eb8472e95c64"
+    },
+    {
+      "provider": "SUBSTACK",
+      "httpStatus": 202,
+      "requestId": "req_9d1c6bf8d618498686848e8b73a3ff6a",
+      "jobId": "job_903943feeed1457b9418583fbc6042c7"
+    },
+    {
+      "provider": "YOUTUBE",
+      "httpStatus": 202,
+      "requestId": "req_9fe7f0c8bdc047b488507ff083f39a92",
+      "jobId": "job_aff800c54bee4de3a628ac3b0cecd0e8"
+    },
+    {
+      "provider": "SUBSTACK",
+      "httpStatus": 202,
+      "requestId": "req_5ddda59e278243ab983c783f0e39b2be",
+      "jobId": "job_3d9532696a0a4a92a2203ebcaa572a9c"
+    },
+    {
+      "provider": "WEB",
+      "httpStatus": 202,
+      "requestId": "req_9fb6be91e60745438d623738da601e8c",
+      "jobId": "job_ca5caa0474f04f77b64db74c16a63612"
+    },
+    {
+      "provider": "WEB",
+      "httpStatus": 202,
+      "requestId": "req_56273b4155454bdb80746df7cfdb8cb7",
+      "jobId": "job_64de5888d32844c98e662685f003b85f"
+    },
+    {
+      "provider": "SUBSTACK",
+      "httpStatus": 202,
+      "requestId": "req_61cfde9982d742298c553a05c4a974d9",
+      "jobId": "job_83dde33e34a44d75a83c700a259f0acb"
+    },
+    {
+      "provider": "SUBSTACK",
+      "httpStatus": 202,
+      "requestId": "req_08719a0d64ac4488a2a276d6953c4866",
+      "jobId": "job_3aec3c641d0e4101b588acf2b4c3d212"
+    }
+  ]
+}

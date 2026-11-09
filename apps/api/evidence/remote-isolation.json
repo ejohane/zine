@@ -1,0 +1,126 @@
+{
+  "at": "2026-11-08T20:45:36.659Z",
+  "origin": "https://api-next.myzine.app",
+  "authentication": {
+    "primary": "real Clerk session",
+    "secondary": "temporary synthetic owner using the deployed PAT auth path; token hash seeded only in the new database"
+  },
+  "observations": [
+    {
+      "operation": "secondary-pat-authenticated",
+      "status": 200,
+      "requestId": "req_5c5e15cc2cfe4e22824596d51af515d8",
+      "responseSha256": "73cb41603b66ada205e8840e0aa4786519d1465394cfbbea06b5af3e0fed164c"
+    },
+    {
+      "operation": "primary-durable-save",
+      "status": 201,
+      "requestId": "req_dcee0f1084ac4cdbbeb78fb8896bbd38",
+      "responseSha256": "e4ca6fcf9a1f1ade60bd7fba62a3f14c5acf275a00dbdcd1f4c1e0f7b840100c"
+    },
+    {
+      "operation": "primary-private-summary",
+      "status": 201,
+      "requestId": "req_4b972b2874d4487196b13f2a4ed1bb10",
+      "responseSha256": "e296a76fb14a820416df14430541f99ca607d6210795ba81a3f6f8fbb6e5c358"
+    },
+    {
+      "operation": "secondary-cannot-read-primary-item",
+      "status": 404,
+      "requestId": "req_c0b088a98d144c36b2271b6c27b7d0bc",
+      "responseSha256": "c08d96fc326d6805bfc093ec7a49c365b53a737b5e55487b36f347ce1b806702"
+    },
+    {
+      "operation": "secondary-same-reference-distinct-item",
+      "status": 201,
+      "requestId": "req_888532408fec4a2597529480a4930eab",
+      "responseSha256": "0063bbffe447504fe981086a31a1702b63fdb9b6a376d260911b2b3717fd5db0"
+    },
+    {
+      "operation": "secondary-cannot-inherit-private-content",
+      "status": 200,
+      "requestId": "req_b97ca6b3ebca441c80abd0f1969e8cc8",
+      "responseSha256": "eae6c515cc294e854ff5a2d857abac15bce4205da3cb50634a415073db0dabdc"
+    },
+    {
+      "operation": "secondary-keyword-search-isolated",
+      "status": 200,
+      "requestId": "req_51d3760b57774d3da4493ff1e484c8f7",
+      "responseSha256": "d47160c01f441269d023ff1a0e5126668c511828d22da948a5f6f4ed033367a5"
+    },
+    {
+      "operation": "primary-private-content-searchable",
+      "status": 200,
+      "requestId": "req_1e83e1a1f29c422ab5bdb08849bbe3e3",
+      "responseSha256": "9bc019701daf4e11cbf84c9b990b49acd18477cca194c30c15977ae0e45a85e0"
+    },
+    {
+      "operation": "secondary-cannot-use-primary-provenance",
+      "status": 404,
+      "requestId": "req_a7748654334c46eeab8eb95f83b3fe81",
+      "responseSha256": "2a7b184d502e4d48e69bd4de2235c6c66f01084e425926ed85e687b5fe00a9ba"
+    },
+    {
+      "operation": "secondary-cannot-read-primary-identity",
+      "status": 404,
+      "requestId": "req_b337256de9ab4c12b88965c08af98a8b",
+      "responseSha256": "03c84c39acc25930748543dbd3e9fec7421072151cd71d90dddb222380a9f0ef"
+    },
+    {
+      "operation": "secondary-cannot-read-primary-reconciliations",
+      "status": 404,
+      "requestId": "req_b5fbaec41815439dba9c5b745d3870fb",
+      "responseSha256": "ecb544d28639d57ed62a3fa7558a0c9d77739c01eed142a68b9219331f0e7f59"
+    },
+    {
+      "operation": "secondary-cannot-read-primary-relationships",
+      "status": 404,
+      "requestId": "req_20d5cab8f8274fc39f9c0998e6c70939",
+      "responseSha256": "69d365a4e0f7ff12932e5a3d59ee290a43929a3e46fa32bb22ac3ef247b488e3"
+    },
+    {
+      "operation": "secondary-cannot-link-primary-item",
+      "status": 404,
+      "requestId": "req_33e11e0510d74a098204f182df394c0c",
+      "responseSha256": "291902452b8531224d2a0c97956d792288fb4940af226524a8df15b5fce5d22c"
+    },
+    {
+      "operation": "secondary-cannot-use-primary-relationship-provenance",
+      "status": 404,
+      "requestId": "req_e85a585eda3e4d5eb3ca628b86125487",
+      "responseSha256": "3f7772e38034182fb1c71952a030b3693bd3b2761aeebdb306d6be7d83a0a85f"
+    },
+    {
+      "operation": "secondary-own-collection",
+      "status": 201,
+      "requestId": "req_542c711dc2474a91a6b9732e6e83636a",
+      "responseSha256": "0daa6e5f3c456034a8d2d407d9735002dc9f6baa2cc68c848424b492c5216919"
+    },
+    {
+      "operation": "secondary-cannot-collect-primary-item",
+      "status": 404,
+      "requestId": "req_05bedaf77b9e400c9ef0ae165e386ee1",
+      "responseSha256": "80d967d45c80f29fa5ea3384d9bd7eb3f64ec2443f859fa4104456a47d0bb774"
+    },
+    {
+      "operation": "agent-cannot-create-persistent-credentials",
+      "status": 403,
+      "requestId": "req_9a95815b3b014a29a31d97174cf4849e",
+      "responseSha256": "9a495d4248493e379259d8f2e4e8067b6074280be0550092f2064c10c6692ba7"
+    },
+    {
+      "operation": "agent-cannot-erase-account",
+      "status": 403,
+      "requestId": "req_4bfa40cdabcc47e7aae4d33cbb392598",
+      "responseSha256": "7ccad5a867820d4f675b5755dfbee5a810ce18432d07e855377471680c67e2c4"
+    },
+    {
+      "operation": "revoked-pat-immediately-rejected",
+      "status": 401,
+      "requestId": "req_8e11ba0e5b1746c7a1fdc646a57f4329",
+      "responseSha256": "97eb63502e14d7adafb04d1a7addbd3c83eb18f3085b694a29c7b35727507020"
+    }
+  ],
+  "allAssertionsPassed": true,
+  "credentialValuesPersisted": false
+}

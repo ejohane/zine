@@ -1,0 +1,21 @@
+{
+  "at": "2026-11-08T18:36:23.898Z",
+  "scope": "Read-only inspection of fresh rewrite D1 after the scheduled live YouTube source observation; pending is not successful intake",
+  "job": {
+    "id": "job_119c3e396da2476b91fa29214c975b09",
+    "status": "pending",
+    "attempts": 0,
+    "last_error_code": null,
+    "available_at": "2026-11-08T19:33:25.014Z",
+    "last_dispatched_at": null
+  },
+  "subscription": {
+    "initialized": 0,
+    "last_error_code": null,
+    "next_poll_at": "2026-11-08T18:14:48.345Z",
+    "last_success_at": null
+  },
+  "verifiedIntake": false,
+  "reason": "The provider quota budget deferred the job again. No cooldown override or duplicate replacement job was used.",
+  "inspectionSha256": "c8c7dfa752982361d5c57cf5d0ec06b7dfda12ca2affcada06ded2de683fb465"
+}

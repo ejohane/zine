@@ -1,0 +1,342 @@
+{
+  "at": "2026-11-08T20:27:35.115Z",
+  "scope": "Read-only inspection of fresh rewrite D1; original corpus membership checked against private import mapping; source extraction separate from imported metadata",
+  "providers": [
+    {
+      "provider": "SPOTIFY",
+      "originalItems": 40,
+      "retained": 40,
+      "freshlyEnriched": 40
+    },
+    {
+      "provider": "WEB",
+      "originalItems": 98,
+      "retained": 98,
+      "freshlyEnriched": 95
+    },
+    {
+      "provider": "YOUTUBE",
+      "originalItems": 246,
+      "retained": 246,
+      "freshlyEnriched": 243
+    },
+    {
+      "provider": "RSS",
+      "originalItems": 26,
+      "retained": 26,
+      "freshlyEnriched": 26
+    },
+    {
+      "provider": "X",
+      "originalItems": 23,
+      "retained": 23,
+      "freshlyEnriched": 23
+    },
+    {
+      "provider": "SUBSTACK",
+      "originalItems": 11,
+      "retained": 11,
+      "freshlyEnriched": 8
+    }
+  ],
+  "jobs": [
+    {
+      "kind": "enrich",
+      "stage": null,
+      "status": "cancelled",
+      "errorCode": null,
+      "count": 3
+    },
+    {
+      "kind": "enrich",
+      "stage": null,
+      "status": "failed",
+      "errorCode": "rate_limited",
+      "count": 4
+    },
+    {
+      "kind": "enrich",
+      "stage": null,
+      "status": "failed",
+      "errorCode": "source_access_restricted",
+      "count": 2
+    },
+    {
+      "kind": "enrich",
+      "stage": null,
+      "status": "failed",
+      "errorCode": "source_not_found",
+      "count": 1
+    },
+    {
+      "kind": "enrich",
+      "stage": null,
+      "status": "pending",
+      "errorCode": null,
+      "count": 1
+    },
+    {
+      "kind": "enrich",
+      "stage": null,
+      "status": "pending",
+      "errorCode": "rate_limited",
+      "count": 1
+    },
+    {
+      "kind": "enrich",
+      "stage": null,
+      "status": "succeeded",
+      "errorCode": null,
+      "count": 458
+    },
+    {
+      "kind": "enrich",
+      "stage": "published-transcript",
+      "status": "succeeded",
+      "errorCode": null,
+      "count": 1
+    },
+    {
+      "kind": "enrich",
+      "stage": "understanding",
+      "status": "succeeded",
+      "errorCode": null,
+      "count": 583
+    },
+    {
+      "kind": "index",
+      "stage": null,
+      "status": "cancelled",
+      "errorCode": null,
+      "count": 1
+    },
+    {
+      "kind": "index",
+      "stage": null,
+      "status": "succeeded",
+      "errorCode": null,
+      "count": 1289
+    },
+    {
+      "kind": "sync",
+      "stage": null,
+      "status": "pending",
+      "errorCode": null,
+      "count": 1
+    },
+    {
+      "kind": "sync",
+      "stage": null,
+      "status": "running",
+      "errorCode": null,
+      "count": 1
+    },
+    {
+      "kind": "sync",
+      "stage": null,
+      "status": "succeeded",
+      "errorCode": null,
+      "count": 216
+    }
+  ],
+  "components": [
+    {
+      "component": "article",
+      "status": "available",
+      "reasonCode": null,
+      "count": 144
+    },
+    {
+      "component": "article",
+      "status": "available",
+      "reasonCode": "source_preview_only",
+      "count": 2
+    },
+    {
+      "component": "article",
+      "status": "unavailable",
+      "reasonCode": "readable_text_not_available",
+      "count": 2
+    },
+    {
+      "component": "creator",
+      "status": "available",
+      "reasonCode": null,
+      "count": 401
+    },
+    {
+      "component": "description",
+      "status": "available",
+      "reasonCode": null,
+      "count": 441
+    },
+    {
+      "component": "durationSeconds",
+      "status": "available",
+      "reasonCode": null,
+      "count": 287
+    },
+    {
+      "component": "entities",
+      "status": "available",
+      "reasonCode": null,
+      "count": 455
+    },
+    {
+      "component": "language",
+      "status": "available",
+      "reasonCode": null,
+      "count": 167
+    },
+    {
+      "component": "links",
+      "status": "available",
+      "reasonCode": null,
+      "count": 153
+    },
+    {
+      "component": "members",
+      "status": "available",
+      "reasonCode": null,
+      "count": 3
+    },
+    {
+      "component": "metadata",
+      "status": "available",
+      "reasonCode": null,
+      "count": 457
+    },
+    {
+      "component": "metadata",
+      "status": "failed",
+      "reasonCode": "rate_limited",
+      "count": 5
+    },
+    {
+      "component": "metadata",
+      "status": "failed",
+      "reasonCode": "source_access_restricted",
+      "count": 2
+    },
+    {
+      "component": "metadata",
+      "status": "failed",
+      "reasonCode": "source_not_found",
+      "count": 1
+    },
+    {
+      "component": "metadata",
+      "status": "failed",
+      "reasonCode": "youtube_metadata_unavailable",
+      "count": 1
+    },
+    {
+      "component": "metadata",
+      "status": "unavailable",
+      "reasonCode": "metadata_not_found",
+      "count": 1
+    },
+    {
+      "component": "publishedAt",
+      "status": "available",
+      "reasonCode": null,
+      "count": 365
+    },
+    {
+      "component": "source",
+      "status": "available",
+      "reasonCode": null,
+      "count": 319
+    },
+    {
+      "component": "structuredData",
+      "status": "available",
+      "reasonCode": null,
+      "count": 69
+    },
+    {
+      "component": "summary",
+      "status": "available",
+      "reasonCode": null,
+      "count": 455
+    },
+    {
+      "component": "thread",
+      "status": "available",
+      "reasonCode": "context_coverage_limited",
+      "count": 35
+    },
+    {
+      "component": "thumbnail",
+      "status": "available",
+      "reasonCode": null,
+      "count": 388
+    },
+    {
+      "component": "title",
+      "status": "available",
+      "reasonCode": null,
+      "count": 466
+    },
+    {
+      "component": "topics",
+      "status": "available",
+      "reasonCode": null,
+      "count": 455
+    },
+    {
+      "component": "transcript",
+      "status": "available",
+      "reasonCode": null,
+      "count": 1
+    },
+    {
+      "component": "transcript",
+      "status": "unavailable",
+      "reasonCode": "caption_retrieval_failed",
+      "count": 242
+    },
+    {
+      "component": "transcript",
+      "status": "unavailable",
+      "reasonCode": "public_caption_track_not_available",
+      "count": 1
+    },
+    {
+      "component": "transcript",
+      "status": "unavailable",
+      "reasonCode": "spotify_web_api_does_not_expose_episode_transcript",
+      "count": 41
+    },
+    {
+      "component": "type",
+      "status": "available",
+      "reasonCode": null,
+      "count": 15
+    },
+    {
+      "component": "understanding",
+      "status": "available",
+      "reasonCode": null,
+      "count": 222
+    },
+    {
+      "component": "understanding",
+      "status": "available",
+      "reasonCode": "metadata_only",
+      "count": 230
+    },
+    {
+      "component": "understanding",
+      "status": "available",
+      "reasonCode": "source_preview_only",
+      "count": 2
+    },
+    {
+      "component": "understanding",
+      "status": "failed",
+      "reasonCode": "processing_error",
+      "count": 1
+    }
+  ]
+}

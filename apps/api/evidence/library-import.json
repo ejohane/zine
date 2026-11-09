@@ -1,0 +1,76 @@
+{
+  "at": "2026-11-08T20:43:36.089Z",
+  "scope": {
+    "runtime": "local workerd / D1 / R2",
+    "authentication": "synthetic signed issuer; not production Clerk proof",
+    "data": "real read-only existing library snapshot",
+    "providerExtraction": "not exercised by this import"
+  },
+  "snapshot": {
+    "sha256": "35ff1d49ab9425c5ec3a019c4b1e318b3036da80d5a85a44200aef612a3cbf61",
+    "capturedAt": "2026-11-08T14:30:50.483Z",
+    "pages": 9,
+    "itemCount": 444
+  },
+  "results": {
+    "imported": 444,
+    "uniqueItems": 444,
+    "providers": {
+      "RSS": 26,
+      "SPOTIFY": 40,
+      "SUBSTACK": 11,
+      "WEB": 98,
+      "X": 23,
+      "YOUTUBE": 246
+    },
+    "requests": 2078,
+    "failures": []
+  },
+  "transcript": [
+    {
+      "operation": "browse imported library across cursors",
+      "status": 200,
+      "assertions": ["444 unique personal items", "5 pages", "no pagination duplicates"]
+    },
+    {
+      "operation": "other-user library isolation",
+      "status": 200,
+      "assertions": ["empty library for unrelated authenticated user"]
+    },
+    {
+      "operation": "RSS representative read and isolation",
+      "status": 200,
+      "assertions": ["imported metadata retrieved", "other user receives 404"]
+    },
+    {
+      "operation": "SPOTIFY representative read and isolation",
+      "status": 200,
+      "assertions": ["imported metadata retrieved", "other user receives 404"]
+    },
+    {
+      "operation": "SUBSTACK representative read and isolation",
+      "status": 200,
+      "assertions": ["imported metadata retrieved", "other user receives 404"]
+    },
+    {
+      "operation": "WEB representative read and isolation",
+      "status": 200,
+      "assertions": ["imported metadata retrieved", "other user receives 404"]
+    },
+    {
+      "operation": "X representative read and isolation",
+      "status": 200,
+      "assertions": ["imported metadata retrieved", "other user receives 404"]
+    },
+    {
+      "operation": "YOUTUBE representative read and isolation",
+      "status": 200,
+      "assertions": ["imported metadata retrieved", "other user receives 404"]
+    },
+    {
+      "operation": "keyword search over imported retained information",
+      "status": 200,
+      "assertions": ["20 first-page results", "match evidence included"]
+    }
+  ]
+}

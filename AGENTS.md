@@ -12,6 +12,13 @@
   - `packages/shared`: shared types/schemas/constants
   - `docs`: architecture and system docs
 
+## Independent API rewrite
+
+- New service work in `apps/api` follows [apps/api/AGENTS.md](apps/api/AGENTS.md).
+- Fresh API sessions should read [the API handoff](apps/api/docs/STATUS.md) and run `bun run doctor` from `apps/api`.
+- This rewrite deliberately uses its own `/v1` contract and fresh Cloudflare resources. Existing native `/api/v1` work remains governed by the client guidance below.
+- Erik is the owner and Codex is the ongoing implementation agent across fresh sessions. Keep operational context and reproducible commands in the repository; prioritize reliable experiences and agent continuity over broad external-developer onboarding.
+
 ## Supported Client Direction
 
 - `apps/ios` is the canonical and only supported mobile client.

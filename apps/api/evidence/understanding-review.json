@@ -1,0 +1,26 @@
+{
+  "at": "2026-11-08T18:24:12.458Z",
+  "scope": "Manual comparison of one actual generated podcast summary with its retained source transcript; bounded fidelity check, not a corpus-wide quality guarantee",
+  "summarySha256": "6ae7c3174192d9f673d13b1f8d0873cee429b65c0da9759b6f1d79709a05b552",
+  "coverage": "transcript",
+  "sourceChunkCount": 4,
+  "reductionLevels": 1,
+  "checkedClaims": [
+    {
+      "claim": "Establishing AI boundaries before implementation",
+      "sourceStartSeconds": 419.43,
+      "supported": true
+    },
+    {
+      "claim": "Human accountability when delegating to AI",
+      "sourceStartSeconds": 1300.33,
+      "supported": true
+    },
+    {
+      "claim": "Technical debt from distributed AI applications",
+      "sourceStartSeconds": 1603,
+      "supported": true
+    }
+  ],
+  "assessment": "The compact overview is consistent with these source passages. It is not an exhaustive account of all talks; source completeness remains unknown in provenance."
+}

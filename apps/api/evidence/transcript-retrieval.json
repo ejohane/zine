@@ -1,0 +1,51 @@
+{
+  "at": "2026-11-08T18:16:11.761Z",
+  "origin": "https://api-next.myzine.app",
+  "authentication": "real Clerk session",
+  "scope": "Keyword retrieval within the actual podcast subscription; source transcript and generated summary provenance checked separately from broader corpus ranking",
+  "querySha256": "8245209321244029fffc626b2be89b41b3789314c6953c90d382e1e69774c4cb",
+  "timestampedMatches": [
+    {
+      "field": "transcript",
+      "startSeconds": 323.885
+    }
+  ],
+  "summaryCoverage": "transcript",
+  "observations": [
+    {
+      "path": "/v1/items/itm_8b9295d7a68225abfe7b803b7520aef6c494cd2b/transcript",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_189cc807c2484bd4a410a9a652a2978c",
+      "responseSha256": "b712d22a296e20f9e10ad320180743230a9560ef8ef9a3a870ea10db40e707a7"
+    },
+    {
+      "path": "/v1/items/itm_8b9295d7a68225abfe7b803b7520aef6c494cd2b/jobs",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_c353cbfefb494b58aac145602fba02ca",
+      "responseSha256": "80e37060b338d3e99393b8a7d4b6054ee1836b084df8a3df22c4a31c369d1b26"
+    },
+    {
+      "path": "/v1/jobs/job_index_itm_8b9295d7a68225abfe7b803b7520aef6c494cd2b_1/retry",
+      "method": "POST",
+      "status": 202,
+      "requestId": "req_e0083b1cbd7349f7bd939a8af97bd3a4",
+      "responseSha256": "f46c0431f39f60eb39b1c7cb1aaa29c775a4a198fec5b1e47888df87cb09dfcf"
+    },
+    {
+      "path": "/v1/items/search",
+      "method": "POST",
+      "status": 200,
+      "requestId": "req_37e900c40b0e49e08d4ea63cbb6dcde5",
+      "responseSha256": "fa9e24fcd1e540cc3866e86c4804c68834643e88f76ba7c9b06ea1cc3c82ac5f"
+    },
+    {
+      "path": "/v1/items/itm_8b9295d7a68225abfe7b803b7520aef6c494cd2b",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_435fef041f1c4585b3f470c94062e239",
+      "responseSha256": "d9fe24b7c666b648e4ee552aa71cca2f0e9f1075bf1ecfc2d92d951807fad814"
+    }
+  ]
+}

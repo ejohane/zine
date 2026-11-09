@@ -1,0 +1,32 @@
+{
+  "at": "2026-11-08T20:43:36.088Z",
+  "scope": "HTTP checks on an isolated local workerd/D1/R2 copy of the real library; synthetic signed issuer, not production account erasure",
+  "expected": 444,
+  "exportedCounts": {
+    "items": 444,
+    "occurrences": 444,
+    "context": 0,
+    "tags": 35,
+    "progress": 0,
+    "annotations": 0,
+    "collections": 0,
+    "collectionMembers": 0,
+    "collectionNotes": 0,
+    "collectionReferences": 0,
+    "sources": 0,
+    "routes": 0,
+    "subscriptions": 0,
+    "subscriptionSeen": 0,
+    "enrichment": 876,
+    "components": 876,
+    "connections": 0,
+    "relationships": 0,
+    "aliases": 0,
+    "reconciliations": 0
+  },
+  "realRetainedArticleRoundTripped": true,
+  "allAuthoritativeDataErased": true,
+  "credentialRevoked": true,
+  "artifactCleanupQueued": true,
+  "freshGenerationVerified": true
+}

@@ -1,0 +1,37 @@
+{
+  "at": "2026-11-09T01:03:01.957Z",
+  "origin": "https://api-next.myzine.app",
+  "health": {
+    "service": "zine-api",
+    "status": "ok",
+    "version": "0.1.0",
+    "deploymentId": "02ecfb45-1cec-471f-ab7f-18303723c01f"
+  },
+  "activeDeploymentId": "ac2b21ab-2673-441b-b06b-3d9442b86fa8",
+  "bindings": [
+    {
+      "type": "r2_bucket",
+      "name": "ARTIFACTS",
+      "resource": "zine-api-next-artifacts"
+    },
+    {
+      "type": "d1",
+      "name": "DB",
+      "resource": "0e55836b-07de-426b-9977-b783b0ea6652"
+    },
+    {
+      "type": "queue",
+      "name": "JOBS",
+      "resource": "zine-api-next-jobs"
+    },
+    {
+      "type": "vectorize",
+      "name": "VECTORS",
+      "resource": "zine-api-next-vectors"
+    }
+  ],
+  "migrationFiles": 17,
+  "sourceFiles": 54,
+  "sourceSha256": "5c2e3772cbf06b82fc20e9ff071fedf72adc651381650c16708821ae50e78df1",
+  "openApiPaths": 45
+}

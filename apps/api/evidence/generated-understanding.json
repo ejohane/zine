@@ -1,0 +1,3408 @@
+{
+  "at": "2026-11-08T18:15:49.551Z",
+  "origin": "https://api-next.myzine.app",
+  "modelExecution": "actual Cloudflare Workers AI",
+  "count": 340,
+  "examples": [
+    {
+      "itemId": "itm_8b9295d7a68225abfe7b803b7520aef6c494cd2b",
+      "coverage": "transcript",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 4,
+      "summarySha256": "6ae7c3174192d9f673d13b1f8d0873cee429b65c0da9759b6f1d79709a05b552",
+      "summaryLength": 351,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_4850a94a26c0452f5776de16738ec96665016aac",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "885893ce9a9e2833478ff111e0d811ffcf66666311396294794baf0a48f3302b",
+      "summaryLength": 45,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_a897e4ee719488a1a242d536c2e68a36118c6791",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 6,
+      "summarySha256": "e34010e667b156c73837a4d9bfa125971b20de26692da4fe0afb9876987f3326",
+      "summaryLength": 328,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_49fc9d84712a09b11845a0b529603297330f4cc6",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "0ef06e72379d512b298b4fdec6ab7e8eba470909085b4b0c0b8af8e9af027aee",
+      "summaryLength": 161,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_3cc3d16c4742efb76ceadfd897a664232acb43bd",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "774cb66438164297f6859053adbae35b6c8786210628cc3e329b081aa09cfcae",
+      "summaryLength": 287,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_f99f4216a2a8dee05d90621cbac3d1f922c5ad40",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "566dbc4282fc54f52c308da3006d27be4afe20b7e9665ab9d7181a7f875ad662",
+      "summaryLength": 289,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_52a445bc0cec78f595f81ca18aea3cdf3f6fe2cf",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "b27413819c99569cacf12d696035f271ff5211046102b9c22c761cf40efd8c8b",
+      "summaryLength": 193,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_da9ce711108abcd518293195db50dd6e119136cb",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "132d599c463e239f5ac2abc16ba5d645e06cc000f8860eba230dd571a4f190c9",
+      "summaryLength": 216,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_6da6e67b28a416f22ffe02e943844c850c1e7b7b",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "e2ede708d6ddc615c66ad32728850d984871bb44ca6c397283bfafab7d4454dc",
+      "summaryLength": 140,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_6d5b3a04b68bc95abab1f2cd6c87cf4140b45431",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "e4e13bb6b41e31324bfba9d5f1650d5bf5bb256742613a55192db33de21919a4",
+      "summaryLength": 225,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_007a7c2ebcbe2f1fb1a6d27d60094846afc748a7",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "85b9404bae0faa912fd031c878eefa95c3ca8df40c5d65208803a356b875c7f9",
+      "summaryLength": 228,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_b235934f328757481601d8aa4f17670a40001ed0",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "9c588dae2319ba6d76338094717e02d4650740357b5b01f84917cbd7aff0099d",
+      "summaryLength": 231,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_4af7684bb863a8718faf395a2aced05f4767be8c",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "41662de0ce09def35ae0406ba36f3a7c11529d32bf899b289b377030ab1c7e3b",
+      "summaryLength": 386,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_6fc24e3562a467524d4d6c0a8f06b4e0cecf6015",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "cb87f9ec5d47b7f110280681a60505e61b5c54f724535c5fa9acc2cb381105eb",
+      "summaryLength": 105,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_1bd4b48f58f69820617df84d82a7e8deec381181",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "0d6aa6b1a9022a49701d74cab43987bd5d20820aee47d882afb5a9dfffdd2176",
+      "summaryLength": 295,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_16e57a459135c0a37d1576a0db4803e854c6a831",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "62bc52d256fecb57fa27288de8365fcef9f058e25dffccd5a6e8626ed039a742",
+      "summaryLength": 200,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_352b7ccac74216d3725ab8c55e3e02ad47d5bafb",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "94620a3e3c1aba0f76e20dff09ea845554f1317d12495460cc256a63dab58c56",
+      "summaryLength": 143,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_cc95bdbabd27fa7336b33e6c0d8d1861adbe7326",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "596f8d223cd24992f5a6d42ca83a63347cf824c97a7e2838aafb07cc4401ab37",
+      "summaryLength": 200,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_b1f5ca6a1473652ea0056f2c5116c516e72b9684",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "002bd24eedf6c7d17e016ad9f8da82e6e1808d33733c9c3470cae1fada2c4743",
+      "summaryLength": 122,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_f93470d83f8606bda48fd53720e25b6373b8e7f6",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "27d912a449ec3ccc94806c9a28ff7fbe34bc698af99b960142f73eed2c16602f",
+      "summaryLength": 253,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_06c6b63d6de477df891e7a43774eb6c70ad36877",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "a3f3e8ff2007552a3fdcccab3ba3e3c241aeba1e012a11c93183223e5e4dbfdf",
+      "summaryLength": 295,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_a76d79885cf8d819c611bed9ede2b704cc057b1f",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "e1666e4abc715f05c9a51e5d38953e9a553d04aab1c48a96c4a786d40738057a",
+      "summaryLength": 94,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_4858135ff21af475dae59861319b8816e171febe",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "ac83e839796a47703c72d19f1b932b703c2f797bf2738c0c1eb4f0677c800a71",
+      "summaryLength": 108,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_6d8c0439d5dd0d0ebd63ef8bfb8d5e1d9ee20a09",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "b708da216eb4120c20a61d3bbc4d01aecf9638b51d81a11bef2412bd608b7e7d",
+      "summaryLength": 181,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_551030f7279d529fb2d65fa8fa1cdd567639d0c8",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "1aae6e9f64cea7c2b09582a675e000e512b4f914ffae231e7e296715d2cc2dc0",
+      "summaryLength": 110,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_547a691bdc0c34a7ec71d61c9191a1d3bfb9de2f",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "213ddeffab907b28f50809f8f6273a8c9a3dcc8352919461e38cbc46cb24761c",
+      "summaryLength": 130,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_c6610267faa568ebcf8d7fe9475b56a9ce2d27d3",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "dc9cc26a8817ec14b15aeb987a0be7d8f2ac67bf8a21e69f3eb8a65048b2f830",
+      "summaryLength": 198,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_b13191bb93d140e06f61395cbc8dc2e0fc0c904b",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "b2fcc4d82e15dd2bdb29f55b4e6c2fc7384444bc95a72990b62d807b90c537ba",
+      "summaryLength": 98,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_509957d6d44f36171721f8e62304641ccd6ea408",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "346db0a259f32dadea93150269af37ba3375cd9b4c051fd53af6b250398d12d2",
+      "summaryLength": 185,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_d184ad5325747801cd33bd8afdabe3c1f4f75211",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "311243879a1016dcd58937da515e2548693f9b91be8fc57f26112384f5e8d342",
+      "summaryLength": 202,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_7d42474472aeaedc2515c1943cb3a2845593811a",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "68a56f5b6c11908136cf9329384bdd60f33d183a5639e5c85ad7a4cffc39c237",
+      "summaryLength": 139,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_a774bda04013f057169011785dc4ff2b09eecd3e",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "71cc5f68927fd9f4a24cc7c1e1b438d024403c0a1ac8c7c2dca519e609c9a335",
+      "summaryLength": 121,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_dba04c4f47634784828290d670ab7ea3877b82c8",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "b9e6f73e353760afeb930a5826b8d8f7f8f7f127e99aa055c5d44d8d21af6f80",
+      "summaryLength": 124,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_be588f977175d9e8bf93f2b11ca6fee79447506d",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "d750342988b247c96ee32498fea45c707a178091b857913f5466ee463f066a37",
+      "summaryLength": 424,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_a9716a31fbf2ab123862a447665d7e11890134cd",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "cb52706c054d555ade8b003736d36ca98732bd47dff24ebb0f4504e6b9ad5491",
+      "summaryLength": 94,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_114076e3a7ad28f9a95b53ae60970bd49b054de4",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "96accbcda47dafe321d14ff7d55702450d5d61072836709b7c05321dc76399d3",
+      "summaryLength": 115,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_0a09e162a9dd71e310bfe891fc8e181795f38fb7",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "f9f6599691c1ac71ea9af7cb853f75cf1db0a729e31a3669d6584756d21400e3",
+      "summaryLength": 390,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_48c9877b062fea5790d0c09a6692592f102e45cc",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "69b86325d1cf73921e7afe281af77dd3ce7a1e8c5fbb2930b434836876502f07",
+      "summaryLength": 159,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_2688cda41b5f44ff20106ec41a5a347fcb595328",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "ac2507399e8918cbc482d4f8f978d7b4dd31edc0995504d09610b25e52ecb83c",
+      "summaryLength": 122,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_2e4824daf14b827b9d7e799f66390c90260557d7",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "b58a6eb08c12587c5c7b8c04bbe497cb3674ac13d1b10704de8b90652cabc747",
+      "summaryLength": 245,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_5abb4c8c46e88b48e7e81888d2544ea8736a1e4b",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "9db118ef665a3d87ea1fd2bedc1af6c0279471d3fb30c70422018dc471f02197",
+      "summaryLength": 125,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_8b1f9571ab80dc61c53ab20239f2f03a6904b653",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "f3c39e35a0b6fe89114d442ac9ab34f7ece8b11be02f24c164f426aed2058a62",
+      "summaryLength": 115,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_c3a2948f1ef9ca7dbe1c4a09ebbdf3bf48644776",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "77207d592f5bfad85c4c8520f4fe7e5b1e699aea3d732f038b720b5b6a771cc7",
+      "summaryLength": 407,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_04f7e8b68b4ea00441c7688a3d08023ba022ab9d",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "828312c51dc3827d956b07bb6d2a2b2a3a36076b1759f48707076ae4c0cb6056",
+      "summaryLength": 270,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_bcf010137277c68f8f99c09da9483b2aa7df476b",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "32b8d0af5f4c667a571eb4036c1049d8990c10d500376acb310138b87e0de904",
+      "summaryLength": 240,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_0eacb4530c7aa6f61f4b2fa2dbe626e31ba625c0",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "d30e633eeba28542467637571ea784fdf04f6d1894332c40a494e3d41e57d81c",
+      "summaryLength": 290,
+      "source": "substack"
+    },
+    {
+      "itemId": "itm_52d2c7debe279ecfa7ca32ff02551aced5030e5c",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "b88b6e1b431b887cf844f0037b8ebe8d15799ab3bfa828f6188994ebdd43418e",
+      "summaryLength": 280,
+      "source": "substack"
+    },
+    {
+      "itemId": "itm_319789a4fa79c5a373fa51cb7e403b8f0e508dfc",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "c205e7ef1f041fa9421564ac1a7f832cb2aca83126620ac61d38f49037466198",
+      "summaryLength": 375,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_c80cf70f262e04af5616f018b8d71971cfb1d81a",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "321130a6f87f0788829e424141d6c0ba31332a448b82bfba9b103c26035b95fc",
+      "summaryLength": 111,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_1785d1a071a96dd20ecdd3131a339452b70403fa",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "e39a3e329944b7d7f2604a93c91aed5a9d3eb60601d507f9aa688bb1747be1c7",
+      "summaryLength": 284,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_6cb72a3f93eca4bf07bd40c93155c3d41a25f379",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "1e253719f111de4e582a444e3a94333253c69e2f48a84f115eb73367eaa6129a",
+      "summaryLength": 209,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_3aaceeaa55755b408fb66e73b82b594e4f6e47a5",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "7692e2f51ca402822daa8a2cbc01fb1ee1678d4c5645fd74e8d7a9b868295fff",
+      "summaryLength": 319,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_6d07824366e8e1e587082eee9cafb6e165065e73",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "a8919dafee9ec277c88affb7cf098e7ebec8bae57af61a68ef5a9e292ef0b1e0",
+      "summaryLength": 109,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_ed8a0726241aa851a172ff494d2d092afe9e0f40",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "7c98ed68616a6661e80aa6b4f62197036f4ee7ef40288454eaf66a411126b7a2",
+      "summaryLength": 451,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_c3106cfc356a7b516978008d1f3fa28de8a161c9",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "48bc3faab33336caf9691ac59cd69d469a1ae07d5468c8a8da281bdd46c1fcd9",
+      "summaryLength": 290,
+      "source": "substack"
+    },
+    {
+      "itemId": "itm_8c8b5809d00667d79af8e49d523d5584e5cf146f",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "ca6b09b9f4db7024424485e4bd62588032ed499d18003229e9d8d02f5dd0d9b1",
+      "summaryLength": 144,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_ff69fc3a3576078bb153d559bebb308d014088b5",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "f943bae9e5f5bc37cfa797dc49730c12a5013d900e4acea498610e6ddbe2d819",
+      "summaryLength": 132,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_a53dd35908b45d9132e3bf2fabd9f21f2ea362a3",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "0a29da1abb555efe22f97dc40656dbf5549205bef41cc9145d2fbc7144b64c38",
+      "summaryLength": 329,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_af6bb7bf6ca7ac5791bd08b5e981e10d75fd2e1f",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "e0eb04a3ca53e3ebee6e964f0979c3409ccb5a511c5cd7d98d4b41565c675215",
+      "summaryLength": 259,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_2d3906c4a8de3e993ea452ba8defb91b750171cf",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "60a4dba89b66264757a9def76c0de553980fafe75321e0f241ecb387e8720a2e",
+      "summaryLength": 109,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_74b6c5371da2648aa8cdfed0a60b1a92332b1b85",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "fb63baac42575715558175046bb9936d1e008a04565838b4e2b665c06273e152",
+      "summaryLength": 117,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_dacc632746a61f47540dda15db238d85461a775f",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "a9b5a5dd796ec7171f058ebffc540bf46aa43e6f18012b1104183e98930ff3c5",
+      "summaryLength": 194,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_0d2a98815dee59e6936a61df650e8bc928e617db",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "3e2c4c4e091f72311f2b4812081d5cd413efbf8ad80afb09abb2c9120e8f2ac9",
+      "summaryLength": 212,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_3f46609e9ba130ed891bf18bd4f1d1fed627f79e",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "4350ebed0bd26de58fc26c4637888a11f07d4fb69276e9563e541ddb8955c17e",
+      "summaryLength": 160,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_c410979905ebf0f7a06ff5ab0492f5015f33d69a",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "c397a18fde5f1ebbacffe1677f5050802d4349e1870de2f001e8f805dddad6f6",
+      "summaryLength": 311,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_7cae99ec07b234f0e75bb6d486528cb62169a992",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "f2e9f6bfd9c7df0029dbee253abc25c67dc7f23acc9ae645883653391867a483",
+      "summaryLength": 250,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_5cafc9008720b7146dcdb78e43297723ba87dac1",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "9d77d64b4e17e584165852292ba6faa9981b5bce38b82305418c8e815582003a",
+      "summaryLength": 241,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_178bef49af3e0ceeeaa3a08c77280ca441010a90",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "c95c2ce31d8e8151f177bf7e3e086175cc204455aa40c5a3cdfa2d9e9853d02b",
+      "summaryLength": 230,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_898cd9f0cb99ef1ae315a0f96b22f943d9d6efe1",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "7e0502ef7c586721b4432cbafc0252daf9edae5ace282556396c9cf829eb13fa",
+      "summaryLength": 159,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_dc6c1f641ae42f61d43a1aeb9e216d92e25114f2",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "9f64ea54cccacd3842d45e44ca7ca8c747c9ac838bb8104f023edf04fd9c9565",
+      "summaryLength": 367,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_3aaf8418bac5e7ceea76cbc2369148681980e7c1",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "29c1ed0b3cf3eeec21cf932bd0d1231c750fec83637d2c8ba7992cc9e8d4514c",
+      "summaryLength": 399,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_e285e59fc94157a877e2a12009c008d6a1b0ecd0",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "6c9f88161c7163a18c874f5261f9349c6594b1388b55d48de0914d404f97f314",
+      "summaryLength": 138,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_dc23f8441d591466ac5d2fc694a8f91c04cff4fd",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "948ab669166c78b5d2b8b8eca13479de91b864b668330a4aa6a053fe0b84b3e7",
+      "summaryLength": 266,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_38388f92d08243419ff00306361cd02afe967ebc",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "adbf62286e9b27226a56d0d8e07c63c923c41300813bee62bc451c125651c458",
+      "summaryLength": 248,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_9df2476933dc1094100d64306a5e96b6c1241c6c",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "cee6f8b77a095da054e7b7491aae34b5fbe036f1c58a3569835b1b6181c15098",
+      "summaryLength": 325,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_b8d30905fa3572338b15c2e5de63b84fe27f6a1f",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "574d14f0117d33033da4ea90296d1052abacee86e4195fde062040a244ca5c7d",
+      "summaryLength": 271,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_a627903be77efeefe8dc57aa88b94d212b2cb73c",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "545ed6c4831d4407c7a25fcbf93080198d18a0d41acdac0fb85437d5f80658f6",
+      "summaryLength": 247,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_47be13d769e378113f24b30e6688083e34e89608",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "ebf429b1ec7a77ff9e3635cefac8d520dbed94a14f863f9705578008ea075809",
+      "summaryLength": 185,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_dc9e19eaf9d03e4f9e0497e38610b704dd23032f",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "fa231afb0ffee5137fa6faf28bba537ac459fe0af7c8d9aaa03beb462c00498c",
+      "summaryLength": 316,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_db52414e1a03c4f1db561e1734c2044391c1fe02",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "cce22086e1e6feb3d6ea6208f1419877473922a790594ea5c1fa77d573916a93",
+      "summaryLength": 282,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_aee8c13884c49661fa4c470d1147ed7876b42e21",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "185ecd8670afb7a7c4a326e488dcade5fb8bb0d1180ac3b42b16795cfd9d806a",
+      "summaryLength": 226,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_d5514ff24918ebd96c01eaa9c9daaa191732d966",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "9328995cc7d4a99c61ae64798d6600ba7f99721d981ee6e0f30cfa809b2dd157",
+      "summaryLength": 165,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_93a6f0db034dca0ab09e902562445f7ce1316b87",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "f4537adba2fd6a66af67658f83359bb3757695970a73997e0629d7f5d82baa37",
+      "summaryLength": 143,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_11f38be1f8baa7858bcaa766372ef1ede7d70f52",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "cea81bac8e06fa8542ffeee5decc4688441f58c73c0f9c6cd50e3227fb634603",
+      "summaryLength": 163,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_59b913e2c0c746bbfd8de4c4e77c0eaae8078898",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "68b87d51b15809f7f8ff3e350ee42e417d07564d4b8304c7ea6d6edc69144066",
+      "summaryLength": 184,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_b112893938830cedc489dc8f1699025d31fb7706",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "5f9d22186a01f502ad100fa308f8b043894cbce625eb23bfdf345c5e1b73779f",
+      "summaryLength": 98,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_dfe54f111ceecf73d9899d102a76e9710a4270b1",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "c8fdbf6c94ae5279188e957153305632983513d237afb6a36dc57da21bcd13d2",
+      "summaryLength": 109,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_a8e657f6969c3798f211e8263572d9493b3e2f8f",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "304015cd0c1db7c28de126bc3a69fdda94026192cc9a81ad4e731ca9139bd75b",
+      "summaryLength": 295,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_8a7b7059e154058e226132ec0044a573c2b7b2ff",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "e9967262c57e72e05100b5216e6cf50e12d0dd5dbe1d2f3d1233e99844ef63e9",
+      "summaryLength": 348,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_1fd09086f3cfe63e70c9093d65673caeffcd283c",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "193ae154cb0f895646a7ca63b08a1431045386560b532593d8f2d551d8e805b1",
+      "summaryLength": 250,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_08e599594014d734d8e8821ac2b4981a9a934f08",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "db3c844d06e56e964f3dccdaaa8094d6b1622e3158ef033bb1afe56213a61173",
+      "summaryLength": 122,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_f49bd234eb90ae2c7927541dc86e5b771a1b6fa9",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "623cd33e4ee9dce77e7d00700dc033b1177f062eac67ad239d9daf4f0b9e1f9a",
+      "summaryLength": 295,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_8197a26c332972d43f7907e1f814544b3aab56cb",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "74277b260683d25b898dfae1f0bb4244815aae1a7accef1dbcf9c61fc8c15dd2",
+      "summaryLength": 163,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_2664ece617ce216940ea22574ad44785c760546a",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "e81166c84fb4e5041a53ab1b34a0c9b33a94a782f3fd504340288fd40fd9b32f",
+      "summaryLength": 101,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_9f50527d757691d77a4ed37c61860f51dc70654a",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "565d1fb14726f0aac8204de0a8b5df529484f77420c67b947ae8914808c79dfb",
+      "summaryLength": 299,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_5328317c64e6235e794d52f8ca97d1357c6877c0",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "d7930527472fca96d47b8ee97a21f2850aaaf50be324d3fef28b00bba9c5ccc8",
+      "summaryLength": 233,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_65d4ff9d194c487ca819f91dc073833bd758d4b5",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "5548ed87ac3d169ebaf6cced5d1ce2a70aefcc506ec8629214b0c3afcbef52dc",
+      "summaryLength": 226,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_309c21817cb73256b90df8fd26442b95c2727fef",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "4460f73347fe2e47ba6bb64b0251f7d1984f4ace43c469af853d6d7eef8acbc6",
+      "summaryLength": 345,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_4cdd1392709cfb4ef55c419941235c75d928fb0d",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "d0c94143b257fff3bbb993d2680ca895890f4ac00e1201556b1c1d82b279a587",
+      "summaryLength": 100,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_5de3baafca831004b69fc04dc971761a2b41bb6e",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "4c489a6e86239fed1503d2c996942a3d06b70e88ab30dbf4d407b7caf8d8fd5a",
+      "summaryLength": 122,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_0c0d95452ed9c656177838320d00e277e231282e",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "0562c9e501a4cbec31e12acfce5e4715aff727f4122f5263a4f49ccff71dd186",
+      "summaryLength": 198,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_f30089b986943d68b54a53b97485275844b22d08",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "bceacc1fed52b9db72e2d8d82b2018bcf55130fa3360f91355952b15317c1d67",
+      "summaryLength": 320,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_f1ac1b5751de02670e135fe1b307cf6e36ad6623",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "10acb38fe05d7c1ce55ce0c524b0d9fd91031bd77852d43e0539ad5bb503ecc8",
+      "summaryLength": 277,
+      "source": "substack"
+    },
+    {
+      "itemId": "itm_5d645b9899e2b0c39fff86518954259664ee54a0",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "38514a4889e331d6d44a917a8a7e5af9961587f0216fbb0d8e86922d191fc3f5",
+      "summaryLength": 392,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_cbeca728d9a7fd1b29af7ebca35be78fa807c10b",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "20406c49e201b3c9771cc4092d31eaa29906b285888b8c04541b9b6fc1a77ed6",
+      "summaryLength": 410,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_a30b15118ea9a73fdd6365a9e215883c0542c46c",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "8bdd7af09a8deb629608a453bb8a9d950f6f3d93fff6659396c2a1ff6e3d81fa",
+      "summaryLength": 94,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_247442cc683b40d370daabf7721534809072809e",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "d69417e1c39945901dedf16e22895bc1d6ff9dc358707726732f35be546a691d",
+      "summaryLength": 387,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_1727a014ee1b70b5c3e46cee4e243a67248f1bbb",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "9a7762f33babc76316126319c2b75357be093fb6e293ff913d046e54a7879235",
+      "summaryLength": 221,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_899b81cb226784fdbe6da6e7a43a4bb19f0d9025",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "adc2295997e374b62450720b22adf4fc65cfcd4be003ff274e7f92aea807633a",
+      "summaryLength": 199,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_28bb6799ee65503ff2bde739b9bfdee8abee55b1",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "38beee2c896317dd364f3f7ed71ebd1bf62fc9af3d64cadc1f55cacd5890693a",
+      "summaryLength": 419,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_73e5242f9e6506dae168163272e9579e0faa18a5",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "fd403f9294bc700f18fb0e99e2cf59c28c8cf3011e7097323dd229d7a0921102",
+      "summaryLength": 199,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_02a83b52a35e4c2cfb861482d52355314b0b26e5",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "f3dcabdbb068e00f41f1d95beb6b78f23a1f1d7353866d98d385c477988d3556",
+      "summaryLength": 240,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_b7aaecc40029b77de3286093a901c0916b331c99",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "e7557ebcad9a034ab2455ee5bf9c1a401c9ad2a07e630917d53de881ef1afa84",
+      "summaryLength": 227,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_b536dac41ca8b5a1f4cabceaa28103b6307203ad",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "2333a1937d49522806c8a4be7f20ea94025f8751976cf6db3a2cf7f1e535c6a5",
+      "summaryLength": 160,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_68e52580d7bb75ad68cedb59361ec027b76d6f80",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "6a4698f14707a2527bc89517c63adfc09f50545413321eece9f3b9aa066b0dd1",
+      "summaryLength": 388,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_03e66dd48f3f4c98f1ecfdc3560cebe01078dd71",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "74b24dbf8b2852f62582601dc2e7852cd58168af75c5a0060e04c2e460229305",
+      "summaryLength": 204,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_29952789e9e374544705b039840d80a49ca25fa9",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "4f75f3d1e0022d332609e27f55db89b523d56593801515607aaa2722c4e3648b",
+      "summaryLength": 201,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_43dd41e4f52761c495288205bb0ef6cc96ec509d",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "6777e74c1c0fafec6c1304d39168c1098d6f851a9a57d23db7ac5021ad2fff4d",
+      "summaryLength": 111,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_9ccd195774d5e6dc5f5d3d8124c07cc9599a7b4c",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "eb8f670dc76330b5ca082b6d92d361c8471c1e3b86aab086b16ef797c69189ea",
+      "summaryLength": 129,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_8845596bbccd765500bbddd81b56b254acfd6bc0",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "8f852e724b25f8b6199ab33ff6223df739f0b0ff7e93b47b39f59f043811bda4",
+      "summaryLength": 112,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_2c12a41e3db2e58f5dba7f837907ded6d13340e6",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "02e4353bea9ad7ff35c71c9811e3de9e1cdeb4271d47a949afadbdd39e912c79",
+      "summaryLength": 405,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_8cb5fb9be7ac4d296e15cad79f4d0c648a54a4e4",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "b38ffac9c5284ee85c2996039709d73c6dd4f0ecfb285533e314470f2ca3eaed",
+      "summaryLength": 364,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_75220095d5043c7509911a5f6fae0209041ae089",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "db43cbcd0e13dc9e8daa45a602ace786cd60975bc4e7415b144417de57a0eb8a",
+      "summaryLength": 140,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_02f9bc379e2b100d1408e97c27e67ba35588bcb1",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "423806395ce340644d25dce655e8b19b6d0fe1dc31008bdf3ab95e378f3f26bc",
+      "summaryLength": 289,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_197d6b0ceec346aa30ad58a18d65dc0a37e5e536",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "d7e5b02f8b3f6329f1a53a7b4756c85263762e74fed9bf6af56fee3b9f4a40a1",
+      "summaryLength": 485,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_d38313ecd847722cdb8609ac77e03283287d27ef",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "06ede490b1beb9826d54f5dda79c4b2c53d568d053f3ffbc46f79e7f1ba4ca2f",
+      "summaryLength": 124,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_1ed15265dd507eee21db58205f37f86880be9cfa",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "af7a5907923794897c600bcb1f8896cdd98a9cd31e665f9e49296880dda4a89a",
+      "summaryLength": 104,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_f0bf17b56e5ce56ccd7957cc8b9e3085f10ade61",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "843569a1e701207d56af0af34385bd82d8590d1cf048fc49e2848dca175ca46b",
+      "summaryLength": 311,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_5e9920d699bd3de67a3c03f9fc7e86778d754a76",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "591ba4e2c74b5da91fe48a562f0bb0ac9eb281384ebc95bd8330251f1c8ec262",
+      "summaryLength": 382,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_e424528ff99c5d6654e9597fd6a19c7b4ac5c6ef",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "aa5c2baa98f8d94c3fd14a13f59509a8660ad5d219105f546aaf2a45dfbda85e",
+      "summaryLength": 253,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_5fc961f991b630669ab75c13862320e634484d46",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "09bf530cb6b5bad408586889e7bd6fa7074db80c314c0fc5d06d4a93f0ea99f4",
+      "summaryLength": 189,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_568ff68ea05270e07edcc7a498c2c3f8eb227d55",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "12a9ed2cf238208dc66a5b42bd356262521bda83991e7eb274ad78b683219d60",
+      "summaryLength": 223,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_fe9ebe861a1ef1d490d612d803f4f07a0600a632",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "c4572aa46e37c44e6cc7d19f343a3f56c970010ba1740fbcc02c449077a495d0",
+      "summaryLength": 83,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_f4342d9f3a9e2e9894d69d883f79f903086a17eb",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "b9f8076200f363beb15a517b24060471eb7cc9f9d503085b7846cf1857272592",
+      "summaryLength": 136,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_522d5b1749891821fc12bc3352dbed44a609ee1b",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "5fa513736912c9694397c3e09c728ffe729d9c1e417fd1a502a1a0a32f991ecc",
+      "summaryLength": 135,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_11fde4372905a8632a8c01972bcb9c214d8ffd3d",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "d6b762b5866d94f3a6b84201f7611d15edc33dcab0b60825766a4c81c051a61e",
+      "summaryLength": 280,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_b0e5bec23d893267f334968d100f0a6fc21313bb",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "bd702459dfcd7965df14a11ce39fd4f00cc9a1eb954554bbfb86b4f94659bc40",
+      "summaryLength": 265,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_fffeb0e4602fe1971abadc53c824a2e10001ca6a",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "70559a7b2eb293e117a291b58a4ad689b0f0b7d31e14f85a3173835eeeec27fd",
+      "summaryLength": 110,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_ba6dc3bb1f0ff65f85f4e44d76f3f45f5ac0b02e",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "358066fba654ba7da59e2041695171d065e218f51b14a405e3d9c0c09b2e7cc8",
+      "summaryLength": 527,
+      "source": "substack"
+    },
+    {
+      "itemId": "itm_ede904196091f70a85834ead732a919f8e02556d",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "d0ff2593acecb7fbba762a7f1cb7cf1675746272ee1d721d3ceb86439820c966",
+      "summaryLength": 255,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_b71c07ea9f6ce009098668292a137fefcd256e94",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "37f10b36a5cc0eb102e784f31ce747ca9d9e9a19c0b180d551bbeee8f02cb9c8",
+      "summaryLength": 193,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_53af6c79bf42f8449a8f02ffd710e4eef5903938",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "2a6003529e4d1b695e808ca6b09663a07a7db1e0413288d9eee094d53886f71d",
+      "summaryLength": 130,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_a5da9c52cd33de9851366f7931733829519620e2",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "24e16bb721643ee066f6a7bc08eab41908de3d8e68309744d3845fd2150e1b56",
+      "summaryLength": 197,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_45698fbce849cb807458eaba960c3a20964f3256",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "4e05847c4847f2a3b35768c3985d2d3c1db75553739cec348d486dd21855b29a",
+      "summaryLength": 331,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_a9272ef77c555dc3aa850b51fae879a8fb17853e",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "677ff585284e5997e044304c28b7053c2726ec32b650a50059033a468c09b286",
+      "summaryLength": 151,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_4d0091c74b0850e752a48d8a682230ccc0dcf19e",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "43300174a495a35aeb4feb3878a7e745f3be7e84966a923cde6a38bb8e758184",
+      "summaryLength": 310,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_c323c30128869c28067057832d1e80825863d577",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "90c43627abc9ec4fcc71c7e80c5a3ac621564cb9e61e87a5bddf8be3369f8553",
+      "summaryLength": 208,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_defe734ae62200dfdac8e7be7ba0f908d8e2b7ef",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "3437a12139b8c1af0375fcf706bc705fc8a84ef5ca93aec8c6c2befbbe923cc3",
+      "summaryLength": 355,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_4b4eebd568a36f9ec925eb27cc8ad3aa3ac791f4",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "126973759600359ac8bf547671dc9662f139d1f04cecee7f60851c2aff7f7c73",
+      "summaryLength": 118,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_d4c33a3673123dcffbffcdafe029e5d46f1a0760",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "900b0e995a9df517fd2c10592f3b2254cce274d0de491edba44974bec45c62fa",
+      "summaryLength": 513,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_28b3ac1f98a1916bf080016ea5ec609de92cd0d5",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "6dce924cdd87fa23229d45d6b999c8f523866415346ff8d1594092282c78c2fb",
+      "summaryLength": 328,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_2445f43a046849a9428b0f3125f40009a9f34f2a",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "00f0251c1285b7c9362221d2d493b443a0515c545af0d8b40a4184c3d2826df8",
+      "summaryLength": 228,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_ea1603b1f16868fc3362a6bfabe68433486af74f",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "af5d6b142d9b7b949e637afcc5e7740ed44a568ab7e93b523a65855e578c97c6",
+      "summaryLength": 390,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_ca924ab24c86c4b29bbe68eafc31e5f882c7e8c0",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "81aba3cd15c99285c1fe43b27633a5cf38012640784ca102d818a88bdb9abd69",
+      "summaryLength": 376,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_68ee0d8adc13c63cce99b3a1162f511d43375380",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "48db00fd3142426dfbfd8c809e9fa6efe14a82b9d034cc4ac53a0a74f79cb2d5",
+      "summaryLength": 102,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_658278f6d7cff1ffbde381277d0b1ae2f8d97d70",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "6305ee522a336f55b53809581e1cf4bd54abf33a26437c2493b727273e53e663",
+      "summaryLength": 75,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_c4d501e8842036f2e316c6c7521fa6b201df80ef",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "ba68937a82374887b799af23d53e55873632da71a931b472da83337baf91b592",
+      "summaryLength": 326,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_f8f932d03259861b6c8cbd7f95936a0587c9fc4a",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "8114d20b2d5fa137f62321398d1a1d8ee5b9c364039abf50a53945a9e69f9e14",
+      "summaryLength": 190,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_8fa9e2619dabff1f811305d6d08b503515d51941",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "d978eebf11cf34bcf64a58016b67f7448d73aec897484949f015838b69b89d2e",
+      "summaryLength": 199,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_dc498ae962727d4970ec37c83399ee282597df18",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "69e1fcfcdbefaa8f8301fb258356a7aa4e8123a336aceeb8bbc78e00093bf858",
+      "summaryLength": 302,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_289e9e46bc84d27e51179447261e64f72a2fa9ca",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "7998012a2bb02023656b6f69057bb46c9576779ddf19f63205bed0d8ab50a780",
+      "summaryLength": 154,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_7cd3b49c99528a79637b068d877bb28681d95ad3",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "df853e5f6902090b0cb661e61fbc186b5f6dfa0afa391fd6a9081c70c1526b9f",
+      "summaryLength": 144,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_343ce6f90f28c664528cea38527f40d22f413334",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "808c447c36679762e9c16c06682f7647419e277b250f30d89a12d4b3a7328f39",
+      "summaryLength": 311,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_0f46d8e6c5272e9b82bcd2b2567243277725ef0a",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "b6f1e847a0c8cfeb7801a26d3db166a7332f90b046149ed85990638a11761bdc",
+      "summaryLength": 215,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_9e950c24e3621d85208e7544b646cfd8f93851b8",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "ce97334f3b8cf1cf993658acf51773d03827a559346a5c161566a1f1451715c6",
+      "summaryLength": 186,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_a8a991b63f60babd027f466aa41978f7d6cbe083",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "3cf2d1c227d6ffe45feee223fc67e2873ffda8ccb144e8fa2208d0892f0e61ae",
+      "summaryLength": 435,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_0351e7b752af2c794a78e57552eb1df5be53e803",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "b3fe5a256f016554e5d05c3730fbc12bf7eec9998d6a52c0eba92b080e3dea82",
+      "summaryLength": 81,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_9d487ce2e8812d384e386a2fe0108a5b4dd623c2",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "582e5cb8f0f2e0f4724d596203e8f8163f585e778d2070eb31976a2ac61717cc",
+      "summaryLength": 171,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_5eca58b31055491c128d150a5b3207a3acf9f22c",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "6be7e7507e88b98afd593e3bf97f564b230e98e6ff605310720880bb62d5206f",
+      "summaryLength": 187,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_cc250b90bef087571304c112c27e06850a0cb58d",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "de278cdf8cb4adc05c3b80c822605ec12b90c668e261cc4f893c2cb9674b1186",
+      "summaryLength": 118,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_f6389227622dbb097c211e50907aa2b0042e51b5",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "143c58b73eebc2216ee61f4da4e2d95786a620d6823ca412b2b027766cc7f356",
+      "summaryLength": 152,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_27a2fa2543982eeb576e4d140528d8ad088f6407",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "96c9ccdecb5cc022e7b8e96b6d180d1bc77c8143015a4d3897b50afdb6ba8d26",
+      "summaryLength": 159,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_0f830abd48cb25da69240d7f867826039cfbb6da",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "a2c4ef33b68e36fc25872e722fd0a082e57e7bb97c7cf6c221c0e0870c54b50e",
+      "summaryLength": 279,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_8427fcb760c077de2137064c63190c0bd8d8fba1",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "d7763a35a4759fdb8e89c68f3626a4dc35ac25cf680656be9f2faeee589f740f",
+      "summaryLength": 91,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_3a6ff78c6babb78e6099c2b8239521c8bd6d6aba",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "4c731b484b6f93387b1e6eddb9c1ff5f9dcd13d37cb4d0f9e876870e436597e0",
+      "summaryLength": 300,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_540cc499d0a838ab0b61faac53beea1ea6b8253f",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "f9c165485e6de9e0a0cb8787c4aac3c1395335f5e70bdb5094299c19420dad1a",
+      "summaryLength": 108,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_3a21216de3ce50a62df879a43e96209656353959",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "386fb57535c30e28ffab85333b150a4411ab42edab6af529dcae732cbb299182",
+      "summaryLength": 340,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_157c1f2b929d7b9dd0b7c65badd1bbc678bf0375",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "8d897dd1613a8cac0fc084e683a52fc8f35eea07e1227d8f392648b5f174d5a9",
+      "summaryLength": 141,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_c926323897614639012e0fdd5e88c0328879b495",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "6972376a4ba36e32de0bd0215bd55b035316d11fcd71a72bddbd1752b8d4d3c8",
+      "summaryLength": 243,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_ec040f3b672d0f45df37ee0900712d312fc27020",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "8690d461a2e43dcaea159097f84230255af292b3de3f2cdef6befe05308f8057",
+      "summaryLength": 520,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_8a3d5c20278c34cd2699e3b59eefaa9dac6d423a",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "db3a7032babdf965e909ff4c89b45cb54d058b5969401d71ad9c159e944e660f",
+      "summaryLength": 182,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_f6c8f0ed62d48eba63335d1ff0d8b9a3fbcb0bfa",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "e45f64f44839a9ef5ea544dac7111f6372d83f63ce0ad694a7c0f15cf5017e74",
+      "summaryLength": 302,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_873ab2c66a6e15c954103b0d17c8e6da4fccfeb0",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "4a633cd7febf65ef0681301ef8ad110eb415304f2cdbdb5dedbfddb4853a8193",
+      "summaryLength": 241,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_4be7a75ed1ee1784efa4e8b372671228656dbc12",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "2f216e88c295ed21fa6cbc3a5d6f9485622bab89786a6f06624779128e149d43",
+      "summaryLength": 121,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_d2489e201a5a9d0c6fc1042ca7a28f986d051d1e",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "53a09c1df3904984aacb0f243edc33ff7175e819d563da6ff0686a1ace4cb175",
+      "summaryLength": 373,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_13dfd78805dbfebad065e738ee752662fecbd2b7",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "f371b21beee58266e400a3f7972c8cd594d138f80acf6828ea7c8f6ddeb4b6b0",
+      "summaryLength": 249,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_b5d1bc9c6581fcc0e9588196c07b28c005b899c3",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "ed3f119bf3a4e8a06c9af88763374ec1dc3fa15ed9e6b2f7816cc2dee48d8137",
+      "summaryLength": 149,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_a6271291ece42056d2d7e951d4b5195466be7023",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "8bf51f981a74c9b52fb8731cbe69384207a32b29227962f6ec94667fadc1e929",
+      "summaryLength": 314,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_e846fa6a675a86e0b464a41571e550f3a96e4c4d",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "4ff3d2a994c8c7d411fdca21ee785c0231f6c9a9fe2cf266768d8bed23000cf4",
+      "summaryLength": 181,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_4fc200f9529edb3ac6e758c4b6e3675958275234",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "116bccad7d66f9320db3bda4a4ef463d475d1447c226ed058bb8c886016c7257",
+      "summaryLength": 184,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_c13af3d190a0e2cf94332a1b3b7f03f9cbd09949",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "4294f51832a530ac4244a1ab583ffd28d6577709c2e106f3a8f8bdf1f73a3943",
+      "summaryLength": 145,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_507fbd5c20669e4d875d6ba6a7bcd98681e9ad44",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "d1fdc6ddb82e8cb4b6303cd85532e5090af9604cb1244aa44ee92649f48a6ef1",
+      "summaryLength": 243,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_4d1544eebeba0cad1967ceca7e1ba1ef465d4f44",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "7cc24d1a89b7235c5d3a654059701aaf299240c13367217974e45954ea74a609",
+      "summaryLength": 120,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_6657b7580844674fedb5fc331f5499211cbca832",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "eeb0698c48f92fa2f5b35c42e6ca065db0ad7de7da0a543f43f99dc12cbca1b7",
+      "summaryLength": 143,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_a7458f77788c1c32921f38f7cc9ee952019ecfe1",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "ddf4c07444087dc54300acc27dbe8b25fdf2ee2e27316ad18b41b8623d0d8bba",
+      "summaryLength": 144,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_24c5b8b6128a19b6e0a1f7367aa8ee3de6fe143f",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "f4d814dac9709ba83b839d3154666cf7ba8c69376112ac08163c962589bd127e",
+      "summaryLength": 574,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_e86dedf0addc55ef4406f43f40a2f8af4d2f8832",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "39ac523f91789f0b217c4016553bf0741fabafa2f71e3a0c9403d8c181e8651a",
+      "summaryLength": 421,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_778412ea46dc3d02ca231bd2dc01dd89438f3e89",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "911cf495c0bbcff4aa2c116961ddae25df96b5b952a94c7d0bccc5658ac87cf3",
+      "summaryLength": 357,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_505e70eb060fe3cff3074c474e9570d2b0f92810",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "df8655bff163a2e2ef7743dc48850f6004e2d1dd29568dc0cbbf1433a14e65f3",
+      "summaryLength": 252,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_0f96ac971662f9dce677069bbb46e7e0bf39f0c3",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 3,
+      "summarySha256": "7decbea4a42f22b25dec4d8bf54c8d68092fdc4a7fa066eaf5d089827e49c9ef",
+      "summaryLength": 457,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_1e9e40216d62fe2cb64ca7c0c6eb695deee9813d",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "6c59040aee65500d649c1d6124a790aab0f9c5fd7cba6d7809b8737c1c8faef9",
+      "summaryLength": 129,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_e76784937181995106a70b5e0ee437df30b57088",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "26f88605353c7faf45c948265a1fca51f50dbb11246e12e118fa6c163a849675",
+      "summaryLength": 149,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_cbf15859f4f119f910d7319d97f135dec4968b2a",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "48aeddce93fc22ebec9d8e67ed731fa2dc18bbd184d40782b761744eba8ff0da",
+      "summaryLength": 192,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_c11c2a3dd3e9bc1563063a8b324317453ec94289",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "82a359f83f0e71aa976e78043c2d972d6b88eaf76d5edad34c847c10a196f8c7",
+      "summaryLength": 267,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_d9cefdad8a0a035a7c6b191f81bf46bc7b68b37e",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "957e1ba0dca8f43889e1607372809242ab890f14bf8ed90ab598a3c5cdd917c8",
+      "summaryLength": 196,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_23cf6bb0c2ce923920dfe368d75c34cfd7fb12a8",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "9d9a5a164d0d11a38a1992f642c0f0e17c7f5cd3c753a11481311257e2c2782e",
+      "summaryLength": 147,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_106c5d405b317c5951f96c5035d9cbce4b87cb11",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "457896e35b2c530be33c7131d9fc173e36f7ea07af7977dd507d9370f8999afb",
+      "summaryLength": 409,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_5a396e4b5bb95d970c2871bac63babba829f194d",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "b9242f860e27aafd6b0f6f64b2ba06c863e553294b1d1dc91d21c54ce1c05b66",
+      "summaryLength": 319,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_36ab1074bb296a53f7a5186702b89f6e708abf6f",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "4a2a240fc4206244f57a5dc96c34768e722e858ffbfb63f58afb685a1c22075f",
+      "summaryLength": 427,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_419bb9d5077d4d0eb5fdf3524a8f05354389f345",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "8e1d2028187588197b75f0817a2abc9f9302cf54ce3822747381e334589c1678",
+      "summaryLength": 193,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_aa482877a92ee63775e1332d7f40538dc0639cb5",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "31a9d95f510d6b3ae4bb6a3d72cad19fc1f7c07c47263d2eeca8e8b8d7d9beac",
+      "summaryLength": 108,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_f4434b5314f767c69b523707c53670564713a5f6",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "3ac3cf52221a9aceacf5132624c6ad31c96295e8766cf972cdea9d9029025776",
+      "summaryLength": 174,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_0e5bd3d3794abcc1e95d8c526f70f92a8b6d5130",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "182e0925853668e625de2707c3284759e589378534c0419521960283a28c3b5f",
+      "summaryLength": 185,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_e5610605dce0979670bd2d8e4401891411880ca2",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "69d2cde1109a84a175689775715bc614e8432e98462489be825960a0ef23dc9b",
+      "summaryLength": 320,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_8140165783c9f90a2543c99b5cc488e27eab3cde",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "21340da78d0ab47493cd4e8782170ba4f6391f7d7072779ef5af47605380d80e",
+      "summaryLength": 124,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_7fb221b971cf25930969f857f22ba69b4c338b81",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "edb775dd6e161cf631e7850880e131ab803fb051ad2fca36d8dcf3bfc9dc1945",
+      "summaryLength": 255,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_80ba6c8f7f3d0d2f36a0c8eb4cf3f6d7243a20d4",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "b7c9f400db7d0b47b8e68cf41612b8b7c1dab65aac49e3380443d38d44b34b23",
+      "summaryLength": 141,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_f831fb64cc2df9d896059d5f3aa7b61be7242cfb",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "608b7779f33b28c1d41fef99fd70b254d7403b6f554d9fb256b308f84feaf9df",
+      "summaryLength": 150,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_aba781a984086f3355b6f32238663bdce96e867e",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "a32b4400a57b386e9ad6f90a1345c9df925ffbbd655e506cd2658bed4e9ff6bd",
+      "summaryLength": 229,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_385c1cb22cfe4512a0adca05bdc6a2ab7ef79cf2",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "181b045445cd2ba6d8c366dbc9bd8b716e0ad201e2669c1db3ce502012bf93aa",
+      "summaryLength": 200,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_728cf50f0f265fa3699ead47b64083e70f1caefd",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "ac2df826a577c19388d4eb6d4716ca048111850364a921dc9e169e4022b9aca7",
+      "summaryLength": 141,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_d5914f640f52ec0d6c090f33627771bbbc05498e",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "803b9342d5956c80a7676dcce00664a9aca823ea60281d6612b78ce10f27511e",
+      "summaryLength": 253,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_e19916bca223f367ae7d2cff5bffe80a1b697dbd",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "e311a5d1818da08c5db52d8f0004a69c216e6cdb7910a42ff0b08edb29a651b2",
+      "summaryLength": 122,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_b3736082fcef98a7848727590c08b849e31f4c83",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "8e9714fcdc7f38d5d05841ba14caf68d3ad0c2c2164e58dc0f2fbac6e96c5cc3",
+      "summaryLength": 257,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_1b9c8ab3a77c4401de9a6b97d32bebf8e4f238ac",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "4652557ff7945565e0a4decbe4b32d13616f18db0ebac37264e0f6b9f08c33d6",
+      "summaryLength": 115,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_d775a5e6a874c488edb504facadbe4409984d5a0",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "728b66d253d408b078ff2d87e2c5522f256dfe03c23751446d00e37ee6bf4247",
+      "summaryLength": 163,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_ae4a6c11c8e83e434b63ab5a75eba7f7877ad26b",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "573217666ed7e65fdaf80db14aed99d87183b056d52a3b50203c37bb99e7a7fd",
+      "summaryLength": 107,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_21aa4de3f3320560a7ba50e45fa7828d4564fe54",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "6a041d860e2e41ae05bfbfa35aa011272ea1ac016dfb412cf0126d0d7977bc73",
+      "summaryLength": 270,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_28b354762bafc2acf2d22d9d2b61a3eb8baf71e3",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "d872ec2c7f0892e30a03d08a33a95267ae6050c8c439d81b5ba23d45663ea9d3",
+      "summaryLength": 288,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_a80821a4a41967dd9f3b6b7719ad1bce3395f81b",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "c19e0f8409b3ab361314e1025b4f99da29b2be351b6113f2020ccfc306dfd48c",
+      "summaryLength": 314,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_f9ff328741827f1c0104590ac16027c2a7dd525d",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "9e705b83a6aabdc9528da312ef765c3a8bc88c6d5eaee5461e00f90399f04b22",
+      "summaryLength": 259,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_37347743b3ba8d3ca24a9fb5a1dcd952d6ca3b00",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "71e70663d85276f20068da6238b3dd1a7cd4771b95fdddb4d1a636ef75cf3592",
+      "summaryLength": 120,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_6ff9ba8a0d4fdee359618cc6b3b278b48da6fdd6",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "1062b3a26604d072614a9bd2e395a3352aab4d0496cc05f791ff5f1e2181742c",
+      "summaryLength": 341,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_1892a7346b82dbc756fb5939a243bf8fe49a57a0",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "c32f5b1805fa60991ac1a5fe6c5c267c2cad626526e5b6419c71a20447bb383a",
+      "summaryLength": 102,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_06aaa56ee2deeedd649dafb2a673399fe30ee1bc",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "8da74d5d45dd1c3c04c0ede470d3fd8a6c475ff14b7b9c467f5e541cf676dc57",
+      "summaryLength": 338,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_b7aabf259cd4148169bb3f27b750b4ba1fbcf698",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "0f03f366b34eca549a3ccd62a662fcf6bef2334c0a3411357b41ce2fbe8c17cc",
+      "summaryLength": 239,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_b2b7f4ac72caf3514c40fc2d7e6162bf789d5ac9",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "54f571c1a8a76ecd7c4a293db348931714b45d207be748600db86d3540c1a783",
+      "summaryLength": 172,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_eeffb312e58771dbf6b1012431b98ffdeba2d325",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "342d45bbe05825a8db50c43525a49d6c44326553245afc3b9182de78f7d3f878",
+      "summaryLength": 364,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_60fec221e63eb03d6e244d02be412ee0fae960d0",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "a7a83739e9ddc02afb102b24afef2d49db1c1c92e36de1470fe0022b6225d050",
+      "summaryLength": 199,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_2dbb2e2d5ba30ff01c771c09fc6107bb0d3e72c4",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "8946c83d629968a8c4063b3b11c8a2f66295f699124ce433781e68c14c729b92",
+      "summaryLength": 157,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_011b90d600fd6361bf636865088176e644dc42e5",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "9f99229bf7d24ae48c9eb37eff998910d037741ec5e84ff8cdeb451204c85cc2",
+      "summaryLength": 387,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_0bb690acaf168379e011d4fa4b1b2daff2538e3d",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "fbdb15f0ddd64e738251fc7d8fa59f35ef6e9d175cc3a4969d98d5d036458807",
+      "summaryLength": 229,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_056f31814b045f9eca7c2ecaef1e7d5659dd8288",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "92cb4eaaa6a087ebbadafebd525a6bdeecdd58e859d690958302fae4bd7bfedc",
+      "summaryLength": 309,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_f25f2636a8463108c777a95602846bd1ccd99aa1",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "fea7a9f4d7b73366e655af7e987a041a792eb5a17bbf443953524b8d2e71927e",
+      "summaryLength": 244,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_55a180cb1b69cd7986b75c51c36713d5b3be9dbd",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "47679fa20f28054c77c5aff25bd7a4c9510a07a2be197ee86298347335bb094f",
+      "summaryLength": 401,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_2f75805226949ebb3c6e6a7fa830ba9ffcc715c7",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "3f330fbd4081ed99624513909c5bd13c2d7a57f382ecd302037959eafbd6b2bb",
+      "summaryLength": 213,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_9ab2c0017af06d48122e0d39f452e03a36133be3",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "433f4b024a847b23e9abf4261c1c226134cf5b8edee933bc6468702aef2ae708",
+      "summaryLength": 119,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_8ffd44061be7382c4ba79d9c2dedeefe6a1329c3",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "6cc8460872bf9c7ab931cd193feaf82664f052b8e47dccf73eb9f2c8afdd97bf",
+      "summaryLength": 276,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_8c72b004b0e6fa345e5fc242b1a10a92329d71de",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "9eecb821176071f06c0e9219aaa552847d1ccd2c615843b2e0cdd1942346b9c9",
+      "summaryLength": 110,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_663e13fcc731b58d7107016a09f4674417aa4cb1",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "353b103d09f6823a17e168e55cf2469d50261dcf455cb841ff7c981a2901240b",
+      "summaryLength": 262,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_0cd89aacecd2c19aed94bddb8781fd398245fe28",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "fd1f13fa29c9f3c21caf85362820fbcb367b46c3dd81ea8e29055e3556fa7481",
+      "summaryLength": 273,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_d5a7f8a60aa09a03c66e369c591f86474d18f8ec",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "9e5221f77ab418ab8d258d9969c8caa8ff787101e01bae533cb803cd02088c31",
+      "summaryLength": 121,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_4ee99d5f1ce1c6a6605bdf7a85f2044255437016",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "e55badd0f7875bd512c5af666c2a5ea47f81d90760ef2ff45698304883929878",
+      "summaryLength": 238,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_2a7499b680261894d5f87845f449af1f5b7db8e0",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "3dbbd4372f5960d88d0f4de46f9aec54f10a3167c40ee19b986bd25b1def5d61",
+      "summaryLength": 100,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_d4648c20d3ceb1fb8c65043511892d283dffadcc",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "af93db4a9c878490739f2e7eb8a1876e1452dc5799fd857286f77cb6fef26949",
+      "summaryLength": 195,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_1d07747d10b7522904cc27e0216d1eb6efa7cddb",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "65fb3fa0223a4d5d548f898515c1c8a164f559604108e4d6a4172a7e42a2e99c",
+      "summaryLength": 411,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_116ceecc5d50febf98c899a6d90a11645301dcca",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "f1812f5b590c2bba33147bb8bf2971362be4ccac66f85bb1a6c85f322f62c7ae",
+      "summaryLength": 156,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_093f3847aa6df04631c9bd12c2203ed0a270d643",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "41436f1fcbde5c905c1bd78b02a5b5fc836aae160e09ebd59c1d37cc3bf20705",
+      "summaryLength": 108,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_9c9caef1df1e712d6e3c5fbc2cec73a204f1cf25",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "4a6ac1ad8a2692add2697184f870c79dc3366a83f159cb9c3f3db3a144c61f38",
+      "summaryLength": 169,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_22efdfe4e6f4d115cb26f453e962e4aee0d658d2",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "e04e4da080af5595e64d5e3072fa2e6a4f41c768fe4477e186d89a5809efaa63",
+      "summaryLength": 258,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_1ad20c201f8b4922a2bc33793a1b6dac04733482",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "e726ac2742c3866bc3f0362982f7fd1f72b8627c0b062e9ee9ef8979975aa3a4",
+      "summaryLength": 155,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_18a87a84c19becc0c3c9438fedf1ddd1febdd258",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "6ddc4e2b9e3b02614de0638706d6799f9f79fad2d7fd43f9ee1c68add61729c6",
+      "summaryLength": 442,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_ffb2949f58909e579e0b9e7a38880a25e68d16f9",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "d2bf4c145a4778cb533c0252bce6b955f3c47cccce67e4d02c5c384840090cec",
+      "summaryLength": 134,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_917acb7a43bdadbc94c1515711eab65274d0ff65",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "98e17eb6bbbb492a62d9a6a7dd38c56e59941a90c3b87028758db53fa213dcdf",
+      "summaryLength": 356,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_c31f83aaa835cc58926a8a9dbfcd77ff66c734f0",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "bab81dd09d22b4082b7c07b46896c76081d6bc8273b57aa693605889b539b81a",
+      "summaryLength": 123,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_22b251cd9af18a218861fc92b72e01653a363cb6",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "d30b71a8d1b958b4b447c7db82dee0943cc30a57ec43eeba6fe540f5a32d5c2c",
+      "summaryLength": 149,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_fc5395c1d797062c05c2b2611dd5f9d5b028210b",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "4e95f2cd05de25718d886e61c57803ed7b88cc30fdf4a78ed644b33cf37f248b",
+      "summaryLength": 352,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_980c532cac63cbb1319f3901a29aa21566fa2bf9",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "9999cc0e15fc044d21e16e144132e35a4385b8b29cc72946bf70798b854010b6",
+      "summaryLength": 253,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_71b60f222ef44ad50ace6a9dabd04f1a03dac7c4",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "e7bb52a72c38b66ef9b1ac155df46fc56667caa2163549ec52bff794e4cd26e1",
+      "summaryLength": 72,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_c20782dddcfb7fd30a265878be4c76785092d5d2",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "0297cce5ebf0286cd86a20a48ed03723f6e9f6328c184c870de2c39ed9471978",
+      "summaryLength": 321,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_ff2b6f333777249394a5ec70d92b20e7dd50b9e6",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "9277946c48b468317ca1c5dfc46ce095234287d6cb8fc2d6ec79c24dc4c37954",
+      "summaryLength": 135,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_c4d8b11d2ea44ff509cf8aa0b907af0d5615fefc",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "44dccdd59ad77ca6ccd03f7b41eb1fcdebcd2abbaf6378fdfa69f3db8351bd88",
+      "summaryLength": 289,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_7d6ade84c948667b9716c4675b94db060d14d472",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "6908d1c175eed12a733d6fd54c1368e9ec358769f90ec00ac451ce2b517b8e95",
+      "summaryLength": 194,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_e484e3938e9f2836ea3983ee41ed3551c9c0bc2b",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "d2e10af99a3c53a0844e40a2240450f062cec685d980348f3f5c60ef474bce39",
+      "summaryLength": 180,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_76722e50c2af2f78fc52be510f8d907589102841",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "96746ca2eccc529ff39fbba50e675e38f7b557d9e738b0d197e68db235fde57d",
+      "summaryLength": 180,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_85ee7fd6fddb0c91886b6e8c59c205c32d07f9fb",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "dbb73d2d7b8228847b30f302b1e7ea8dd1ff8c0e4839d842b6c6ee3d2043b9d8",
+      "summaryLength": 402,
+      "source": "substack"
+    },
+    {
+      "itemId": "itm_90e657085df90965c3641618f8becc2e7c30ddca",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "59c7e4fe29a86f83bdf14ba111eb755f78f36b88b1d3dcb225010ef00380e974",
+      "summaryLength": 247,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_0ff60e27fda45aba56a3e6ad3b5f5a524b6d8be6",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "ca3d648d79953741325c4155e0a8ca6d2b3b5d6fdb20b517871e5c79e3d714c5",
+      "summaryLength": 161,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_e6f0d67cbb22c3790bed7f657e2c2d3e534cb38f",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "a9676ebe98c9f09cc3587d109b959f4043ad8f7ebb6620da2277e6f03b02f8b7",
+      "summaryLength": 107,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_d2eaded3199c94b6a549c762981ea04adcc24e98",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "95909ea8e315be620b540393d509a6dfad7a820b85bab8b767abf400418d7f85",
+      "summaryLength": 179,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_cb9bd9f8e188c61dd3b0589b9498e9f989b18af5",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "825654b504ae241183ad47d1b115d206f7be65c66dc6212d1511a800db972dad",
+      "summaryLength": 212,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_9cd3a1c4e702219a497dd81471cb9619b54e1d83",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "38f6c2406d7ebd7b513f3182aa3b138170c3f58e463f40a59695cb135d458989",
+      "summaryLength": 433,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_821867cb2b341903093499d09822066a90f41363",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "ac7c8f2665ea6fdcefbebc6bc0d2a22eeea3cda94356f3955435552297e95ec3",
+      "summaryLength": 198,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_d383ab3f26f3f66e1a6bd47b1c76afe64e673b07",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "79f32498606d41bf462e53b7ffc66a82c5667ee7f9e08d8c9b0e4ae90dc5eec0",
+      "summaryLength": 230,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_d1a1c63420f26f6ec88136d89037b0c7818a0dd1",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "95829b9c434e3347fcf00d8ec7d1af7989165458fc5da3d9fe4a6e9d632785d2",
+      "summaryLength": 122,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_c522ac2dafe4eb920f31f801806c858b3fe47d7c",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "9f2758768eb24210104f92dab9c715ad462a42bc3c8cca65bdc2060f16f69ee6",
+      "summaryLength": 284,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_666c692b8e864cd23fab3d8c93126f81b3066911",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "f17197ab67a9820d20c6cc178679d0988774c6a5625e47ddbdc4269ca708b354",
+      "summaryLength": 220,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_450e2d1b79e9041eb0a6cbf0b266fd026b240f05",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "bd9cadf668d6d9154dfcd43478991094f6115005f20aff7787e1e9ee21fd7aef",
+      "summaryLength": 195,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_21b05d66913bde1486743f3f2cc6375d689e1e8f",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "7388730dad1f86a5dcd5da13dd3a7a9eeb140ab9f4bd02600066fc8f2bc97b12",
+      "summaryLength": 191,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_0fc261f9331194822f5816b52e06048c2a71ee47",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "ed55cc3fed10f675a55924c33e89d04c933a8f280f755f12ddefce8dcdc34842",
+      "summaryLength": 128,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_4aff763db0077d69374f3e8b48f46e92a85341dd",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "8d3db3cd4add22bcf8d819792e9fef4574b5a71bf72108ac2f19ce1a5d4865b2",
+      "summaryLength": 107,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_1995ecedc2a12268754f95235bc2034c5eb9c851",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "fecddf70d27e5baf9243ee6841ca7779c056d4ad6a688a5b255a7070ae28be20",
+      "summaryLength": 196,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_9250696098752af5cdd17703396f7f308b7640af",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "b70a34534b584a7fedfaba19debb98e79edb2601ea63e564b5a80a7820a4e729",
+      "summaryLength": 181,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_697f0165c8da65d2dc268c474f8e8fcc48793946",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "95d914706027c436ccc8c3151b3a8f8581034283747b2ae3cebdd76cc1b5d706",
+      "summaryLength": 92,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_14750d977e610b1079e2bb00d73f8d94ddf03f2b",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "8aec1589a7b82d22fbe3b7802535037e404ded50ffd3ae66013dd4130a893503",
+      "summaryLength": 193,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_f104bcc7532d3b557e62c04ff9435228832ca38f",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "caeae8430da1be76eea5c16b2a4715bb33ca87c482cedb64b6865e2a42e92425",
+      "summaryLength": 162,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_df79b0e0a7cf28b89b5d709d141eafa2416432f6",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "8d916ec7e7786c4784b801cb28c77e2bfc4f432bfee6a5db64d42148cc53c53a",
+      "summaryLength": 373,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_734bf6ded19332db19f4f7c4bfcda1c5f55cee4e",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "3e5fd0729dc56d32533b49269554264d4582712e9a62df97178ccb5ba17b371b",
+      "summaryLength": 63,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_5ccca4f36c2d45b0d61be82b4b8a0554c3b99f0c",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "480d1f4d0d36c24a4fd2aaac033c17c06761ecd0351c63cb8c12dbaba9e86236",
+      "summaryLength": 161,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_aab82c69b0e0be920b082459382c2e0e91674c61",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "0fede264e8caf85ca20c9a242326c9454f14b5099da8839cde6937a420f4195f",
+      "summaryLength": 200,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_c6875968d008853b34da2a10d3bf1ef595c5f8d1",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "be28603304723fe0e9777de07a216fcb88a11ebcbd75d807347aa5f7a66efa58",
+      "summaryLength": 356,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_2517adb57bbea2c9754694644035ff5e285ad207",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "c86e659d5c830cc7865df77a4d8f9038dd152bbcd0c1449cbaf7af215ab4e0ba",
+      "summaryLength": 290,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_1866e2de4ec8060686e9a09ecacbfbbba4930e90",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "489195bd610c6a80b3b2e7b03de4bca256fd1c3cb9ff383ce880c85251e2a48a",
+      "summaryLength": 299,
+      "source": "substack"
+    },
+    {
+      "itemId": "itm_8e048977b18fb12f09f0d97ed02bf3b4793974cf",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "9d59ed6c6d129842a12d2a25698f8cb7ead38f3f74e41ce1abf4e9f339da61ff",
+      "summaryLength": 155,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_23408b276205889b2bd83791b3f8a679d71f164e",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "762e4f0b42f259907ba8a89dfbf41bb47790b509bdd912325f26a63c6a73c2a2",
+      "summaryLength": 132,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_844b75f7a210f69d838bcf4d0b3217d0dbc9c611",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "1e599bad1836c7708526974f23d5de5b22a6ad04d32ae928fa914c1379e94a1e",
+      "summaryLength": 162,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_e71e3ef531bf082e6870764e560e21cbf1de500f",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "61fc719609556f307a0139f2f03c87f4f618331c197fca9e2d7d53fbe3c1b617",
+      "summaryLength": 103,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_eb4c39e2f089a9d4db50296fd302c0dcc5591be1",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "62ad6dc5ac0fb75997047e8e4d7279a692f2248eaf0c850fa1012ae40912d940",
+      "summaryLength": 154,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_0f54875006dc757af299082fcbc6ce0b717cae9d",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "ed1b0d7263742731f02f99d11fd1173dfac9eaa906fb85fdee14eca1a0ad74a8",
+      "summaryLength": 405,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_1eb781c31f42e2446b151e5218150fd9f5f29e95",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "3cce66d3534c4ba9a6410bf66015c194ecf09a8947f0b9c3a5daedb8b3b235f0",
+      "summaryLength": 259,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_2da7b41a7a646dd0427cb23ff15c7fa1d305ed54",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "26bd516f767b8bd801d45d27173cb74ae3d25644d968165876acdb25b034e41f",
+      "summaryLength": 255,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_28028edf6cc20375c624c85055233681b0f87b57",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "da4c6fc6fcafd7fa5e3a7a6b59ea56480bbf5954759f22fc5d5d3d44dfc7e55a",
+      "summaryLength": 353,
+      "source": "substack"
+    },
+    {
+      "itemId": "itm_7c3d7caddce8ced63d5c1ed37968e5f7a5b49373",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "1898e6a2cdacf8f17a3a85a15b8b1a51cdad09f5a19d896de2230ffce396ccb0",
+      "summaryLength": 159,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_6584ac267bbc41d47fad7d6daa8fbaff70f53d85",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "ed8772ed4b244d76d858a5aac066517ed9a69df84d7feddaabb0f9c45173919a",
+      "summaryLength": 77,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_4c00d98c1d003cb849d27e6088766cd0bc4e66b9",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "c978ed18ec2bb03fe365c26d578220e93033756f365b5f64afd03b73e18c0b21",
+      "summaryLength": 102,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_20fc408476e1df5f842666ad0dc20a508faa6dc4",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "3ab80aeda5317599d7d51c687c253c456f249fcbb3693a8c25c8d75eb68f3b85",
+      "summaryLength": 385,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_35024048d1caa3474d71f6deeff51d3ae4a8ac96",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "345c3bceee4a38f89eaea729b1859eb679a122639cede09ba03c32242fec29c2",
+      "summaryLength": 285,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_72670150a5ab5f6e677901626e23bef1e37f2603",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "4762ce78368bcad970ee502a75370de8593bfbf20deb4a509d69d6e459afec1e",
+      "summaryLength": 471,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_65ed635d13e803f4d0128770218c2fd65316cda5",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "5d74d4bf80343380ae238d6c7cc1fffa44f5177b664f4fdbe2e316e39759be89",
+      "summaryLength": 171,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_c94913fe52cf75bbbce0f627b46c1ec5367938c9",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "2b153ca09e08f3e83d3d292112d99db6e9b338600e788b2178b42220179b5d3a",
+      "summaryLength": 198,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_46df2a1bc2a323e0d9c9e4e229f9b55bf48f9c83",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "a706e87a285cf9eaf8ea8c5d815ef1479804e2ffbfa1ea4507c63071bd7191f7",
+      "summaryLength": 90,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_5179a1854318ddf80a4633e70ed48d3993b09c18",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "448beec77a077bb09aad6a1fbfbec9e51ca4861537272403435d6d5498d4cb8e",
+      "summaryLength": 131,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_4f353db1769b291d2462d92e71190f163bdba14a",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "d26438c311c887c5182a915c4db56240f2c68acd913876f58dd608a1eda43777",
+      "summaryLength": 134,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_4c1ea972ed9f14d3616fb9492e5d03ba9749c0ec",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "c7bcf2f432eea32c548dfaca326f7094d179284219eb3bc0f6274f9c94e1aa8a",
+      "summaryLength": 89,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_2e4447fda07e6c67aa9cf3de99f93dd8ddaea5c7",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "f21e27bc88110cee83a885c886549456f013dfb381f7bfd43248a5e9ac503ff3",
+      "summaryLength": 102,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_70f43ad889190344d5390fb092f62f006c7aff73",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "24e35e8a473bbb453d8decbfed315bad1624499d6b765fe10c17455a8790c48b",
+      "summaryLength": 99,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_b82cf009d9f65f4f9657e4e0d0263cb39fb5d838",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "9748134180060024cde03038e314e6f91e03724ca7a9317e1f87b470752dc25a",
+      "summaryLength": 121,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_a2e3a739343955f30f704fe38fc3e3b33b313d3c",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "8a4ce5e3838142a9a1543b5b4f01fb592047f89371998b80e4da843d4ecda5c0",
+      "summaryLength": 102,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_70631b12fa91bac16df1f77d6fbbe09c327e8b7a",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "505f13363b82569169dd1b2cef8e27a14922ea6daab849cd240f91908236a82e",
+      "summaryLength": 84,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_7ed90bb8e288e76b2fc1a628eaaeecff08670302",
+      "coverage": "thread",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "bc3c52f7097bd3aa453b146c96f488b3a72dbe6714c2e1ddde8032e0fbf2e166",
+      "summaryLength": 117,
+      "source": "x"
+    },
+    {
+      "itemId": "itm_86dfebd05d0662bf36b12ccd6f4809fda7e28a41",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "e6e35f2933a4d99fb46b227d512121d90a46a7d3be69db0916e764a2b740754d",
+      "summaryLength": 200,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_8cd2506e676832e4bc15166ae0fc603ff755089a",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "b922c5976161236e22ccc62549d5904e916499fe3bc16603f6bd0dd767c38afa",
+      "summaryLength": 52,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_7428b87c9d9fc3e272f6cc26bd58a8bcb4b88e24",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "6771786472248a588b088032ae7f9a902cb86cdbfae40cfb82f9adf3e66b6852",
+      "summaryLength": 246,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_22e2d121e9af4900ca0a8d9522cd7ed1a0aafbb5",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "7ba7c4609c0633bcad68ca3d33d7cc2b6a6f16b5fc042bfcb10ec831d90337aa",
+      "summaryLength": 286,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_85693c58f9e6204f74f553314305011ecc8b8901",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "a18845919f99eec840c53aada28575ea153714d5c262c0881d385fae8c8c9785",
+      "summaryLength": 72,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_4b367edec049127f4cc7210240321c94c3f5b694",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "ab0c55ec28ab9b9405f12fbf3cddb5b315a931af21e8a63ee8ade24a7e003f6d",
+      "summaryLength": 236,
+      "source": "spotify"
+    },
+    {
+      "itemId": "itm_edf0c41a6b2203d15acfc0a99d50cb5cdb202d0e",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 2,
+      "summarySha256": "46ddb6a3326970275200974e2bad61e82fad08151e54b7651b18280f75220af1",
+      "summaryLength": 418,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_87b7f687318405ff5138038303b67944fc94debf",
+      "coverage": "article",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "a42433142ad8b670ffe0dd625e487bd1e1355a3ff39fa65a53d311b494d65962",
+      "summaryLength": 151,
+      "source": "web"
+    },
+    {
+      "itemId": "itm_38bba6fb4bb55b025108656156510ee1c7e46301",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "60f9db9e41cf6b0b0e8be0846c1962fdd7ac1a10b46d96543b36198a71b1325b",
+      "summaryLength": 192,
+      "source": "youtube"
+    },
+    {
+      "itemId": "itm_408103ec55233c5084ea3addbf1c7b487df7ca2e",
+      "coverage": "metadata_only",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "inputCount": 1,
+      "sourceChunkCount": 1,
+      "summarySha256": "dcbebfe3f8b10392e208d494ba37877b236d36f0067686bcb571bacfd41ec003",
+      "summaryLength": 309,
+      "source": "spotify"
+    }
+  ]
+}

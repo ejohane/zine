@@ -1,0 +1,47 @@
+{
+  "at": "2026-11-08T20:45:30.910Z",
+  "origin": "https://api-next.myzine.app",
+  "authentication": "real Clerk session",
+  "actualProviderResponses": true,
+  "paginationNoDuplicates": true,
+  "observations": [
+    {
+      "operation": "public-playlist-members",
+      "status": 200,
+      "requestId": "req_d39d8d3b2ada4ea5b8cb767a75a97266",
+      "count": 5,
+      "hasNext": false,
+      "responseSha256": "f40ca2c11a1253b265057e9cffaafc3e61c60594789f978bb9ebd9d83f528d4f"
+    },
+    {
+      "operation": "existing-library-podcast-show-capture",
+      "status": 200,
+      "requestId": "req_4331aaa90e8d4bcc8e6cd36ccb16fc6f",
+      "responseSha256": "db3842552db15c0e230df46d38ca8aca4c6fbf88aab912556d4b426842d17666"
+    },
+    {
+      "operation": "show-members-first-page",
+      "status": 200,
+      "requestId": "req_91dbf15fc25a425fb38361a68688b5cc",
+      "count": 50,
+      "hasNext": true,
+      "responseSha256": "967a1126ea1b46dddd7e6d8fb38add6a1c166b5ae6b69f402ece249e7a7c244c"
+    },
+    {
+      "operation": "show-members-second-page",
+      "status": 200,
+      "requestId": "req_e6b254c7963c4f149614cc4c39bd1123",
+      "count": 50,
+      "hasNext": true,
+      "responseSha256": "cd876fa62f05b33251cda752a7845bb7de857ad60753cc91fa0dc5a380a9a220"
+    },
+    {
+      "operation": "album-members",
+      "status": 200,
+      "requestId": "req_cba8dc87344f4a9bbee5c5920631fe5b",
+      "count": 18,
+      "hasNext": false,
+      "responseSha256": "47b0e81509c5d2711b2200804f28dcfa2a813734058eed22e70465ed457ca31b"
+    }
+  ]
+}

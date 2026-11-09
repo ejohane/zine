@@ -1,0 +1,18 @@
+{
+  "at": "2026-11-09T05:18:02.988Z",
+  "origin": "https://api-next-staging.myzine.app",
+  "sourceSha": "c35b365c9f8c14a6194e8d42815f6070e4eb543f",
+  "startingVersion": "9959b1a1-8814-49fa-8478-143c8c0820b6",
+  "rollbackVersion": "785df10f-9262-4ab7-bfed-490238b111c8",
+  "finalVersion": "9959b1a1-8814-49fa-8478-143c8c0820b6",
+  "migrationsBefore": 23,
+  "migrationsAfter": 23,
+  "checks": {
+    "previousCodeServed": true,
+    "savedContextSurvivedRollback": true,
+    "savedContextSurvivedForwardPromotion": true,
+    "exactVersionRestored": true,
+    "noDuplicateOccurrence": true
+  },
+  "scope": "Actual Cloudflare staging Worker rollback and forward promotion with authenticated readback of a controlled save. D1 schema/data remained current; no production mutation."
+}

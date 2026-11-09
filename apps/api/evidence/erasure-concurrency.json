@@ -1,0 +1,38 @@
+{
+  "at": "2026-11-08T20:44:59.064Z",
+  "scope": "Controlled real workerd/D1/R2 HTTP and helper checks with a synthetic signed issuer and synthetic Google responses; not live Google authorization or deployed account erasure",
+  "allAssertionsPassed": true,
+  "fullSuite": {
+    "tests": 102,
+    "files": 21
+  },
+  "scenarios": [
+    "Google exchange completing after erasure cannot recreate a connection; another owner and fresh requests remain functional",
+    "Successful stale refresh cannot overwrite a disconnected and reconnected grant",
+    "Failed stale refresh cannot expire a disconnected and reconnected grant",
+    "Feed discovery completing after erasure cannot recreate sources or routes",
+    "Authentication-time generation fences reject stale item and owner writes while fresh collection/capture operations succeed",
+    "Forty-five initial arrivals resume in bounded jobs without refetching or losing the preceding baseline"
+  ],
+  "realLibraryErasure": {
+    "items": 444,
+    "allAuthoritativeDataErased": true,
+    "freshGenerationVerified": true,
+    "artifact": "isolated-corpus-erasure.json",
+    "at": "2026-11-08T20:43:36.088Z"
+  },
+  "logSha256": "b55289c7bcda9f7f8aa72ae6acf39358058981b67cbb8d7240a8b216977425c9",
+  "sources": {
+    "src/auth.ts": "695f5cd548b91a1db25b689021456da5fb4ef2bb7e91ad64309b17766dab8039",
+    "src/lib.ts": "e54ed4577ed3f15bdb96d4331f675866493107468244e0deecb495d1d77ee2e2",
+    "src/connections.ts": "ff726487d91832121432e12d039486f80b8b0a4a8b5732505fddb3e1a4ada6be",
+    "src/enrichment.ts": "e2347d0d3fa2ab32f9bd7580fad19bf72f7c8235c1cd69d6de158bb5dce3db18",
+    "src/subscriptions.ts": "1d0acc640bfd6b90374958c27d421ad858341cb0272c0a55e0e26ed94f8d0bcd",
+    "src/access.ts": "139dcf20d3728bbcd097029c71563d3fc4f902dbb37002f69f12b52462928838",
+    "src/personal.ts": "6fa44f299e09c29214391d16dbf28d1011add61e0bca656783461e8de446c1b3",
+    "src/semantic.ts": "95f481bae6a0cc912328bf9fcb43ab8b34c66a5a1212272dbef1c506f132d260",
+    "src/reconciliation.ts": "c71775b5a89545a1ffc1a9dcab8cc064387a051589eeb07dcd53541ce4c3a77f",
+    "test/request-erasure.test.ts": "ed99579c71cac5726de272311a536ecd0e7266d9ebd9cb9c5a62b772e9ad2e88",
+    "test/ingestion.test.ts": "244e34b9c986709f95da51b391cc7912634db1dacbfdaac5ef7c8c001ca68a3b"
+  }
+}

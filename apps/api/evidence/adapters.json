@@ -1,0 +1,36 @@
+{
+  "at": "2026-11-08T18:31:09.524Z",
+  "origin": "https://api-next.myzine.app",
+  "authentication": "real Clerk session",
+  "mcp": {
+    "officialClient": true,
+    "toolCount": 8,
+    "observations": [
+      {
+        "operation": "zine_save",
+        "status": 200
+      },
+      {
+        "operation": "zine_save",
+        "status": 200
+      },
+      {
+        "operation": "zine_get_item",
+        "status": 200
+      },
+      {
+        "operation": "zine_search",
+        "status": 200
+      }
+    ],
+    "idempotencyReplay": true,
+    "credentialManagementDenied": true,
+    "canonicalPathRestrictionChecks": 5
+  },
+  "cli": {
+    "actualCommand": "list --limit 2 --output",
+    "returned": 2,
+    "hasCursor": true,
+    "responseSha256": "2754447943605a446674d6acb55d02a6a422bdbfd139ea7b32b3779d74e5312b"
+  }
+}

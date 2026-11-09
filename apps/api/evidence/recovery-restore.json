@@ -1,0 +1,123 @@
+{
+  "at": "2026-11-09T04:35:03.890Z",
+  "sourceSnapshotSha256": "5da4b3e0cac545e80d2aa5158345ea9e16620d1d4b77733537284f5c4247e03a",
+  "sourceEnvironment": "production",
+  "targetDatabase": "29df9a64-93a0-4ada-929e-43c057b2ead8",
+  "targetBucket": "zine-api-next-recovery-artifacts",
+  "authoritativeItems": 491,
+  "contributions": 5473,
+  "restoredObjects": 299,
+  "authoritativeTableHashes": [
+    {
+      "table": "content_items",
+      "rows": 501,
+      "sha256": "0090a611a86dc7444a3efe933f2fb9cc528d664ff94705accbf45aced2d36538"
+    },
+    {
+      "table": "personal_items",
+      "rows": 491,
+      "sha256": "67c8b08157ea43f9f5447b3c847ac11704873fe268915ee97fe82567bacfc4cf"
+    },
+    {
+      "table": "save_occurrences",
+      "rows": 491,
+      "sha256": "40c1bb812e3fa8bf2c585353337a28006cbe88ef2cea9e35007c6bfb05b69894"
+    },
+    {
+      "table": "context_entries",
+      "rows": 7,
+      "sha256": "f926bec2aebddb2bf191d9e295688b50f5fb83e0e3ef2ffb0e10cd43aa0f7572"
+    },
+    {
+      "table": "item_tags",
+      "rows": 487,
+      "sha256": "28ba89ea49c15214cb5b15e7cf02530a664329eecdc30e5648ba1ec7c0519541"
+    },
+    {
+      "table": "progress",
+      "rows": 1,
+      "sha256": "d56319bc7f49fc6b5b6da3006127b2b652a6088a72350046ac04be77e166db8f"
+    },
+    {
+      "table": "annotations",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "collections",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "collection_members",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "collection_notes",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "collection_note_references",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "sources",
+      "rows": 7,
+      "sha256": "47724aaac3b4aa6bbeba588b04d4d7b8de80df4160394766ded4337276bf4743"
+    },
+    {
+      "table": "source_routes",
+      "rows": 7,
+      "sha256": "f591f2a4e55063cbc36f1df9481fbf74f88fd2f0ea014a6234b44a11c1a1f25e"
+    },
+    {
+      "table": "subscriptions",
+      "rows": 6,
+      "sha256": "fd7af9defc110a9d560d7739ab5554e7cb2e2856886dc11803f7ce796377d5c6"
+    },
+    {
+      "table": "subscription_seen",
+      "rows": 2706,
+      "sha256": "1f9f7c3ab37bcddc144771a868e5bc0f666deb29081f6e0f9c39f3450e487039"
+    },
+    {
+      "table": "contributions",
+      "rows": 5473,
+      "sha256": "8d90386c423e93cc88dfb5c41dd550530e7872898884654ed791ff932076ee6e"
+    },
+    {
+      "table": "enrichment_components",
+      "rows": 6084,
+      "sha256": "132fb534ca00dcc55efb585b0aa3d2f51e402a551f7decf7021bd734d028623f"
+    },
+    {
+      "table": "item_relationships",
+      "rows": 26,
+      "sha256": "e92e749930752298875ce8a83ea5a961b1b635a516ee952e21f029b54ffe144c"
+    },
+    {
+      "table": "item_aliases",
+      "rows": 2,
+      "sha256": "13333a5b0582c9231cce575bd25b3e87b4113ec8cc0bd11bb654aeed56b08855"
+    },
+    {
+      "table": "reconciliation_events",
+      "rows": 1,
+      "sha256": "f66a81003343e3132400c93267d48ff54362439b3c93fecbe3a8f9cea1dda157"
+    },
+    {
+      "table": "search_documents",
+      "rows": 6065,
+      "sha256": "43ca942b2230042272e6f8d8ef3c2f9562385f5d1f9dabf0295192b3d049896f"
+    }
+  ],
+  "allObjectHashesReadBack": true,
+  "foreignKeysValid": true,
+  "credentialsRemoved": true,
+  "subscriptionsPaused": true,
+  "externalJobsPaused": true,
+  "scope": "Actual isolated Cloudflare D1 import and full referenced-object R2 write/readback. Search vectors are deliberately absent and must be rebuilt. This does not mutate the source database, bucket or Worker."
+}

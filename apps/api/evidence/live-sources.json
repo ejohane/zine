@@ -1,0 +1,409 @@
+{
+  "at": "2026-11-08T20:47:19.854Z",
+  "origin": "https://api-next.myzine.app",
+  "authentication": "real Clerk session",
+  "sourceFilterItems": 2,
+  "x": {
+    "observedItems": 16,
+    "afterRepeat": 16,
+    "newArrivals": 0,
+    "retainedPriorItems": true,
+    "repeatNoDuplicates": true
+  },
+  "substack": {
+    "latestItems": 1,
+    "repeatNoDuplicates": true
+  },
+  "youtube": {
+    "route": "public channel feed",
+    "latestItems": 1,
+    "repeatNoDuplicates": true
+  },
+  "observations": [
+    {
+      "path": "/v1/items?sourceId=src_b5bf0266ca164215b4e5591a801129ba887572e3&status=saved&limit=100",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_c4012e0f43684b199838650be453c4e2",
+      "responseSha256": "aa8dcc9d734e1e3f1569a350bb8ca387f3f53f5036059119e91fa540e5889d45"
+    },
+    {
+      "path": "/v1/subscriptions/sub_3be673302825459ebf77905e375d062e",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_06248758cc1847339ad72f30fbfeb63d",
+      "responseSha256": "dea9716fa15725b40681c52a7313b171f7a892a0ffde9f96fc6bc13032eea1b3"
+    },
+    {
+      "path": "/v1/items?subscriptionId=sub_3be673302825459ebf77905e375d062e&status=received&limit=100",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_a1a11d5bc5d94dbbb0170b1a0f85c187",
+      "responseSha256": "e816022386681091d5201361d1ca67da84744c96a6e654b9adcba0d479750d99"
+    },
+    {
+      "path": "/v1/subscriptions/sub_3be673302825459ebf77905e375d062e/sync",
+      "method": "POST",
+      "status": 202,
+      "requestId": "req_1482212e8a70408d87e2d6ea01723e00",
+      "responseSha256": "eed2274b38548777de8079cd248d43d63ba0174243dd060314136ee0e8f63819"
+    },
+    {
+      "path": "/v1/jobs/job_74fa679818a944499f0f866e51458097",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_0fe6f554fc0a410bae591336c6f21d0b",
+      "responseSha256": "87f7b2282fc2815dd813ea94cdb01a0ea3eb180de229f65a4b2aad480a84e92d"
+    },
+    {
+      "path": "/v1/jobs/job_74fa679818a944499f0f866e51458097",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_02f04d5dfd424e47b620ed4a3e832dca",
+      "responseSha256": "87f7b2282fc2815dd813ea94cdb01a0ea3eb180de229f65a4b2aad480a84e92d"
+    },
+    {
+      "path": "/v1/jobs/job_74fa679818a944499f0f866e51458097",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_837f73c5cfb9408784f77a9eff675d29",
+      "responseSha256": "87f7b2282fc2815dd813ea94cdb01a0ea3eb180de229f65a4b2aad480a84e92d"
+    },
+    {
+      "path": "/v1/jobs/job_74fa679818a944499f0f866e51458097",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_db17e1bc8b464c57867f588504b2fd91",
+      "responseSha256": "87f7b2282fc2815dd813ea94cdb01a0ea3eb180de229f65a4b2aad480a84e92d"
+    },
+    {
+      "path": "/v1/jobs/job_74fa679818a944499f0f866e51458097",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_98758c79ba10437dbd04e27449169b7b",
+      "responseSha256": "87f7b2282fc2815dd813ea94cdb01a0ea3eb180de229f65a4b2aad480a84e92d"
+    },
+    {
+      "path": "/v1/jobs/job_74fa679818a944499f0f866e51458097",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_af70a59baf254cac8f14b7bd7f2d1a6c",
+      "responseSha256": "87f7b2282fc2815dd813ea94cdb01a0ea3eb180de229f65a4b2aad480a84e92d"
+    },
+    {
+      "path": "/v1/jobs/job_74fa679818a944499f0f866e51458097",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_1944b6901c1946caac5603519014c013",
+      "responseSha256": "d5ebe845842efa9c46dace4d73bdb9dad81b3aa4a2d1a02086cec4c9f3c0c264"
+    },
+    {
+      "path": "/v1/jobs/job_74fa679818a944499f0f866e51458097",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_5ee7a22add934c1fad3e38f673db01df",
+      "responseSha256": "d5ebe845842efa9c46dace4d73bdb9dad81b3aa4a2d1a02086cec4c9f3c0c264"
+    },
+    {
+      "path": "/v1/jobs/job_74fa679818a944499f0f866e51458097",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_0eca560240074a2c93d5120549181f97",
+      "responseSha256": "d5ebe845842efa9c46dace4d73bdb9dad81b3aa4a2d1a02086cec4c9f3c0c264"
+    },
+    {
+      "path": "/v1/jobs/job_74fa679818a944499f0f866e51458097",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_662c1e24806a43c39adb694d840d89f3",
+      "responseSha256": "d5ebe845842efa9c46dace4d73bdb9dad81b3aa4a2d1a02086cec4c9f3c0c264"
+    },
+    {
+      "path": "/v1/jobs/job_74fa679818a944499f0f866e51458097",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_f755fe899901468aac0f81784bdda560",
+      "responseSha256": "d5ebe845842efa9c46dace4d73bdb9dad81b3aa4a2d1a02086cec4c9f3c0c264"
+    },
+    {
+      "path": "/v1/jobs/job_74fa679818a944499f0f866e51458097",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_3fb4cdb631ec4e67967bae414faadc6a",
+      "responseSha256": "d5ebe845842efa9c46dace4d73bdb9dad81b3aa4a2d1a02086cec4c9f3c0c264"
+    },
+    {
+      "path": "/v1/jobs/job_74fa679818a944499f0f866e51458097",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_914cd6f0134b47e8a514cea8df99f5a6",
+      "responseSha256": "d5ebe845842efa9c46dace4d73bdb9dad81b3aa4a2d1a02086cec4c9f3c0c264"
+    },
+    {
+      "path": "/v1/jobs/job_74fa679818a944499f0f866e51458097",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_8271456496cb4bb6943e13af3ffea1cb",
+      "responseSha256": "9c5b46de17ecfa35dd3fc16f63debf9bd1d4ec06e0eefd0db8b55dc2ba443efd"
+    },
+    {
+      "path": "/v1/items?subscriptionId=sub_3be673302825459ebf77905e375d062e&status=received&limit=100",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_e4bc6e51abfa49ec99333c185818a80e",
+      "responseSha256": "e816022386681091d5201361d1ca67da84744c96a6e654b9adcba0d479750d99"
+    },
+    {
+      "path": "/v1/subscriptions?limit=100",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_2bd9cd5588b44a43a89ea981a93d739c",
+      "responseSha256": "badaaaf4c07377f59d0d5dc05770f5b2ab454ce3d563c60ffed843b810a7e1d4"
+    },
+    {
+      "path": "/v1/subscriptions/sub_61677e4efbc44c2fb4c586c3f0881e59/sync",
+      "method": "POST",
+      "status": 202,
+      "requestId": "req_c12bb93baf5b4e5aabfc6c3029edb77f",
+      "responseSha256": "072504f7be84b450101f768b6b0186d7d36e4e4f08b7da68eae395d3deed8b28"
+    },
+    {
+      "path": "/v1/jobs/job_06f63d70e8f942b89476fcc358cf2525",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_7d1991901b4444c7a0ba691a673e0ad6",
+      "responseSha256": "89d28d2d61fb71683d898851abfbf24cc15502108d1a317e4ad5336f604e84cf"
+    },
+    {
+      "path": "/v1/jobs/job_06f63d70e8f942b89476fcc358cf2525",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_894a243002a841d29b76f9009ee03350",
+      "responseSha256": "89d28d2d61fb71683d898851abfbf24cc15502108d1a317e4ad5336f604e84cf"
+    },
+    {
+      "path": "/v1/jobs/job_06f63d70e8f942b89476fcc358cf2525",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_bbddde1fbf97437390131be28a58121d",
+      "responseSha256": "89d28d2d61fb71683d898851abfbf24cc15502108d1a317e4ad5336f604e84cf"
+    },
+    {
+      "path": "/v1/jobs/job_06f63d70e8f942b89476fcc358cf2525",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_55fb8e3affda4d848c4ef6a15f6447d4",
+      "responseSha256": "89d28d2d61fb71683d898851abfbf24cc15502108d1a317e4ad5336f604e84cf"
+    },
+    {
+      "path": "/v1/jobs/job_06f63d70e8f942b89476fcc358cf2525",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_b97ced799e5044b09e79104ace70c34b",
+      "responseSha256": "89d28d2d61fb71683d898851abfbf24cc15502108d1a317e4ad5336f604e84cf"
+    },
+    {
+      "path": "/v1/jobs/job_06f63d70e8f942b89476fcc358cf2525",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_db3e155581e748c4af9cd8224f29286a",
+      "responseSha256": "cb4909c5048c6e8e191ce4be90b20d9cada1abbc5bbfafea2379930960cafd80"
+    },
+    {
+      "path": "/v1/jobs/job_06f63d70e8f942b89476fcc358cf2525",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_2176c1d657b84bc3ab8993572c6c2da9",
+      "responseSha256": "d40e6d78070ebcb57b86c5fe975594ca4e51eb8554348c62209767360e31cfde"
+    },
+    {
+      "path": "/v1/items?subscriptionId=sub_61677e4efbc44c2fb4c586c3f0881e59&status=received&limit=100",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_a348562d765e4fec8d4486f78165ee9a",
+      "responseSha256": "d47160c01f441269d023ff1a0e5126668c511828d22da948a5f6f4ed033367a5"
+    },
+    {
+      "path": "/v1/items?subscriptionId=sub_61677e4efbc44c2fb4c586c3f0881e59&status=saved&limit=100",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_1f7c5beed568482a94610f52b6eb3c2a",
+      "responseSha256": "4555ae8f7a3d0bdb5a7452458b8c8029cb2b85221ab6bb6c550e1b0c6a553688"
+    },
+    {
+      "path": "/v1/subscriptions/sub_61677e4efbc44c2fb4c586c3f0881e59/sync",
+      "method": "POST",
+      "status": 202,
+      "requestId": "req_a9372a8db92b429c9fd08bcb2d9e6999",
+      "responseSha256": "cef46be8ceb99f719ddbb0cdaaf875893b53472acd4fac17b1e9e78f49a1f521"
+    },
+    {
+      "path": "/v1/jobs/job_4052124e7e9c44248654996c6bfe8560",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_4837c3e363fb4dca88b45b8e51198efb",
+      "responseSha256": "c7ae23080d636c8d8f7882bea9c87f4711321dfed8e732f097a6fae66cb54c61"
+    },
+    {
+      "path": "/v1/jobs/job_4052124e7e9c44248654996c6bfe8560",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_ae6ecb548fe84df485a7bee60417aef6",
+      "responseSha256": "c7ae23080d636c8d8f7882bea9c87f4711321dfed8e732f097a6fae66cb54c61"
+    },
+    {
+      "path": "/v1/jobs/job_4052124e7e9c44248654996c6bfe8560",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_08e4a91bd0fa4b7894a537c918481616",
+      "responseSha256": "c7ae23080d636c8d8f7882bea9c87f4711321dfed8e732f097a6fae66cb54c61"
+    },
+    {
+      "path": "/v1/jobs/job_4052124e7e9c44248654996c6bfe8560",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_9d94f92f794041ac9b7f893a5f661447",
+      "responseSha256": "c7ae23080d636c8d8f7882bea9c87f4711321dfed8e732f097a6fae66cb54c61"
+    },
+    {
+      "path": "/v1/jobs/job_4052124e7e9c44248654996c6bfe8560",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_fe690098fae94cbaab4dcb92e02a41b9",
+      "responseSha256": "c7ae23080d636c8d8f7882bea9c87f4711321dfed8e732f097a6fae66cb54c61"
+    },
+    {
+      "path": "/v1/jobs/job_4052124e7e9c44248654996c6bfe8560",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_d2240ebfeae54e20bb91c99dc636a842",
+      "responseSha256": "c7ae23080d636c8d8f7882bea9c87f4711321dfed8e732f097a6fae66cb54c61"
+    },
+    {
+      "path": "/v1/jobs/job_4052124e7e9c44248654996c6bfe8560",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_03da3363851242b59a1496afb59a870d",
+      "responseSha256": "d90f2288e914d99ec0c0e7cdbd61c5d2447d6ac1748148bed6dd0a0b976fc996"
+    },
+    {
+      "path": "/v1/jobs/job_4052124e7e9c44248654996c6bfe8560",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_dd086a56724a4e3397d84395fcd3192f",
+      "responseSha256": "281e637c8c463f59536100e562cfe6908c81b29aa6ec00d988a056a5a66cb216"
+    },
+    {
+      "path": "/v1/items?subscriptionId=sub_61677e4efbc44c2fb4c586c3f0881e59&status=received&limit=100",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_1fec2b0b265f416d826ea0b6b91a4d68",
+      "responseSha256": "d47160c01f441269d023ff1a0e5126668c511828d22da948a5f6f4ed033367a5"
+    },
+    {
+      "path": "/v1/items?subscriptionId=sub_61677e4efbc44c2fb4c586c3f0881e59&status=saved&limit=100",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_37ab9e1865984b23b06882fabfa91c3f",
+      "responseSha256": "4555ae8f7a3d0bdb5a7452458b8c8029cb2b85221ab6bb6c550e1b0c6a553688"
+    },
+    {
+      "path": "/v1/subscriptions/sub_8d8644123a58489ba39c5be96df0bb00",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_1c4be37a22f14777b1063ab3bf0e0b22",
+      "responseSha256": "d8607a5b3c6f7d798e1408e3e8af84115c5fd1da9b4a9cd0237cbda3c08034ce"
+    },
+    {
+      "path": "/v1/items?subscriptionId=sub_8d8644123a58489ba39c5be96df0bb00&status=received&limit=100",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_9099bd4a5e3043a5a176b0540076d3e3",
+      "responseSha256": "03fb51582e4d0d2e74f270ccec9ffc3673d56a23b6a7f56eacea904de24999c0"
+    },
+    {
+      "path": "/v1/items?subscriptionId=sub_8d8644123a58489ba39c5be96df0bb00&status=saved&limit=100",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_774827a9ab3743d38340f859bfe7a9d7",
+      "responseSha256": "d47160c01f441269d023ff1a0e5126668c511828d22da948a5f6f4ed033367a5"
+    },
+    {
+      "path": "/v1/subscriptions/sub_8d8644123a58489ba39c5be96df0bb00/sync",
+      "method": "POST",
+      "status": 202,
+      "requestId": "req_b2d0572f0830429b9870e0bf2563c903",
+      "responseSha256": "17786e2c927a60cb4cd1060ca3e4758417421d7c7449f7dce7f3e6f7d1d5f786"
+    },
+    {
+      "path": "/v1/jobs/job_d18b81606e704a9386401b405646e288",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_1ffc7748d2cd45168905c6fe1276da52",
+      "responseSha256": "9860107a0d3b46c926dd747b406f9b417e286af4c6afe580083ba69bc1048e90"
+    },
+    {
+      "path": "/v1/jobs/job_d18b81606e704a9386401b405646e288",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_a63280930be942f99d463ab998c142c0",
+      "responseSha256": "9860107a0d3b46c926dd747b406f9b417e286af4c6afe580083ba69bc1048e90"
+    },
+    {
+      "path": "/v1/jobs/job_d18b81606e704a9386401b405646e288",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_3cfc3cfe8e71414cb08df349471652d1",
+      "responseSha256": "9860107a0d3b46c926dd747b406f9b417e286af4c6afe580083ba69bc1048e90"
+    },
+    {
+      "path": "/v1/jobs/job_d18b81606e704a9386401b405646e288",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_ab4433a79d5d433f9af184015f37c544",
+      "responseSha256": "9860107a0d3b46c926dd747b406f9b417e286af4c6afe580083ba69bc1048e90"
+    },
+    {
+      "path": "/v1/jobs/job_d18b81606e704a9386401b405646e288",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_957b9abf58204c9690b048205d2f1f14",
+      "responseSha256": "9860107a0d3b46c926dd747b406f9b417e286af4c6afe580083ba69bc1048e90"
+    },
+    {
+      "path": "/v1/jobs/job_d18b81606e704a9386401b405646e288",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_1d5f27aba8754990acd983e705a0133a",
+      "responseSha256": "9860107a0d3b46c926dd747b406f9b417e286af4c6afe580083ba69bc1048e90"
+    },
+    {
+      "path": "/v1/jobs/job_d18b81606e704a9386401b405646e288",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_99a03d001b614f2981694e3cd09930d9",
+      "responseSha256": "d21c12eef3b8aa0daf5551915060cbdb927bae14b43017359042ed18c947025a"
+    },
+    {
+      "path": "/v1/jobs/job_d18b81606e704a9386401b405646e288",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_e9faa6e774eb4939bb8384a4fa961236",
+      "responseSha256": "cb78f7d633f7fe764176f40c531260021de6203e0bee06846288c23580e070d7"
+    },
+    {
+      "path": "/v1/items?subscriptionId=sub_8d8644123a58489ba39c5be96df0bb00&status=received&limit=100",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_1b83da7e074a4a2f953d994cdcb7895f",
+      "responseSha256": "03fb51582e4d0d2e74f270ccec9ffc3673d56a23b6a7f56eacea904de24999c0"
+    },
+    {
+      "path": "/v1/items?subscriptionId=sub_8d8644123a58489ba39c5be96df0bb00&status=saved&limit=100",
+      "method": "GET",
+      "status": 200,
+      "requestId": "req_fe926ff7503844ca86bf60549c229275",
+      "responseSha256": "d47160c01f441269d023ff1a0e5126668c511828d22da948a5f6f4ed033367a5"
+    }
+  ]
+}

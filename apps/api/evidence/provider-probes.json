@@ -1,0 +1,429 @@
+{
+  "scope": "live provider calls using reusable client credentials; not full acceptance",
+  "results": [
+    {
+      "at": "2026-11-08T14:49:06.520Z",
+      "provider": "spotify",
+      "input": "real-library-reference",
+      "status": "extracted",
+      "fields": [
+        "title",
+        "description",
+        "thumbnail",
+        "creator",
+        "durationSeconds",
+        "publishedAt",
+        "language",
+        "source"
+      ],
+      "components": [
+        {
+          "component": "metadata",
+          "status": "available"
+        },
+        {
+          "component": "transcript",
+          "status": "unavailable",
+          "reasonCode": "spotify_web_api_does_not_expose_episode_transcript"
+        }
+      ]
+    },
+    {
+      "at": "2026-11-08T14:49:06.691Z",
+      "provider": "spotify",
+      "input": "real-library-reference",
+      "status": "extracted",
+      "fields": [
+        "title",
+        "description",
+        "thumbnail",
+        "creator",
+        "durationSeconds",
+        "publishedAt",
+        "language",
+        "source"
+      ],
+      "components": [
+        {
+          "component": "metadata",
+          "status": "available"
+        },
+        {
+          "component": "transcript",
+          "status": "unavailable",
+          "reasonCode": "spotify_web_api_does_not_expose_episode_transcript"
+        }
+      ]
+    },
+    {
+      "at": "2026-11-08T14:49:06.835Z",
+      "provider": "spotify",
+      "input": "real-library-reference",
+      "status": "extracted",
+      "fields": [
+        "title",
+        "description",
+        "thumbnail",
+        "creator",
+        "durationSeconds",
+        "publishedAt",
+        "language",
+        "source"
+      ],
+      "components": [
+        {
+          "component": "metadata",
+          "status": "available"
+        },
+        {
+          "component": "transcript",
+          "status": "unavailable",
+          "reasonCode": "spotify_web_api_does_not_expose_episode_transcript"
+        }
+      ]
+    },
+    {
+      "at": "2026-11-08T14:49:07.674Z",
+      "provider": "youtube",
+      "input": "real-library-reference",
+      "status": "extracted",
+      "fields": [
+        "title",
+        "description",
+        "thumbnail",
+        "creator",
+        "durationSeconds",
+        "publishedAt",
+        "source"
+      ],
+      "components": [
+        {
+          "component": "metadata",
+          "status": "available"
+        },
+        {
+          "component": "transcript",
+          "status": "unavailable",
+          "reasonCode": "caption_retrieval_failed"
+        }
+      ]
+    },
+    {
+      "at": "2026-11-08T14:49:08.494Z",
+      "provider": "youtube",
+      "input": "real-library-reference",
+      "status": "extracted",
+      "fields": [
+        "title",
+        "description",
+        "thumbnail",
+        "creator",
+        "durationSeconds",
+        "publishedAt",
+        "topics",
+        "source"
+      ],
+      "components": [
+        {
+          "component": "metadata",
+          "status": "available"
+        },
+        {
+          "component": "transcript",
+          "status": "unavailable",
+          "reasonCode": "caption_retrieval_failed"
+        }
+      ]
+    },
+    {
+      "at": "2026-11-08T14:49:09.392Z",
+      "provider": "youtube",
+      "input": "real-library-reference",
+      "status": "extracted",
+      "fields": [
+        "title",
+        "description",
+        "thumbnail",
+        "creator",
+        "durationSeconds",
+        "publishedAt",
+        "topics",
+        "source"
+      ],
+      "components": [
+        {
+          "component": "metadata",
+          "status": "available"
+        },
+        {
+          "component": "transcript",
+          "status": "unavailable",
+          "reasonCode": "caption_retrieval_failed"
+        }
+      ]
+    },
+    {
+      "at": "2026-11-08T14:49:09.848Z",
+      "provider": "x",
+      "input": "real-library-reference",
+      "status": "extracted",
+      "fields": [
+        "title",
+        "description",
+        "creator",
+        "source",
+        "publishedAt",
+        "links",
+        "thumbnail",
+        "thread"
+      ],
+      "components": [
+        {
+          "component": "metadata",
+          "status": "available"
+        },
+        {
+          "component": "thread",
+          "status": "available",
+          "reasonCode": "context_coverage_limited"
+        }
+      ]
+    },
+    {
+      "at": "2026-11-08T14:49:10.086Z",
+      "provider": "x",
+      "input": "real-library-reference",
+      "status": "extracted",
+      "fields": ["title", "description", "creator", "source", "publishedAt", "links", "thread"],
+      "components": [
+        {
+          "component": "metadata",
+          "status": "available"
+        },
+        {
+          "component": "thread",
+          "status": "available",
+          "reasonCode": "context_coverage_limited"
+        }
+      ]
+    },
+    {
+      "at": "2026-11-08T14:49:10.328Z",
+      "provider": "x",
+      "input": "real-library-reference",
+      "status": "extracted",
+      "fields": ["title", "description", "creator", "source", "publishedAt", "links", "thread"],
+      "components": [
+        {
+          "component": "metadata",
+          "status": "available"
+        },
+        {
+          "component": "thread",
+          "status": "available",
+          "reasonCode": "context_coverage_limited"
+        }
+      ]
+    },
+    {
+      "at": "2026-11-08T14:49:11.524Z",
+      "provider": "web",
+      "input": "real-library-reference",
+      "status": "extracted",
+      "fields": [
+        "title",
+        "description",
+        "creator",
+        "thumbnail",
+        "publishedAt",
+        "language",
+        "structuredData",
+        "article",
+        "links"
+      ],
+      "components": [
+        {
+          "component": "metadata",
+          "status": "available"
+        },
+        {
+          "component": "article",
+          "status": "available"
+        }
+      ]
+    },
+    {
+      "at": "2026-11-08T14:49:12.205Z",
+      "provider": "web",
+      "input": "real-library-reference",
+      "status": "extracted",
+      "fields": ["title", "description", "creator", "thumbnail", "article", "links"],
+      "components": [
+        {
+          "component": "metadata",
+          "status": "available"
+        },
+        {
+          "component": "article",
+          "status": "available"
+        }
+      ]
+    },
+    {
+      "at": "2026-11-08T14:49:12.378Z",
+      "provider": "web",
+      "input": "real-library-reference",
+      "status": "extracted",
+      "fields": ["title", "language", "article", "links"],
+      "components": [
+        {
+          "component": "metadata",
+          "status": "available"
+        },
+        {
+          "component": "article",
+          "status": "available"
+        }
+      ]
+    },
+    {
+      "at": "2026-11-08T14:49:13.059Z",
+      "provider": "rss",
+      "input": "real-library-reference",
+      "status": "extracted",
+      "fields": ["title", "description", "language", "article", "links"],
+      "components": [
+        {
+          "component": "metadata",
+          "status": "available"
+        },
+        {
+          "component": "article",
+          "status": "available"
+        }
+      ]
+    },
+    {
+      "at": "2026-11-08T14:49:13.294Z",
+      "provider": "rss",
+      "input": "real-library-reference",
+      "status": "extracted",
+      "fields": ["title", "description", "language", "article", "links"],
+      "components": [
+        {
+          "component": "metadata",
+          "status": "available"
+        },
+        {
+          "component": "article",
+          "status": "available"
+        }
+      ]
+    },
+    {
+      "at": "2026-11-08T14:49:13.646Z",
+      "provider": "rss",
+      "input": "real-library-reference",
+      "status": "extracted",
+      "fields": [
+        "title",
+        "description",
+        "creator",
+        "thumbnail",
+        "publishedAt",
+        "language",
+        "structuredData",
+        "article",
+        "links"
+      ],
+      "components": [
+        {
+          "component": "metadata",
+          "status": "available"
+        },
+        {
+          "component": "article",
+          "status": "available"
+        }
+      ]
+    },
+    {
+      "at": "2026-11-08T14:49:13.838Z",
+      "provider": "substack",
+      "input": "real-library-reference",
+      "status": "extracted",
+      "fields": [
+        "title",
+        "description",
+        "creator",
+        "thumbnail",
+        "language",
+        "structuredData",
+        "article",
+        "links"
+      ],
+      "components": [
+        {
+          "component": "metadata",
+          "status": "available"
+        },
+        {
+          "component": "article",
+          "status": "available"
+        }
+      ]
+    },
+    {
+      "at": "2026-11-08T14:49:14.398Z",
+      "provider": "substack",
+      "input": "real-library-reference",
+      "status": "extracted",
+      "fields": [
+        "title",
+        "description",
+        "creator",
+        "thumbnail",
+        "language",
+        "structuredData",
+        "article",
+        "links"
+      ],
+      "components": [
+        {
+          "component": "metadata",
+          "status": "available"
+        },
+        {
+          "component": "article",
+          "status": "available"
+        }
+      ]
+    },
+    {
+      "at": "2026-11-08T14:49:14.601Z",
+      "provider": "substack",
+      "input": "real-library-reference",
+      "status": "extracted",
+      "fields": [
+        "title",
+        "description",
+        "creator",
+        "thumbnail",
+        "language",
+        "structuredData",
+        "article",
+        "links"
+      ],
+      "components": [
+        {
+          "component": "metadata",
+          "status": "available"
+        },
+        {
+          "component": "article",
+          "status": "available"
+        }
+      ]
+    }
+  ]
+}
