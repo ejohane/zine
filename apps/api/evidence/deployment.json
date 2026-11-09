@@ -1,13 +1,14 @@
 {
-  "at": "2026-11-09T01:03:01.957Z",
+  "at": "2026-11-09T06:37:41.851Z",
   "origin": "https://api-next.myzine.app",
   "health": {
     "service": "zine-api",
     "status": "ok",
     "version": "0.1.0",
-    "deploymentId": "02ecfb45-1cec-471f-ab7f-18303723c01f"
+    "deploymentId": "23b9f152-39a0-4450-b0fd-1da9e746e130",
+    "releaseSha": "627b63d439f1bcb781026901b754ebf363b4e373"
   },
-  "activeDeploymentId": "ac2b21ab-2673-441b-b06b-3d9442b86fa8",
+  "activeDeploymentId": "ae94ea53-2eca-4d62-acf8-140e4263612a",
   "bindings": [
     {
       "type": "r2_bucket",
@@ -30,8 +31,8 @@
       "resource": "zine-api-next-vectors"
     }
   ],
-  "migrationFiles": 17,
-  "sourceFiles": 54,
-  "sourceSha256": "5c2e3772cbf06b82fc20e9ff071fedf72adc651381650c16708821ae50e78df1",
-  "openApiPaths": 45
+  "migrationFiles": 23,
+  "sourceFiles": 65,
+  "sourceSha256": "39f5b10904764bfd786197ee4e4975724f13608b7eaf2ae64de752e7489a94f1",
+  "openApiPaths": 56
 }

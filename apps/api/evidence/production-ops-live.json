@@ -1,0 +1,78 @@
+{
+  "at": "2026-11-09T06:50:01.934Z",
+  "origin": "https://api-next.myzine.app",
+  "sourceSha": "627b63d439f1bcb781026901b754ebf363b4e373",
+  "deploymentId": "23b9f152-39a0-4450-b0fd-1da9e746e130",
+  "jobs": {
+    "total": 3003,
+    "failed": 126,
+    "ready": 0,
+    "expiredLeases": 0,
+    "oldestReadyAt": null,
+    "oldestReadyAgeSeconds": 0
+  },
+  "subscriptions": {
+    "active": 6,
+    "stale": 0,
+    "errors": 1,
+    "oldestSuccessAt": "2026-11-09T00:06:28.862Z"
+  },
+  "cron": {
+    "lastStartedAt": "2026-11-09T06:45:03.125Z",
+    "lastSucceededAt": "2026-11-09T06:45:10.319Z",
+    "lastFailedAt": null,
+    "errorCategory": null,
+    "ageSeconds": 291
+  },
+  "indexing": {
+    "total": 497,
+    "dirty": 0
+  },
+  "conditions": {
+    "queue_stalled": false,
+    "jobs_failed": true,
+    "subscriptions_stale": false,
+    "cron_stale": false,
+    "cron_failed": false
+  },
+  "sourceState": [
+    {
+      "platform": "rss",
+      "status": "active",
+      "lastSuccessAt": "2026-11-09T06:30:11.062Z",
+      "errorCode": null
+    },
+    {
+      "platform": "rss",
+      "status": "active",
+      "lastSuccessAt": "2026-11-09T06:30:11.860Z",
+      "errorCode": null
+    },
+    {
+      "platform": "spotify",
+      "status": "active",
+      "lastSuccessAt": "2026-11-09T06:35:11.486Z",
+      "errorCode": null
+    },
+    {
+      "platform": "substack",
+      "status": "active",
+      "lastSuccessAt": "2026-11-09T06:30:08.998Z",
+      "errorCode": null
+    },
+    {
+      "platform": "x",
+      "status": "active",
+      "lastSuccessAt": "2026-11-09T00:06:28.862Z",
+      "errorCode": "provider_http_402"
+    },
+    {
+      "platform": "youtube",
+      "status": "active",
+      "lastSuccessAt": "2026-11-09T06:30:10.042Z",
+      "errorCode": null
+    }
+  ],
+  "scope": "Real Clerk authenticated production operational readback after natural cron. Aggregate state only; no manual syncs, heartbeat injection, queue reset or quota override.",
+  "limits": "Point-in-time owner aggregates and shared scheduler heartbeat. Normal upstream job/source errors are reported separately from critical infrastructure conditions."
+}

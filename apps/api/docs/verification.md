@@ -1,10 +1,16 @@
 # Verification ledger
 
-The independent API is deployed and the core service journeys have live evidence.
-The goal remains open: account-authorized YouTube playlist/channel pagination still
-needs a usable Google grant or API key. Public YouTube metadata extraction is live;
-that is a separate capability. Browser interaction is also unverified because the
-session's browser surface is disabled. No mobile changes were requested or made.
+The independent API production controls are released at source
+`627b63d439f1bcb781026901b754ebf363b4e373`. The
+[productionization acceptance](productionization.md) and [session handoff](STATUS.md)
+record the final operational work and exact current release. New OAuth and
+Google-authorized live acceptance are explicitly excluded from this milestone;
+the older Google-inclusive goal remains deferred. No mobile changes were made.
+
+The receipts below have individual timestamps and scopes. Historical provider
+success is not a current availability guarantee. The later observer recorded X
+HTTP402 and a public YouTube feed HTTP404; scheduled Spotify, Substack and RSS polls
+continued. Browser rendering/interactive login has no visual verification claim.
 
 ## Reproducible evidence
 
@@ -44,40 +50,63 @@ ignored `.local-data/` files with restricted permissions. Credentials are exclud
 
 ## Automated checks
 
-Recorded backend verification has 102 passing tests across 21 files, verified under both the host
-Node 25 and the repository-compatible Node 22.21.1. The Node 22 distribution
-archive was checked against its official SHA-256 manifest. The architecture
-walkthrough adds two separately passing DOM interaction checks; deployed delivery
-and standalone equivalence are recorded in `architecture-guide.json`. Browser
-visual verification remains unavailable because browser use is disabled. Integration tests run actual
-workerd, D1, R2 and signed-JWT verification. External provider responses and model
-outputs are controlled where deterministic failure/race coverage is needed; those
-checks do not establish live provider access or model quality.
+The current API suite passed **130 tests across 28 files under Node 22**, including
+actual isolated workerd/D1/R2 and signed-JWT verification. The exact promoted source
+passed lint, strict app/tools typechecking, that suite and a Wrangler dry-run build
+in the [production workflow](https://github.com/ejohane/zine/actions/runs/42573335811).
+The source PR and Linux tooling fix also passed applicable repository CI checks:
+[#466](https://github.com/ejohane/zine/pull/466),
+[#467](https://github.com/ejohane/zine/pull/467).
 
-Coverage includes atomic capture/idempotency, competing writes and deletion races,
-owner generations, private enrichment/provenance, transcript formats, independent
-completion/archive, collection references, subscription baselines and format
-filters, delayed first-poll boundaries, large retained feed inputs, resumable
-snapshots, conditional retrieval, page cycles, verified reconciliation, private
-relationships, registered uploads and ambiguous-storage acknowledgement recovery,
-provider budgets, queue outage/recovery, AI backfill scheduling, resumable indexing
-and understanding, semantic disclosure checks, export/erasure, credential refresh,
-MCP restrictions (including canonical/encoded path bypasses) and OpenAPI references.
+Coverage includes capture/idempotency and competing writes, deletion/erasure and
+owner-generation races, provenance/transcripts, completion/archive, subscriptions
+and feed cursors, reconciliation, export and scoped permissions (including MCP and
+export boundaries), atomic multi-caller quotas, deferred work, signed webhook
+retry/leases/retention, index recovery and client retry behavior. Fixture issuers,
+providers and AI outputs establish their controlled cases, not live access or
+model quality. Those claims require the separate live receipts.
 
-API lint, strict application/tools typechecking and dry-run build pass. Repository
-lint/typechecking/formatting pass. Existing Worker regression checks passed 2,212
-tests (four skipped), and existing web checks passed 102 Vitest plus four Bun tests.
-The original application implementation was not modified. Zod 4 uses its own alias;
-Vitest 2 and root Wrangler 3 retain the original applications' resolutions. The new
-workflow is present in the working tree; GitHub CI has not run for these unpushed
-changes. See `repository-checks.json` for recorded commands.
+The earlier baseline `repository-checks.json` and 102-test count are historical;
+`production-checks.json` records the later local 130-test checkpoint. GitHub logs
+verify the promoted source independently. The architecture guide has separate DOM
+interaction/delivery evidence in `architecture-guide.json`; those checks do not
+establish visual browser review.
+
+## Production controls and recovery evidence
+
+| Artifact                            | Actual observed result                                                                                                                                                                  | Scope                                                                                                        |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `production-release.json`           | Exact source active at 100%, all four fresh resource bindings, 23 migrations, anonymous library denied; private predeploy backup                                                        | Full successful GitHub production workflow; behavior has separate receipts                                   |
+| `production-controls-live.json`     | Read-default scopes, revocation, idempotency, live 25-call quota burst and independent caller                                                                                           | Real Clerk and isolated Cloudflare staging                                                                   |
+| `production-live.json`              | 15 concurrent requests, six durable references, no lost/duplicate retry captures; pagination, keyword, progress/archive, six replayed created events and official MCP read/denied write | Exact deployed production source; real Clerk/PATs; controlled references removed and probe tokens revoked    |
+| `webhooks-live.json`                | Independent receiver validates HMAC; scheduled retry after 503 has same delivery ID/body hash and receives 204                                                                          | Actual staging and separate Cloudflare receiver; not a simulated retry                                       |
+| `operations-live.json`              | Injected backlog opens/deduplicates/resolves durable alert                                                                                                                              | Staging only; no real provider or production fault injection                                                 |
+| `rollback-live.json`                | Previous Worker serves, retained context survives rollback/forward, exact version restored, 23 migrations stay current                                                                  | Actual staging; storage is not rolled back                                                                   |
+| `backup-latest.json`                | Private content-addressed archive downloaded again and hash verified; 491 items, 299 retained objects                                                                                   | No raw snapshot or content in GitHub; private R2, 30-day backup retention                                    |
+| `recovery-restore.json`             | Full 21 authoritative table hashes, FK validity and all 299 R2 object write/readback hashes                                                                                             | Isolated restored data; subscription/lease safety overlays explicitly documented, credentials removed        |
+| `recovery-search-live.json`         | 491 rebuilt items, zero pending; all 12 retrieval checks rank expected item first, three retained-material API readbacks                                                                | Real Clerk/Workers AI/fresh Vectorize; another-owner denial uses controlled PAT, not second real Clerk login |
+| `production-soak-prepromotion.json` | 45 minutes, 46 healthy authenticated observations; scheduled Spotify/Substack/RSS poll advances                                                                                         | Earlier Worker version, explicitly separate from final release                                               |
+
+`staging-origin-live.json` verifies real Clerk staging-origin sessions on staging
+and HTTP401 rejection by production after the staging config correction. It is
+authentication-boundary evidence; it does not claim visual browser interaction.
+
+Additional exact-release receipts: `production-search-live.json` passes all 12
+real-library keyword/semantic/hybrid cases; `production-ops-live.json` records a
+natural cron heartbeat, zero ready backlog/expired leases/dirty index revisions
+and explicitly visible historical job/source errors. `monitor-live.json` links the
+actual GitHub execution with its read-only operational PAT, including the initial
+pre-heartbeat failure and healthy result after natural cron.
+
+These are bounded observed cases. They do not prove universal correctness, future
+uptime, unavailable provider permissions, or every possible client experience.
 
 ## Fresh deployment
 
 Worker `zine-api-next`; domain <https://api-next.myzine.app>; D1
 `0e55836b-07de-426b-9977-b783b0ea6652`; R2 `zine-api-next-artifacts`;
 queues `zine-api-next-jobs` and `zine-api-next-dead`; Vectorize
-`zine-api-next-vectors`. Migrations 0001–0017 are applied remotely. The exact serving
+`zine-api-next-vectors`. Migrations 0001–0023 are applied remotely. The exact serving
 version and source digest are in `deployment.json` and public `/health`.
 Existing production Zine resources were not modified. Approved credentials were
 provisioned independently through stdin; the rewrite has its own encryption key.
@@ -94,7 +123,8 @@ provisioned independently through stdin; the rewrite has its own encryption key.
   alone is not an account grant. Independently encrypted
   grant storage, refresh and official API pagination are implemented and tested
   with controlled upstreams; a usable grant or API key is needed for live proof.
-- Public YouTube channel intake and repeated synchronization now succeed. The
+- Historical public YouTube channel intake and repeated synchronization succeeded;
+  the later observer found a feed 404 and current availability must be refreshed. The
   previous never-attempted job was held by a watch-page budget incorrectly shared
   with feeds; migration 0016 and separate scopes fixed that coupling. Actual D1
   inspection confirms the original watch cooldown was preserved. Feed metadata
