@@ -23,7 +23,7 @@
     "AUTH_ISSUER": "https://clerk.myzine.app",
     "CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsubXl6aW5lLmFwcCQ",
     "AUTH_AUDIENCE": "",
-    "AUTH_AUTHORIZED_PARTIES": "https://api-next.myzine.app",
+    "AUTH_AUTHORIZED_PARTIES": "https://api-next.myzine.app,https://api-next-staging.myzine.app",
     "ALLOWED_ORIGINS": "https://api-next-staging.myzine.app,http://localhost:8890",
     "EMBEDDING_MODEL": "@cf/qwen/qwen3-embedding-0.6b",
     "USAGE_LIMITS_JSON": "{\"requestsPerMinute\":300,\"callerRequestsPerMinute\":20}",
