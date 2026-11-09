@@ -23,6 +23,17 @@ assert.equal(config.name, target.worker);
 assert.equal(config.vars.ENVIRONMENT, environment);
 assert.equal(config.d1_databases[0].database_id, target.databaseId);
 assert.equal(config.r2_buckets[0].bucket_name, target.bucket);
+assert.equal(
+  config.queues.producers.find((b: { binding: string }) => b.binding === 'JOBS')?.queue,
+  target.worker + '-jobs'
+);
+assert.equal(
+  config.vectorize.find((b: { binding: string }) => b.binding === 'VECTORS')?.index_name,
+  target.worker + '-vectors'
+);
+assert.equal(config.queues.consumers[0].queue, target.worker + '-jobs');
+assert.equal(config.queues.consumers[0].dead_letter_queue, target.worker + '-dead');
+await quietCommand('bunx', ['wrangler@4.158.0', 'whoami']);
 if (environment === 'production') {
   const stage = (await fetch(environments.staging.origin + '/health').then((r) => r.json())) as {
     releaseSha?: string;
@@ -75,8 +86,13 @@ const previous = await cloudflare<{
 }>('workers/scripts/' + target.worker + '/deployments');
 const previousVersions = previous.deployments[0]?.versions ?? [];
 // A native snapshot plus referenced material is archived before every production migration/deploy.
-if (environment === 'production')
+let preDeployBackup: Record<string, unknown> | null = null;
+if (environment === 'production') {
   await quietCommand('bun', ['run', 'scripts/backup.ts', 'production']);
+  preDeployBackup = JSON.parse(await readFile('evidence/backup-latest.json', 'utf8'));
+  assert.equal(preDeployBackup!.environment, 'production');
+  assert.equal(preDeployBackup!.bucket, 'zine-api-next-backups');
+}
 await quietCommand('bunx', [
   'wrangler@4.158.0',
   'd1',
@@ -143,12 +159,19 @@ const resources = bindings.bindings
   }));
 assert.equal(resources.find((r) => r.name === 'DB')?.resource, target.databaseId);
 assert.equal(resources.find((r) => r.name === 'ARTIFACTS')?.resource, target.bucket);
-assert.ok(
-  resources.every(
-    (r) => r.resource === target.databaseId || r.resource?.startsWith(target.worker + '-')
-  ),
-  'A foreign infrastructure binding was found'
-);
+const expectedResources: Record<string, string> = {
+  DB: target.databaseId,
+  ARTIFACTS: target.bucket,
+  JOBS: target.worker + '-jobs',
+  VECTORS: target.worker + '-vectors',
+};
+assert.equal(resources.length, 4, 'Unexpected runtime storage binding count');
+for (const resource of resources)
+  assert.equal(
+    resource.resource,
+    expectedResources[resource.name],
+    'A foreign runtime binding was found: ' + resource.name
+  );
 const contract = (await fetch(target.origin + '/openapi.json').then((r) => r.json())) as {
   paths: Record<string, unknown>;
 };
@@ -168,6 +191,7 @@ const manifest = {
   origin: target.origin,
   deploymentId: health.deploymentId,
   previousVersions,
+  preDeployBackup,
   resources,
   migrations,
   checks: {

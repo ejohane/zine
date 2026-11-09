@@ -78,6 +78,11 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y sqlite3
       - run: bun run scripts/release.ts production
         working-directory: apps/api
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sanitized-predeployment-backup-receipt
+          path: apps/api/evidence/backup-latest.json
+          if-no-files-found: error
       - name: Remove ephemeral private backups
         if: always()
         run: rm -rf apps/api/.local-data/backups

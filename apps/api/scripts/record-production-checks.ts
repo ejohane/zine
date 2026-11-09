@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { format, resolveConfig } from 'prettier';
-const logs = Object.fromEntries(
+const logs: Record<string, string> = Object.fromEntries(
   await Promise.all(
     [
       'production-reviewed-tests',
@@ -28,7 +28,8 @@ async function walk(dir: string) {
     else sources.push(path);
   }
 }
-for (const dir of ['src', 'client', 'migrations', 'test']) await walk(dir);
+for (const dir of ['src', 'client', 'migrations', 'test', 'scripts', 'verification'])
+  await walk(dir);
 sources.sort();
 const sourceHash = createHash('sha256');
 for (const path of sources) {

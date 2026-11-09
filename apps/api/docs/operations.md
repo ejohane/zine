@@ -39,7 +39,8 @@ Release checks reject unrelated bindings, unknown remote migrations and changes 
 recorded migration checksums. The first ledger initialization establishes a
 reviewed baseline for migrations already applied before the ledger existed.
 Health reports `releaseSha` and the actual Worker `deploymentId`. A private release
-manifest records bindings, migrations, prior versions and readiness checks in
+manifest records the predeployment backup receipt, bindings, migrations, prior
+versions and readiness checks in
 `zine-api-next-backups/releases/{environment}/{sha}/{version}.json`. Manifests do
 not establish provider behavior; run the appropriate authenticated acceptance too.
 
@@ -50,7 +51,8 @@ bun run scripts/rollback.ts staging EXPLICIT_WORKER_VERSION_UUID
 ```
 
 Select a reviewed version belonging to that Worker. The command verifies actual
-serving-version readback. It restores code/configuration only: **D1, R2, queues and
+serving-version readback. It follows [Cloudflare rollback semantics](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/)
+and restores code/configuration only: **D1, R2, queues and
 vectors remain current**. Prefer additive migrations and a forward fix. Never
 assume a Worker rollback reverses data changes. `verify-rollback-live.ts VERSION`
 uses staging only to check controlled context readback across rollback and forward
@@ -63,7 +65,8 @@ bun run scripts/backup.ts production
 ```
 
 The daily GitHub backup workflow and every production release run this command.
-It uses Cloudflare's native point-in-time `sqlite3_cli_only` export so FTS does not
+It uses [Cloudflare's native point-in-time export](https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/export/)
+with `sqlite3_cli_only` so FTS does not
 prevent the snapshot. The source database is briefly unavailable during native
 export. SQLite verifies the downloaded snapshot; immutable retained objects and
 active checkpoints referenced by it are copied separately. A missing referenced
