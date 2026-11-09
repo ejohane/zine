@@ -1,11 +1,12 @@
 /** Real password authentication through Clerk FAPI; no bypass or minted identity. */
-export async function realSession() {
+export async function realSession(origin = 'https://api-next.myzine.app') {
+  if (!['https://api-next.myzine.app', 'https://api-next-staging.myzine.app'].includes(origin))
+    throw new Error('Use an approved independent API origin');
   const email = process.env.ZINE_TEST_USER_EMAIL;
   const password = process.env.ZINE_TEST_USER_PASSWORD;
   if (!email || !password)
     throw new Error('Use secretsctl run zine.test to inject the existing login credentials');
   const issuer = 'https://clerk.myzine.app';
-  const origin = 'https://api-next.myzine.app';
   const cookies = new Map<string, string>();
   async function call(path: string, body?: Record<string, string>) {
     const response = await fetch(`${issuer}/v1${path}`, {
