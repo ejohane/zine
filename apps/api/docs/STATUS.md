@@ -37,13 +37,17 @@ objective; track this authorized non-OAuth work here.
   staging; the full workflow verified, staged, backed up and promoted the source.
 - Actual production REST/MCP concurrency acceptance passed with cleanup. The
   scoped GitHub monitor token is configured; GitHub monitoring passed after the
-  first natural cron heartbeat. A 30-minute read-only observer is running against this exact release.
+  first natural cron heartbeat. The 30-minute exact-release observer completed with 30
+  healthy authenticated observations, zero failures and successful scheduled
+  Spotify/Substack/YouTube/RSS poll advances (`production-soak.json`).
 - Staging-origin Clerk configuration was corrected in merged PR #468: staging
-  originally accepted only production-origin sessions. Staging deployment
-  `d1759e4a-a1d0-4bd4-9278-e660f44c5bfa` serves source
+  originally accepted only production-origin sessions. At the origin-boundary probe, staging deployment
+  `d1759e4a-a1d0-4bd4-9278-e660f44c5bfa` served source
   `b40fd5af5e4a76357dd62769390b3697558aa380`. Real Clerk staging-origin
   acceptance and production rejection both passed (`staging-origin-live.json`).
-  Production's trusted origins remain restricted. Browser rendering is distinct.
+  Production's trusted origins remain restricted. Later main pushes automatically
+  stage documentation/helper updates; inspect staging `/health` for its latest
+  stamp. Browser rendering is distinct.
 
 ## Resources and behavior
 
@@ -126,11 +130,10 @@ processes/private progress before starting another observer.
 - New OAuth and Google-authorized metadata/pagination acceptance are deferred.
   The original app supports Google integration; its encrypted grant could not be
   reused with approved available keys. Do not claim that integration is absent.
-- The earlier real provider observer found X HTTP402 and a public YouTube feed
-  HTTP404. Earlier successful extraction/intake receipts are historical. No paid
-  provider plan or billing changes were made. Saves remain durable, failures are
-  explicit, and other providers continued polling. Refresh status before claiming
-  those upstreams are healthy.
+- X currently reports upstream `provider_http_402`; no provider-plan/billing
+  changes were made. The earlier public YouTube feed 404 recovered: YouTube, Spotify,
+  Substack and both RSS subscriptions advanced during the new production observation.
+  Saves remain durable and inaccessible source failures are explicit.
 - Captions/paywalls/inaccessible pages can prevent rich extraction. Imported
   metadata or accepted jobs do not prove extracted content or a full transcript.
 - Browser visual verification of the Inspector/architecture guide was unavailable
@@ -140,8 +143,25 @@ processes/private progress before starting another observer.
   may not have them. Do not fabricate original-library artifacts. Backups and
   credential values must never enter this PUBLIC repository.
 
-## Next action
+## Final audit and next action
 
-Observe the exact-release soak (session 25042; private `.local-data/soak-progress.json`,
-started 06:37 UTC, expected through 07:07 UTC) without duplicating it. Monitor workflow 42574555374 passed after natural cron. Finish the
-exact-release observation and publish final sanitized receipts/runbooks.
+All P1–P12 productionization requirements were inspected against their receipts;
+see [productionization.md](productionization.md). The proof package is in PR #469.
+The original source/controls PR #466, Linux backup fix #467 and staging-origin fix
+#468 are merged. Inspect its actual merge/check state when starting a fresh session; production
+release identity above is independent of later documentation-only main commits.
+There are no local observers or development servers left running. Cloudflare's
+staging/recovery/proof resources remain for reproducible operation; retained data
+and credentials remain private. `doctor-production.json` records a clean Node 22
+startup check; its public-health scope is separate from authenticated evidence.
+
+For a new experience, start with `client/README.md`, `docs/usage.md`, OpenAPI and the
+existing CLI. Use the actual production `releaseSha`, preserve save idempotency
+keys across retries, and handle asynchronous processing and explicit source errors.
+Configure any new web origin deliberately; use scoped PATs for trusted agents.
+
+Remaining decisions: OAuth/Google-authorized live acceptance and X account/provider
+access are deferred. Goal-control cleanup is an administrative TODO. GitHub monitor
+and daily backup workflows are active; their executable paths were observed via
+manual dispatch. Natural GitHub scheduled-trigger execution is not claimed by
+those receipts. Continue observing normal scheduled runs through routine operations.

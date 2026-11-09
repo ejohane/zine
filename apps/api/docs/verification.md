@@ -9,7 +9,7 @@ the older Google-inclusive goal remains deferred. No mobile changes were made.
 
 The receipts below have individual timestamps and scopes. Historical provider
 success is not a current availability guarantee. The later observer recorded X
-HTTP402 and a public YouTube feed HTTP404; scheduled Spotify, Substack and RSS polls
+HTTP 402 and a public YouTube feed HTTP 404; scheduled Spotify, Substack and RSS polls
 continued. Browser rendering/interactive login has no visual verification claim.
 
 ## Reproducible evidence
@@ -88,7 +88,7 @@ establish visual browser review.
 | `production-soak-prepromotion.json` | 45 minutes, 46 healthy authenticated observations; scheduled Spotify/Substack/RSS poll advances                                                                                         | Earlier Worker version, explicitly separate from final release                                               |
 
 `staging-origin-live.json` verifies real Clerk staging-origin sessions on staging
-and HTTP401 rejection by production after the staging config correction. It is
+and HTTP 401 rejection by production after the staging config correction. It is
 authentication-boundary evidence; it does not claim visual browser interaction.
 
 Additional exact-release receipts: `production-search-live.json` passes all 12
@@ -97,6 +97,12 @@ natural cron heartbeat, zero ready backlog/expired leases/dirty index revisions
 and explicitly visible historical job/source errors. `monitor-live.json` links the
 actual GitHub execution with its read-only operational PAT, including the initial
 pre-heartbeat failure and healthy result after natural cron.
+
+`production-soak.json` records 30 authenticated observations over 30 minutes on
+exact source `627b63d439f1bcb781026901b754ebf363b4e373`, zero failures and successful
+scheduled Spotify/Substack/YouTube/RSS poll advances. X still reports upstream 402.
+The earlier public YouTube feed 404 recovered. `doctor-production.json` establishes
+clean-checkout public startup checks under Node 22, with its limits declared.
 
 These are bounded observed cases. They do not prove universal correctness, future
 uptime, unavailable provider permissions, or every possible client experience.

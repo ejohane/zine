@@ -1,11 +1,11 @@
 {
-  "at": "2026-11-09T06:50:01.934Z",
+  "at": "2026-11-09T07:07:27.614Z",
   "origin": "https://api-next.myzine.app",
   "sourceSha": "627b63d439f1bcb781026901b754ebf363b4e373",
   "deploymentId": "23b9f152-39a0-4450-b0fd-1da9e746e130",
   "jobs": {
-    "total": 3003,
-    "failed": 126,
+    "total": 3012,
+    "failed": 130,
     "ready": 0,
     "expiredLeases": 0,
     "oldestReadyAt": null,
@@ -18,11 +18,11 @@
     "oldestSuccessAt": "2026-11-09T00:06:28.862Z"
   },
   "cron": {
-    "lastStartedAt": "2026-11-09T06:45:03.125Z",
-    "lastSucceededAt": "2026-11-09T06:45:10.319Z",
+    "lastStartedAt": "2026-11-09T07:05:03.127Z",
+    "lastSucceededAt": "2026-11-09T07:05:06.501Z",
     "lastFailedAt": null,
     "errorCategory": null,
-    "ageSeconds": 291
+    "ageSeconds": 141
   },
   "indexing": {
     "total": 497,
@@ -39,25 +39,25 @@
     {
       "platform": "rss",
       "status": "active",
-      "lastSuccessAt": "2026-11-09T06:30:11.062Z",
+      "lastSuccessAt": "2026-11-09T06:50:10.331Z",
       "errorCode": null
     },
     {
       "platform": "rss",
       "status": "active",
-      "lastSuccessAt": "2026-11-09T06:30:11.860Z",
+      "lastSuccessAt": "2026-11-09T06:50:11.360Z",
       "errorCode": null
     },
     {
       "platform": "spotify",
       "status": "active",
-      "lastSuccessAt": "2026-11-09T06:35:11.486Z",
+      "lastSuccessAt": "2026-11-09T06:55:07.418Z",
       "errorCode": null
     },
     {
       "platform": "substack",
       "status": "active",
-      "lastSuccessAt": "2026-11-09T06:30:08.998Z",
+      "lastSuccessAt": "2026-11-09T06:50:07.875Z",
       "errorCode": null
     },
     {
@@ -69,7 +69,7 @@
     {
       "platform": "youtube",
       "status": "active",
-      "lastSuccessAt": "2026-11-09T06:30:10.042Z",
+      "lastSuccessAt": "2026-11-09T06:50:09.131Z",
       "errorCode": null
     }
   ],

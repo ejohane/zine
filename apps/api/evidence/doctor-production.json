@@ -1,0 +1,45 @@
+{
+  "at": "2026-11-09T06:59:39.306Z",
+  "apiOrigin": "https://api-next.myzine.app",
+  "mode": "public-http",
+  "checkout": {
+    "head": "7a3a352c2fe178bc12582b1804d50d367cbe60c9",
+    "branch": "codex/zine-api-acceptance-receipts",
+    "uncommittedPaths": 0
+  },
+  "runtime": {
+    "bun": "1.3.4",
+    "hostNode": "v22.21.1",
+    "expectedNodeMajor": 22
+  },
+  "requiredFiles": {
+    "AGENTS.md": true,
+    "docs/STATUS.md": true,
+    "docs/blueprint.md": true,
+    "docs/usage.md": true,
+    "docs/verification.md": true,
+    "wrangler.jsonc": true
+  },
+  "checks": {
+    "health": {
+      "status": "passed",
+      "service": "zine-api",
+      "version": "0.1.0",
+      "deploymentId": "23b9f152-39a0-4450-b0fd-1da9e746e130",
+      "scope": "Public health endpoint; includes its database connectivity check"
+    },
+    "contract": {
+      "status": "passed",
+      "paths": 56,
+      "scope": "Public API contract availability; not behavior verification"
+    }
+  },
+  "warnings": [],
+  "scope": "Local checkout and anonymous HTTP startup checks. Authentication, providers, queue progress, recovery and release readiness require their own verification.",
+  "nextSteps": [
+    "Read docs/STATUS.md and inspect git status",
+    "Follow docs/usage.md for authenticated operations",
+    "Use docs/verification.md for the evidence map; inspect scripts before running them"
+  ],
+  "completedWithoutFailure": true
+}

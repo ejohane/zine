@@ -19,20 +19,20 @@ integration marketplace or developer portal is not required.
 
 ## Requirements and proof
 
-| ID  | Deliverable                                                       | Required evidence                                                                                                                                                      | Status                                              |
-| --- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| P1  | Source-controlled rewrite, reviewed release and passing GitHub CI | Scoped commits/PR, required check results, merge/release source SHA                                                                                                    | Merged; CI + production release verified            |
-| P2  | Separate staging and explicit production configuration            | Actual Worker/D1/R2/queue/vector bindings; isolation checks; no legacy bindings                                                                                        | Live isolated staging/production verified           |
-| P3  | Repeatable migration/deploy/rollback                              | Automated workflow, immutable release manifest, migration validation, observed staging deployment and rollback/readback                                                | Release, backup workflow + rollback verified        |
-| P4  | Database and retained-material recovery                           | Private backup manifest; actual restore into isolated new resources; record/artifact integrity and another-owner isolation; no real-account erasure                    | Live restore verified                               |
-| P5  | Search-index rebuilding                                           | Actual index rebuild from restored authoritative material and verified keyword/semantic/hybrid retrieval                                                               | 491 rebuilt; 12 live retrieval cases passed         |
-| P6  | Operational visibility and alerts                                 | Queue age, subscription freshness, component failures, usage and release status; durable alert lifecycle; injected failure observed and resolved                       | Live alert lifecycle + GitHub monitor verified      |
-| P7  | Caller and resource usage controls                                | Scoped request limits, enrichment and AI ceilings, retry/reset behavior, multi-caller fairness and live boundary checks                                                | Isolated + staging verified                         |
-| P8  | Scoped revocable personal tokens                                  | Read/write/subscription/operations capabilities, no scope escalation, revocation, expiry, owner isolation, existing session behavior                                   | Isolated + staging verified                         |
-| P9  | Agent-friendly typed client/CLI and reference experiences         | Runnable save/retrieve/search/subscription flows with safe retries, pagination, async status and structured errors against the live service                            | Production REST/MCP/client run verified             |
-| P10 | Durable events and signed webhook delivery                        | Transactional event records, paginated replay, delivery signatures, retry/idempotency, cancellation/erasure fencing and observed receiver behavior                     | Live signed retry verified in staging               |
-| P11 | Sustained operation and burst checks                              | Timestamped real-provider and real-library observations across scheduled polling cycles, bounded multi-owner bursts, no duplicate/lost durable saves, backlogs recover | Prior 45min complete; released-source 30min running |
-| P12 | Fresh-session operations and final audit                          | Agent guide, doctor, runbooks, exact commands and artifacts, current source/deployment identities; every requirement inspected                                         | In progress                                         |
+| ID  | Deliverable                                                       | Required evidence                                                                                                                                                      | Status                                         |
+| --- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| P1  | Source-controlled rewrite, reviewed release and passing GitHub CI | Scoped commits/PR, required check results, merge/release source SHA                                                                                                    | Merged; CI + production release verified       |
+| P2  | Separate staging and explicit production configuration            | Actual Worker/D1/R2/queue/vector bindings; isolation checks; no legacy bindings                                                                                        | Live isolated staging/production verified      |
+| P3  | Repeatable migration/deploy/rollback                              | Automated workflow, immutable release manifest, migration validation, observed staging deployment and rollback/readback                                                | Release, backup workflow + rollback verified   |
+| P4  | Database and retained-material recovery                           | Private backup manifest; actual restore into isolated new resources; record/artifact integrity and another-owner isolation; no real-account erasure                    | Live restore verified                          |
+| P5  | Search-index rebuilding                                           | Actual index rebuild from restored authoritative material and verified keyword/semantic/hybrid retrieval                                                               | 491 rebuilt; 12 live retrieval cases passed    |
+| P6  | Operational visibility and alerts                                 | Queue age, subscription freshness, component failures, usage and release status; durable alert lifecycle; injected failure observed and resolved                       | Live alert lifecycle + GitHub monitor verified |
+| P7  | Caller and resource usage controls                                | Scoped request limits, enrichment and AI ceilings, retry/reset behavior, multi-caller fairness and live boundary checks                                                | Isolated + staging verified                    |
+| P8  | Scoped revocable personal tokens                                  | Read/write/subscription/operations capabilities, no scope escalation, revocation, expiry, owner isolation, existing session behavior                                   | Isolated + staging verified                    |
+| P9  | Agent-friendly typed client/CLI and reference experiences         | Runnable save/retrieve/search/subscription flows with safe retries, pagination, async status and structured errors against the live service                            | Production REST/MCP/client run verified        |
+| P10 | Durable events and signed webhook delivery                        | Transactional event records, paginated replay, delivery signatures, retry/idempotency, cancellation/erasure fencing and observed receiver behavior                     | Live signed retry verified in staging          |
+| P11 | Sustained operation and burst checks                              | Timestamped real-provider and real-library observations across scheduled polling cycles, bounded multi-owner bursts, no duplicate/lost durable saves, backlogs recover | 30min exact release + bounded bursts verified  |
+| P12 | Fresh-session operations and final audit                          | Agent guide, doctor, runbooks, exact commands and artifacts, current source/deployment identities; every requirement inspected                                         | Audited; handoff/doctor/proof complete         |
 
 Tests establish their actual cases, not universal correctness. Separate fixture
 issuer/provider/AI checks from real Clerk/provider/Cloudflare execution. Builds,
@@ -77,9 +77,17 @@ Additional proof:
 - [Production keyword/semantic/hybrid search](../evidence/production-search-live.json).
 - [Natural cron and operational state](../evidence/production-ops-live.json).
 - [Actual GitHub scoped-monitor execution](../evidence/monitor-live.json).
-- [45-minute prepromotion observation](../evidence/production-soak-prepromotion.json); the final production observation is separate.
+- [45-minute prepromotion observation](../evidence/production-soak-prepromotion.json); the [final 30-minute exact-release observation](../evidence/production-soak.json) has 30 authenticated reads, zero failures and scheduled poll advances.
 
-Upstream source limits are visible: the earlier observer recorded X HTTP402 and a
-public YouTube feed HTTP404; Spotify/Substack/RSS continued scheduled polling.
-No paid provider plan changes were made. OAuth/Google-authorized acceptance remains
-deferred. These limits do not erase durable captures or become fake content.
+Current source limit: X reports upstream `provider_http_402`; no paid provider plan
+change was made. The earlier YouTube feed 404 recovered: the new production
+observation records successful YouTube, Spotify, Substack and RSS poll advances.
+OAuth/Google-authorized acceptance remains deferred. These conditions remain
+explicit; unavailable content is never fabricated.
+
+The active GitHub backup/monitor workflows have successful actual Linux executions
+via manual dispatch. Their natural scheduled triggers have not yet been observed
+in these receipts. See [GitHub metadata](../evidence/github-operations-live.json),
+[monitor execution](../evidence/monitor-live.json) and the scope on each receipt.
+The final audit accepts the tested executable paths and configured schedules;
+ongoing future uptime is not a claim of this finite verification window.
