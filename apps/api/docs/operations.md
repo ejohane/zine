@@ -50,6 +50,19 @@ not establish provider behavior; run the appropriate authenticated acceptance to
 bun run scripts/rollback.ts staging EXPLICIT_WORKER_VERSION_UUID
 ```
 
+Production rollback additionally requires the target's exact tagged-source release
+manifest in the private backup bucket, with matching Worker/version/source and all
+productionization migrations 18–23. Missing/foreign/older manifests fail before
+promotion. In particular, **do not use pre-scope production version
+`02ecfb45-1cec-471f-ab7f-18303723c01f`**: it would remove scoped-token enforcement.
+It is rejected by the command. Until another compatible reviewed production
+release exists, use a forward repair. `rollback-policy-live.json` records actual
+read-only rejection/acceptance preflights; no production rollback was performed.
+
+```sh
+bun run scripts/rollback.ts production EXPLICIT_WORKER_VERSION_UUID --check-only
+```
+
 Select a reviewed version belonging to that Worker. The command verifies actual
 serving-version readback. It follows [Cloudflare rollback semantics](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/)
 and restores code/configuration only: **D1, R2, queues and

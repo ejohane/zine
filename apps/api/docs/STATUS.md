@@ -95,6 +95,11 @@ under `../evidence/` contain hashes/counts/assertions, not raw library content.
   critical queue/cron condition, no dirty index revisions; actual GitHub runner
   monitoring with its scoped PAT. Historical failed jobs and source errors remain
   visible as noncritical conditions.
+- `rollback-policy-live.json`: actual production read-only preflight rejects the
+  pre-scope version 02ec before deployment and accepts the current tagged release's
+  matching private manifest. Six policy tests cover invalid tags/receipt identities
+  and missing scope migration. Production rollback must retain migrations 18–23
+  and their policy floor; use forward repair until a compatible older release exists.
 - `rollback-live.json`: actual staging rollback/forward promotion, exact-version
   readback and retained context; all 23 migrations remain current.
 - `backup-latest.json`: private R2 archive with full round-trip hash readback;

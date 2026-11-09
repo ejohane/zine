@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import { writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { cloudflare, environments } from './cloudflare-control';
 import { quietCommand } from './quiet-command';
+import { assertProductionRollbackReceipt, rollbackReleaseSha } from './rollback-policy';
 const environment = process.argv[2],
   version = process.argv[3];
 assert.ok(
@@ -10,8 +11,36 @@ assert.ok(
 );
 assert.match(version ?? '', /^[a-f0-9-]{36}$/);
 const target = environments[environment];
+assert.ok(process.argv[4] === undefined || process.argv[4] === '--check-only');
 // Validate this version belongs to the selected Worker before asking Cloudflare to promote it.
-await cloudflare('workers/scripts/' + target.worker + '/versions/' + version);
+const details = await cloudflare<{
+  resources: { bindings: { type: string; name: string; text?: string }[] };
+}>('workers/scripts/' + target.worker + '/versions/' + version);
+if (environment === 'production') {
+  const sourceSha = rollbackReleaseSha(details.resources.bindings);
+  const directory = '.local-data/rollback-manifests';
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  await chmod(directory, 0o700);
+  const path = directory + '/' + version + '.json';
+  await quietCommand('bunx', [
+    'wrangler@4.158.0',
+    'r2',
+    'object',
+    'get',
+    `zine-api-next-backups/releases/production/${sourceSha}/${version}.json`,
+    '--remote',
+    '--file',
+    path,
+  ]);
+  await chmod(path, 0o600);
+  assertProductionRollbackReceipt(JSON.parse(await readFile(path, 'utf8')), version, sourceSha);
+}
+if (process.argv[4] === '--check-only') {
+  console.log(
+    JSON.stringify({ environment, version, preflightPassed: true, deploymentChanged: false })
+  );
+  process.exit(0);
+}
 await quietCommand('bunx', [
   'wrangler@4.158.0',
   'rollback',

@@ -50,10 +50,14 @@ ignored `.local-data/` files with restricted permissions. Credentials are exclud
 
 ## Automated checks
 
-The current API suite passed **130 tests across 28 files under Node 22**, including
+The promoted-source API suite passed **130 tests across 28 files under Node 22**, including
 actual isolated workerd/D1/R2 and signed-JWT verification. The exact promoted source
 passed lint, strict app/tools typechecking, that suite and a Wrangler dry-run build
 in the [production workflow](https://github.com/ejohane/zine/actions/runs/42573335811).
+Six additional rollback-policy tests reject untagged/pre-scope and foreign release
+receipts. Their actual production preflight receipt is `rollback-policy-live.json`;
+the verified production version did not change. The final repository suite adds
+these to the promoted source's 130 cases.
 The source PR and Linux tooling fix also passed applicable repository CI checks:
 [#466](https://github.com/ejohane/zine/pull/466),
 [#467](https://github.com/ejohane/zine/pull/467).

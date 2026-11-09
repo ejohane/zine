@@ -73,6 +73,7 @@ Additional proof:
 - [Observed Linux private-backup workflow](https://github.com/ejohane/zine/actions/runs/42572985940).
 - [Rebuilt recovery search and retained-material readbacks](../evidence/recovery-search-live.json).
 - [Staging rollback and forward promotion](../evidence/rollback-live.json).
+- [Production pre-scope rollback rejection and current-manifest acceptance](../evidence/rollback-policy-live.json); no production rollback was executed.
 - [Exact released-source REST/MCP concurrency acceptance](../evidence/production-live.json).
 - [Production keyword/semantic/hybrid search](../evidence/production-search-live.json).
 - [Natural cron and operational state](../evidence/production-ops-live.json).
