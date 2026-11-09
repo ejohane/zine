@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-09T04:42:40.006Z",
+  "origin": "https://api-next-staging.myzine.app",
+  "scope": "Controlled pending-job fault injected only into staging D1, observed and resolved through the actual API using real Clerk. No production/provider/library mutation.",
+  "checks": {
+    "baselineClear": true,
+    "backlogDetected": true,
+    "durableAlertOpened": true,
+    "repeatedCheckDeduplicated": true,
+    "conditionCleared": true,
+    "alertResolved": true
+  }
+}

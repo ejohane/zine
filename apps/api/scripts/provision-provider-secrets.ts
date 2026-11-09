@@ -1,4 +1,8 @@
 import { spawn } from 'node:child_process';
+const args = process.argv.slice(2);
+if (args.length > 1 || (args.length === 1 && args[0] !== '--staging'))
+  throw new Error('Use no argument for production or --staging');
+const workerName = args[0] === '--staging' ? 'zine-api-next-staging' : 'zine-api-next';
 import { existingProviderCredentials } from './provider-credentials';
 
 // Values travel only from approved existing configuration through stdin to
@@ -24,7 +28,7 @@ if (!credentials.X_BEARER_TOKEN && credentials.X_CLIENT_ID && credentials.X_CLIE
   credentials.X_BEARER_TOKEN = token.access_token;
 }
 if (!Object.keys(credentials).length) throw new Error('No reusable provider credentials found');
-const child = spawn('bunx', ['wrangler@4.158.0', 'secret', 'bulk', '--name', 'zine-api-next'], {
+const child = spawn('bunx', ['wrangler@4.158.0', 'secret', 'bulk', '--name', workerName], {
   stdio: ['pipe', 'inherit', 'inherit'],
 });
 child.stdin.end(JSON.stringify(credentials));

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod4';
+import { requiredScope } from './permissions';
 import { all, ApiError, now, stmt } from './lib';
 import type { AppEnv, Env } from './types';
 
@@ -33,6 +34,10 @@ const sections: Record<string, string> = {
   enrichment: 'SELECT d.*,d.id AS exportKey FROM contributions d WHERE d.owner_id=?',
   components:
     "SELECT d.*,d.content_id||':'||d.component AS exportKey FROM enrichment_components d WHERE d.owner_id=?",
+  events:
+    'SELECT id,type,subject_id,data_json,occurred_at,id AS exportKey FROM service_events WHERE owner_id=?',
+  webhooks:
+    'SELECT id,url,enabled,created_at,updated_at,id AS exportKey FROM webhooks WHERE owner_id=?',
   connections:
     'SELECT provider,status,created_at,updated_at,provider AS exportKey FROM connections WHERE owner_id=?',
   relationships:
@@ -142,6 +147,10 @@ export async function eraseAccountData(env: Env, owner: string) {
     ),
     stmt(env.DB, 'DELETE FROM material_artifacts WHERE owner_id=?', owner),
     ...[
+      'event_retention',
+      'webhook_deliveries',
+      'webhooks',
+      'operational_alerts',
       'api_tokens',
       'item_relationships',
       'item_aliases',
@@ -157,6 +166,8 @@ export async function eraseAccountData(env: Env, owner: string) {
       'personal_items',
       'subscriptions',
     ].map((table) => stmt(env.DB, `DELETE FROM ${table} WHERE owner_id=?`, owner)),
+    stmt(env.DB, 'DELETE FROM service_events WHERE owner_id=?', owner),
+    stmt(env.DB, "DELETE FROM service_state WHERE name='ops_cursor' AND value=?", owner),
     stmt(
       env.DB,
       'DELETE FROM source_routes WHERE source_id IN(SELECT id FROM sources WHERE owner_id=?)',
@@ -183,7 +194,14 @@ portabilityRoutes.get('/export', (c) =>
   c.json({
     schemaVersion: 1,
     consistency: 'live',
-    sections: Object.keys(sections),
+    sections: Object.keys(sections).filter((section) => {
+      const scopes = c.get('principal').scopes;
+      const required = requiredScope('GET', '/v1/export/' + section);
+      return (
+        scopes === undefined ||
+        (required !== null && required !== 'unsupported' && scopes.includes(required))
+      );
+    }),
     credentialsIncluded: false,
     description:
       'Page each section; enrichment includes retained material. Concurrent library changes may be reflected between pages.',

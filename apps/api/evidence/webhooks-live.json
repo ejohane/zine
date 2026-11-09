@@ -1,0 +1,23 @@
+{
+  "startedAt": "2026-11-09T04:19:17.713Z",
+  "completedAt": "2026-11-09T04:30:11.898Z",
+  "origin": "https://api-next-staging.myzine.app",
+  "receiver": "https://zine-api-next-webhook-proof.yw9bvbwb9f.workers.dev",
+  "deploymentId": "785df10f-9262-4ab7-bfed-490238b111c8",
+  "scope": "Real Clerk, Cloudflare staging D1, a separately deployed Cloudflare receiver, and scheduled retry. The receiver intentionally returned 503 on the first valid signature and 204 on retry; no manual second dispatch.",
+  "checks": {
+    "transactionalReplay": true,
+    "signingSecretNotListed": true,
+    "receiverRejectsAnonymousProofRead": true,
+    "receiverRejectsUnsignedDelivery": true,
+    "signedDeliveryAccepted": true,
+    "stableDeliveryId": "dlv_wh_82246ccd8d3d4acfbd7e2197c0385a01_evt_abdbbd4f986ca057addba39f1057ca2e",
+    "bodySha256": "33bf8d22394b2c38f941805622fb6d3351f10b67fd94283659932ea312d5217d",
+    "receiverAttempts": 2,
+    "firstAttemptAt": "2026-11-09T04:25:06.988Z",
+    "retriedAt": "2026-11-09T04:30:06.608Z",
+    "retryDelayHonored": true,
+    "deliveryMarkedSucceeded": true
+  },
+  "limits": "Controlled receiver failure demonstrates bounded at-least-once behavior. Concurrent cancellation/erasure, private URLs, redirects and quota exhaustion are tested separately in the isolated runtime. This does not promise exactly-once external side effects."
+}

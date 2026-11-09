@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { format, resolveConfig } from 'prettier';
 import { execFileSync } from 'node:child_process';
 import { readFile, writeFile, readdir } from 'node:fs/promises';
 const sourceFiles: string[] = [];
@@ -24,7 +25,12 @@ const modified = execFileSync('git', ['diff', '--name-only'], { encoding: 'utf8'
   .filter(Boolean);
 const allowedTrackedChanges = new Set(['AGENTS.md', 'bun.lock']);
 assert.ok(
-  modified.every((path) => allowedTrackedChanges.has(path)),
+  modified.every(
+    (path) =>
+      allowedTrackedChanges.has(path) ||
+      path.startsWith('apps/api/') ||
+      /^\.github\/workflows\/api-next(?:-[a-z]+)?\.yml$/.test(path)
+  ),
   'Existing application implementation changed outside the rewrite'
 );
 const ignored = execFileSync(
@@ -43,7 +49,9 @@ const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standa
   .split('\n')
   .filter(Boolean);
 assert.ok(
-  untracked.every((p) => p.startsWith('apps/api/') || p === '.github/workflows/api-next.yml')
+  untracked.every(
+    (p) => p.startsWith('apps/api/') || /^\.github\/workflows\/api-next(?:-[a-z]+)?\.yml$/.test(p)
+  )
 );
 assert.ok(
   untracked.every(
@@ -65,5 +73,11 @@ const report = {
   existingApplicationImplementationChanged: false,
   note: 'One-time credential/library inspection helpers are separate from runtime code; fresh deployed bindings are independently checked in deployment.json; root AGENTS.md has an intentional API session-routing addition',
 };
-await writeFile('evidence/rewrite-boundary.json', JSON.stringify(report, null, 2) + '\n');
+await writeFile(
+  'evidence/rewrite-boundary.json',
+  await format(JSON.stringify(report), {
+    ...(await resolveConfig('evidence/rewrite-boundary.json')),
+    parser: 'json',
+  })
+);
 console.log(JSON.stringify(report));

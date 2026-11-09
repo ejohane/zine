@@ -73,15 +73,38 @@ describe('durable material uploads under ambiguous storage acknowledgements', ()
   });
   it('preserves committed readable material after a D1 commit succeeds but acknowledgement fails', async () => {
     const { principal, itemId } = await capture();
-    let batches = 0;
+    let failed = false;
+    const queries = new WeakMap<object, string>();
     const broken = {
       ...env,
       DB: new Proxy(env.DB, {
         get(target, prop) {
+          if (prop === 'prepare')
+            return (sql: string) => {
+              const prepared = target.prepare(sql);
+              return new Proxy(prepared, {
+                get(statement, key) {
+                  if (key === 'bind')
+                    return (...args: unknown[]) => {
+                      const bound = statement.bind(...args);
+                      queries.set(bound, sql);
+                      return bound;
+                    };
+                  const value = Reflect.get(statement, key);
+                  return typeof value === 'function' ? value.bind(statement) : value;
+                },
+              });
+            };
           if (prop === 'batch')
             return async (statements: D1PreparedStatement[]) => {
               const result = await target.batch(statements);
-              if (++batches === 2) {
+              if (
+                !failed &&
+                statements.some((statement) =>
+                  queries.get(statement)?.includes('INSERT INTO contributions')
+                )
+              ) {
+                failed = true;
                 throw new Error('lost D1 acknowledgement');
               }
               return result;

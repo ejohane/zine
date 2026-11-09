@@ -1,3 +1,4 @@
+import { reserveSourceJob, UsageLimitError } from './usage';
 import { processUnderstanding, scheduleUnderstanding } from './understanding';
 import type { UnderstandingPayload } from './understanding';
 import { contribute } from './enrichment';
@@ -11,6 +12,8 @@ import { hasYouTubeApi } from './providers/youtube-api';
 import { extractX } from './providers/x';
 import { indexItem } from './semantic';
 import { diagnostic } from './diagnostics';
+import { scheduledOperations } from './operations';
+import { scheduledWebhooks } from './events';
 import { contentIdentity, personalContentIdentity } from './identity';
 import { addRelationship, relationshipSchema } from './relationships';
 import { reconcileVerifiedIdentity } from './reconciliation';
@@ -396,6 +399,12 @@ export async function runJob(env: Env, jobId: string) {
         return { claimed: true, status: 'deferred' };
       }
     }
+    if (
+      !metadataOnly &&
+      (job.kind === 'sync' ||
+        (job.kind === 'enrich' && JSON.parse(job.payload_json).stage !== 'understanding'))
+    )
+      await reserveSourceJob(env, job.owner_id, job.kind === 'sync' ? 'sync' : 'enrich');
     if (metadataOnly) {
       /* The available source observation is already retained. */
     } else if (job.kind === 'enrich' && JSON.parse(job.payload_json).stage === 'understanding')
@@ -442,6 +451,19 @@ export async function runJob(env: Env, jobId: string) {
     if (scope) await releaseBudget(env, scope, leaseToken);
     return { claimed: true, status: 'succeeded' };
   } catch (error) {
+    if (error instanceof UsageLimitError) {
+      if (scope) await releaseBudget(env, scope, leaseToken);
+      await stmt(
+        env.DB,
+        "UPDATE jobs SET status='pending',attempts=MAX(0,attempts-1),lease_token=NULL,lease_until=NULL,last_dispatched_at=NULL,last_error_code=?,available_at=?,updated_at=? WHERE id=? AND lease_token=?",
+        error.code,
+        error.resetAt,
+        now(),
+        jobId,
+        leaseToken
+      ).run();
+      return { claimed: true, status: 'deferred', code: error.code };
+    }
     const cancelled =
       error instanceof ApiError &&
       [
@@ -637,7 +659,7 @@ export async function scheduleIndexes(env: Env, owner?: string) {
   }
 }
 
-export async function scheduled(_event: ScheduledController, env: Env) {
+async function maintenance(env: Env) {
   if (env.VECTORS) {
     const vectors = await all<{ vector_id: string }>(
       env.DB,
@@ -680,6 +702,7 @@ export async function scheduled(_event: ScheduledController, env: Env) {
     ).run();
   }
   await collectMaterialArtifacts(env);
+  await stmt(env.DB, 'DELETE FROM usage_windows WHERE expires_at<?', now()).run();
   await scheduleSubscriptions(env);
   await scheduleUnderstanding(env);
   await scheduleIndexes(env);
@@ -728,5 +751,31 @@ export async function collectMaterialArtifacts(env: Env) {
       ]);
     }
     await stmt(env.DB, 'DELETE FROM artifact_garbage WHERE artifact_key=?', key).run();
+  }
+}
+
+export async function scheduled(_event: ScheduledController, env: Env) {
+  await stmt(
+    env.DB,
+    `INSERT INTO service_checks(name,started_at) VALUES('cron',?) ON CONFLICT(name) DO UPDATE SET started_at=excluded.started_at`,
+    now()
+  ).run();
+  try {
+    await maintenance(env);
+    await scheduledOperations(env);
+    await scheduledWebhooks(env);
+    await stmt(
+      env.DB,
+      "UPDATE service_checks SET succeeded_at=?,error_category=NULL WHERE name='cron'",
+      now()
+    ).run();
+  } catch (error) {
+    await stmt(
+      env.DB,
+      "UPDATE service_checks SET failed_at=?,error_category=? WHERE name='cron'",
+      now(),
+      diagnostic(error).category
+    ).run();
+    throw error;
   }
 }

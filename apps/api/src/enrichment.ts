@@ -13,6 +13,7 @@ import {
   stmt,
 } from './lib';
 import { publicUrl } from './identity';
+import { reserveArtifactUsage } from './usage';
 import { visibleContributions } from './items';
 import type { AppEnv, Env, Principal } from './types';
 
@@ -265,6 +266,7 @@ export async function contribute(
     ? `private/${principal.userId}/${contributionId}/${crypto.randomUUID()}.json`
     : null;
   if (artifactKey) {
+    await reserveArtifactUsage(env, principal.userId, JSON.stringify(input.value));
     const [registered] = await atomicOwnerWrite(env, principal.userId, [
       stmt(
         env.DB,

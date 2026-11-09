@@ -1,0 +1,25 @@
+{
+  "startedAt": "2026-11-09T04:04:58.040Z",
+  "completedAt": "2026-11-09T04:05:03.955Z",
+  "origin": "https://api-next-staging.myzine.app",
+  "deploymentId": "acc1f9f4-54f0-431b-ba0c-e7bf306d4f46",
+  "scope": "Actual Cloudflare staging Worker/D1 and real Clerk sign-in; production receives read-only isolation checks. No fixture issuer or auth bypass.",
+  "checks": {
+    "readOnlyDefault": true,
+    "deniedWrite": true,
+    "idempotentSaveReadback": true,
+    "contextAndOccurrenceExactlyOnce": true,
+    "keywordRetrieval": true,
+    "productionIsolation": true,
+    "requestBurst": {
+      "attempts": 25,
+      "accepted": 20,
+      "limited": 5,
+      "retryHeader": true
+    },
+    "otherCallerUnaffected": true,
+    "operationalStatus": true,
+    "immediateRevocation": true
+  },
+  "limits": "A bounded single-owner live run. Expiry, multi-owner concurrency, erasure races and external failures have separate isolated-runtime tests. Provider enrichment is asynchronous and is not asserted here."
+}

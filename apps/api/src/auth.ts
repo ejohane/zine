@@ -2,6 +2,7 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { MiddlewareHandler } from 'hono';
 import { ApiError, digest, now, ownerGeneration, stmt } from './lib';
 import type { AppEnv } from './types';
+import { tokenScopes } from './permissions';
 
 const keysets = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 export const authenticate: MiddlewareHandler<AppEnv> = async (c, next) => {
@@ -12,12 +13,32 @@ export const authenticate: MiddlewareHandler<AppEnv> = async (c, next) => {
   if (token.startsWith('zine2_')) {
     const row = await stmt(
       c.env.DB,
-      'SELECT id,owner_id,COALESCE((SELECT generation FROM owner_generations WHERE owner_id=api_tokens.owner_id),0) AS generation FROM api_tokens WHERE token_hash=? AND revoked_at IS NULL AND expires_at>?',
+      'SELECT id,owner_id,scopes_json,COALESCE((SELECT generation FROM owner_generations WHERE owner_id=api_tokens.owner_id),0) AS generation FROM api_tokens WHERE token_hash=? AND revoked_at IS NULL AND expires_at>?',
       await digest(token),
       now()
-    ).first<{ id: string; owner_id: string; generation: number }>();
+    ).first<{ id: string; owner_id: string; generation: number; scopes_json: string }>();
     if (!row) throw new ApiError(401, 'invalid_token', 'API token is invalid, expired, or revoked');
-    c.set('principal', { userId: row.owner_id, contributor: `api-token:${row.id}` });
+    let scopes: string[];
+    try {
+      const parsed: unknown = JSON.parse(row.scopes_json);
+      if (
+        !Array.isArray(parsed) ||
+        parsed.some(
+          (scope) =>
+            typeof scope !== 'string' || !(tokenScopes as readonly string[]).includes(scope)
+        )
+      )
+        throw new Error('Invalid scopes');
+      scopes = parsed;
+    } catch {
+      throw new ApiError(401, 'invalid_token', 'API credential capabilities are invalid');
+    }
+    c.set('principal', {
+      userId: row.owner_id,
+      contributor: `api-token:${row.id}`,
+      tokenId: row.id,
+      scopes,
+    });
     await stmt(c.env.DB, 'UPDATE api_tokens SET last_used_at=? WHERE id=?', now(), row.id).run();
     c.env = {
       ...c.env,

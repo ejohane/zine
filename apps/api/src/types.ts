@@ -1,6 +1,10 @@
 export interface Env {
-  /** Internal per-request fence; never a deployed binding or caller-controlled input. */
+  /** Optional deployment-time usage policy. */
+  USAGE_LIMITS_JSON?: string;
+  /** Internal request marker; never caller-controlled or a deployed binding. */
+  OPERATION_USAGE_OWNER?: string;
   OPERATION_EPOCH?: { owner: string; generation: number };
+  RELEASE_SHA?: string;
   DEPLOYMENT?: WorkerVersionMetadata;
   DB: D1Database;
   ARTIFACTS: R2Bucket;
@@ -27,6 +31,8 @@ export interface Env {
 export interface Principal {
   userId: string;
   contributor: string;
+  tokenId?: string;
+  scopes?: string[];
 }
 
 export type AppEnv = {

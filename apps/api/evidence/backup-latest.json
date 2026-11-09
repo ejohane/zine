@@ -1,0 +1,14 @@
+{
+  "at": "2026-11-09T04:43:22.575Z",
+  "environment": "production",
+  "bucket": "zine-api-next-backups",
+  "key": "backups/production/2026-11-09T04-21-33-602Z/d14283a9e5a868ad7554bb2f469d3c87a75425249ece86a8653674c8c166c82a.tar.gz",
+  "archiveSha256": "d14283a9e5a868ad7554bb2f469d3c87a75425249ece86a8653674c8c166c82a",
+  "remoteArchiveHashVerified": true,
+  "bytes": 12010454,
+  "items": 491,
+  "referencedObjects": 299,
+  "snapshotSqlSha256": "5da4b3e0cac545e80d2aa5158345ea9e16620d1d4b77733537284f5c4247e03a",
+  "retentionDays": 30,
+  "scope": "Private content-addressed R2 archive. No raw database, library text, credentials or object bodies are included in this public summary."
+}

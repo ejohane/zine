@@ -1,5 +1,6 @@
 import { all, ApiError, atomicOwnerWrite, digest, id, now, ownedItem, stmt } from './lib';
 import { ProviderError } from './remote';
+import { reserveAIUsage } from './usage';
 import type { Env } from './types';
 
 interface SearchDocument {
@@ -12,10 +13,12 @@ interface SearchDocument {
 export async function embedding(
   env: Env,
   text: string[],
-  mode: 'documents' | 'queries' = 'documents'
+  mode: 'documents' | 'queries',
+  owner: string
 ) {
   if (!env.AI)
     throw new ApiError(503, 'semantic_search_not_ready', 'Embedding service is not configured');
+  await reserveAIUsage(env, owner, text);
   let result: unknown;
   try {
     result = await env.AI.run(
@@ -95,7 +98,9 @@ export async function indexItem(env: Env, owner: string, itemId: string) {
     if (!changes.length) continue;
     const values = await embedding(
       env,
-      changes.map((entry) => entry.document.text)
+      changes.map((entry) => entry.document.text),
+      'documents',
+      owner
     );
     await env.VECTORS.upsert(
       changes.map((entry, index) => ({
@@ -166,7 +171,7 @@ export async function semanticCandidates(
   if (!env.VECTORS)
     throw new ApiError(503, 'semantic_search_not_ready', 'Semantic index is not configured');
   if (!eligible.length) return [];
-  const vector = (await embedding(env, [query], 'queries'))[0];
+  const vector = (await embedding(env, [query], 'queries', owner))[0];
   const namespace = await namespaceFor(owner);
   const hits: SemanticHit[] = [];
   // Filter eligible IDs before vector retrieval, then re-authorize every hit in

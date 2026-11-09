@@ -1,4 +1,5 @@
 import { z } from 'zod4';
+import { reserveAIUsage, reserveArtifactUsage } from './usage';
 import { contribute } from './enrichment';
 import { getItem } from './items';
 import { all, ApiError, digest, id, now, ownedItem, stableId, stmt } from './lib';
@@ -58,8 +59,14 @@ export function understandingChunks(text: string, maxBytes = 16000) {
   if (chunk) chunks.push(chunk);
   return chunks;
 }
-async function generate(env: Env, text: string, reduction: boolean): Promise<Understanding> {
+async function generate(
+  env: Env,
+  text: string,
+  reduction: boolean,
+  owner: string
+): Promise<Understanding> {
   if (!env.AI) throw new ProviderError('understanding_not_configured', false);
+  await reserveAIUsage(env, owner, [text]);
   let result: unknown;
   try {
     result = await env.AI.run(model, {
@@ -101,6 +108,7 @@ async function storeState(
   state: State
 ) {
   const key = `understanding/${await digest(owner)}/${id('state')}.json`;
+  await reserveArtifactUsage(env, owner, JSON.stringify(state));
   await stmt(
     env.DB,
     'INSERT INTO understanding_artifacts(artifact_key,owner_id,item_id,created_at) VALUES(?,?,?,?)',
@@ -309,7 +317,7 @@ export async function processUnderstanding(
   if (!artifact) throw new ProviderError('understanding_checkpoint_missing', false);
   const state = await artifact.json<State>();
   await component(env, owner, itemId, payload.generation, 'processing');
-  state.results.push(await generate(env, state.chunks[state.offset], state.level > 0));
+  state.results.push(await generate(env, state.chunks[state.offset], state.level > 0, owner));
   state.offset++;
   const final = state.offset === state.chunks.length && state.results.length === 1;
   if (final) {

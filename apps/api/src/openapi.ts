@@ -1,4 +1,8 @@
 import { z } from 'zod4';
+import { tokenInputSchema } from './access';
+import { tokenScopes } from './permissions';
+import { alertSchema } from './operations';
+import { eventSchema, webhookSchema, webhookInputSchema, webhookPatchSchema } from './events';
 import { googleCredentialSchema } from './connections';
 import { saveSchema, patchItemSchema, progressSchema } from './items';
 import { searchSchema } from './query';
@@ -339,16 +343,12 @@ const schemaSources: Record<string, z.ZodType> = {
   Job: job,
   JobList: z.object({ jobs: z.array(job) }),
   Pending: pending,
-  TokenInput: z
-    .object({
-      name: z.string().trim().min(1).max(200),
-      expiresInDays: z.number().int().min(1).max(365).default(30),
-    })
-    .strict(),
+  TokenInput: tokenInputSchema,
   TokenCreated: z.object({
     id: z.string(),
     name: z.string(),
     token: z.string(),
+    scopes: z.array(z.enum(tokenScopes)),
     expiresAt: z.string(),
     createdAt: z.string(),
   }),
@@ -361,6 +361,7 @@ const schemaSources: Record<string, z.ZodType> = {
         revokedAt: nullableString,
         createdAt: z.string(),
         lastUsedAt: nullableString,
+        scopes: z.array(z.enum(tokenScopes)),
       })
     ),
   }),
@@ -402,13 +403,84 @@ const schemaSources: Record<string, z.ZodType> = {
       })
     ),
   }),
+  EventPage: z.object({
+    events: z.array(eventSchema),
+    nextCursor: z.string(),
+    hasMore: z.boolean(),
+    retentionDays: z.number(),
+  }),
+  WebhookInput: webhookInputSchema,
+  WebhookPatch: webhookPatchSchema,
+  Webhook: webhookSchema,
+  WebhookCreated: webhookSchema.extend({
+    secret: z
+      .string()
+      .meta({ format: 'password', description: 'Signing secret shown only on creation' }),
+  }),
+  WebhookList: z.object({ webhooks: z.array(webhookSchema) }),
+  WebhookDeliveries: z.object({
+    deliveries: z.array(
+      z.object({
+        id: z.string(),
+        eventSequence: z.number(),
+        status: z.string(),
+        attempts: z.number(),
+        availableAt: z.string(),
+        httpStatus: z.number().nullable(),
+        errorCode: z.string().nullable(),
+        createdAt: z.string(),
+        updatedAt: z.string(),
+      })
+    ),
+    nextCursor: z.string().nullable(),
+  }),
+  WebhookDispatch: z.object({ accepted: z.literal(true), candidates: z.number().int() }),
+  DeliveryRetry: z.object({ queued: z.literal(true) }),
+  IndexRebuild: z.object({ queued: z.literal(true), items: z.number().int() }),
+  OperationalStatus: z.object({
+    indexing: z.object({ total: z.number().int(), dirty: z.number().int() }),
+    observedAt: z.string(),
+    deploymentId: z.string(),
+    environment: z.string(),
+    jobs: z.record(z.string(), z.unknown()),
+    subscriptions: z.record(z.string(), z.unknown()),
+    cron: z.record(z.string(), z.unknown()),
+    conditions: z.record(z.string(), z.boolean()),
+    usage: z.record(z.string(), z.unknown()),
+    scope: z.string(),
+  }),
+  Usage: z.object({
+    policy: z.record(z.string(), z.number()),
+    windows: z.array(
+      z.object({
+        metric: z.string(),
+        subject: z.string(),
+        windowStart: z.string(),
+        resetAt: z.string(),
+        used: z.number(),
+        limit: z.number(),
+      })
+    ),
+    accounting: z.string(),
+    retention: z.string(),
+  }),
+  OperationalAlerts: z.object({ alerts: z.array(alertSchema) }),
+  OperationalCheck: z.object({
+    status: z.record(z.string(), z.unknown()),
+    alerts: z.array(alertSchema),
+  }),
   Health: z.object({
     service: z.literal('zine-api'),
+    releaseSha: z.string(),
     status: z.literal('ok'),
     version: z.string(),
     deploymentId: z.string(),
   }),
-  Me: z.object({ id: z.string(), contributor: z.string() }),
+  Me: z.object({
+    id: z.string(),
+    contributor: z.string(),
+    scopes: z.array(z.enum(tokenScopes)).nullable(),
+  }),
   Error: z.object({
     error: z.object({
       code: z.string(),
@@ -453,6 +525,78 @@ op(
   'Health'
 );
 op('get', `${p}/me`, 'Authenticated identity', undefined, 'Me');
+op(
+  'post',
+  `${p}/ops/index/rebuild`,
+  'Rebuild owner search vectors from authoritative retained material',
+  undefined,
+  'IndexRebuild',
+  202
+);
+op(
+  'post',
+  `${p}/webhooks/{hookId}/dispatch`,
+  'Dispatch up to five due deliveries; normal retry timing applies',
+  undefined,
+  'WebhookDispatch',
+  202
+);
+op(
+  'get',
+  `${p}/events`,
+  'Replay owner change events within 30-day retention',
+  undefined,
+  'EventPage'
+);
+op(
+  'post',
+  `${p}/webhooks`,
+  'Create signed webhook; signing secret is revealed once',
+  'WebhookInput',
+  'WebhookCreated',
+  201
+);
+op('get', `${p}/webhooks`, 'List owned webhook metadata', undefined, 'WebhookList');
+op(
+  'patch',
+  `${p}/webhooks/{hookId}`,
+  'Enable or disable delivery; pending work is cancelled',
+  'WebhookPatch',
+  'Webhook'
+);
+op(
+  'delete',
+  `${p}/webhooks/{hookId}`,
+  'Remove webhook and its deliveries',
+  undefined,
+  undefined,
+  204
+);
+op(
+  'get',
+  `${p}/webhooks/{hookId}/deliveries`,
+  'Page owned delivery status',
+  undefined,
+  'WebhookDeliveries'
+);
+op(
+  'post',
+  `${p}/webhooks/{hookId}/deliveries/{deliveryId}/retry`,
+  'Retry a failed owned delivery',
+  undefined,
+  'DeliveryRetry'
+);
+
+op(
+  'get',
+  `${p}/ops/status`,
+  'Owner queue, subscriptions, usage and shared cron status',
+  undefined,
+  'OperationalStatus'
+);
+op('get', `${p}/ops/usage`, 'Current owner and caller usage windows', undefined, 'Usage');
+op('get', `${p}/ops/alerts`, 'Durable owner alert lifecycle', undefined, 'OperationalAlerts');
+op('post', `${p}/ops/check`, 'Evaluate and persist owner alerts', undefined, 'OperationalCheck');
 op(
   'post',
   `${p}/saves`,
@@ -993,7 +1137,7 @@ export function openApiDocument(): Json {
           'Stable for a retry; a different payload with the same key returns 409. Deleted receipts return 410.',
       });
     const responses: Record<string, unknown> = {};
-    for (const status of [401, 403, 404, 409, 410, 413, 415, 422, 500, 503])
+    for (const status of [401, 403, 404, 409, 410, 413, 415, 422, 429, 500, 503])
       responses[String(status)] = {
         description: `HTTP ${status}; machine-readable error code and request correlation`,
         content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },

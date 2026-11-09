@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { z } from 'zod4';
 import { authenticate } from './auth';
+import { authorizeScopes } from './permissions';
+import { accountRequestUsage, UsageLimitError } from './usage';
 import { ApiError, canonicalItemId, id, parseBody } from './lib';
 import {
   deleteItem,
@@ -24,6 +26,8 @@ import { memberRoutes } from './members';
 import { portabilityRoutes } from './portability';
 import { connectionRoutes } from './connections';
 import { accessRoutes } from './access';
+import { operationsRoutes } from './operations';
+import { eventRoutes } from './events';
 import { inspector } from './inspector';
 import { ProviderError } from './remote';
 import { diagnostic } from './diagnostics';
@@ -59,6 +63,8 @@ app.use('/v1/*', async (c, next) => {
       'X-Request-Id',
       'Idempotency-Replayed',
       'X-Zine-Canonical-Item',
+      'Retry-After',
+      'X-Usage-Reset-At',
       'Content-Location',
     ],
     maxAge: 600,
@@ -71,6 +77,7 @@ app.get('/health', async (c) => {
     status: 'ok',
     version: '0.1.0',
     deploymentId: c.env.DEPLOYMENT?.id ?? 'local',
+    releaseSha: c.env.RELEASE_SHA ?? 'unreleased',
   });
 });
 app.get('/', (c) => c.html(inspector(c.env, crypto.randomUUID())));
@@ -78,6 +85,8 @@ app.get('/openapi.json', (c) => c.json(openApiDocument()));
 app.get('/docs', (c) => c.html(apiReference()));
 app.get('/architecture', (c) => c.html(architectureGuide()));
 app.use('/v1/*', authenticate);
+app.use('/v1/*', accountRequestUsage);
+app.use('/v1/*', authorizeScopes);
 app.use('/v1/*', async (c, next) => {
   const matches = [...c.req.path.matchAll(/\/items\/(itm_[a-f0-9]+)(?=\/|$)/g)];
   let path = c.req.path;
@@ -105,6 +114,7 @@ app.use('/v1/*', async (c, next) => {
   await next();
 });
 app.use('/mcp', authenticate);
+app.use('/mcp', accountRequestUsage);
 app.all('/mcp', async (c) => {
   const origin = c.req.header('origin');
   if (
@@ -132,7 +142,11 @@ app.all('/mcp', async (c) => {
   return handler.fetch(c.req.raw);
 });
 app.get('/v1/me', (c) =>
-  c.json({ id: c.get('principal').userId, contributor: c.get('principal').contributor })
+  c.json({
+    id: c.get('principal').userId,
+    contributor: c.get('principal').contributor,
+    scopes: c.get('principal').scopes ?? null,
+  })
 );
 app.post('/v1/saves', async (c) => {
   const result = await save(
@@ -223,6 +237,8 @@ app.route('/v1', reconciliationRoutes);
 app.route('/v1', enrichmentRoutes);
 app.route('/v1', subscriptionRoutes);
 app.route('/v1', accessRoutes);
+app.route('/v1', operationsRoutes);
+app.route('/v1', eventRoutes);
 app.route('/v1', connectionRoutes);
 app.route('/v1', portabilityRoutes);
 app.route('/v1', memberRoutes);
@@ -233,6 +249,10 @@ app.notFound((c) =>
   )
 );
 app.onError((error, c) => {
+  if (error instanceof UsageLimitError) {
+    c.header('Retry-After', String(error.retryAfterSeconds));
+    c.header('X-Usage-Reset-At', error.resetAt);
+  }
   if (error instanceof ApiError)
     return c.json(
       {

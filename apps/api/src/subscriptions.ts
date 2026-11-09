@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { reserveArtifactUsage } from './usage';
 import { z } from 'zod4';
 import {
   all,
@@ -387,6 +388,7 @@ async function ingestOnce(env: Env, subscription: SubscriptionRow, entry: FeedEn
         'Subscription changed before retaining input'
       );
     try {
+      await reserveArtifactUsage(env, owner, serialized);
       await env.ARTIFACTS.put(inputKey, serialized, {
         httpMetadata: { contentType: 'application/json' },
       });
@@ -793,15 +795,15 @@ export async function syncSubscription(
         subscriptionId,
         finished
       ).run();
-      await env.ARTIFACTS.put(
-        stateKey,
-        JSON.stringify({
-          ...cursor,
-          page: next,
-          ...(!hasPending ? { pending: undefined, following: undefined } : {}),
-        }),
-        { httpMetadata: { contentType: 'application/json' } }
-      );
+      const checkpointBody = JSON.stringify({
+        ...cursor,
+        page: next,
+        ...(!hasPending ? { pending: undefined, following: undefined } : {}),
+      });
+      await reserveArtifactUsage(env, owner, checkpointBody);
+      await env.ARTIFACTS.put(stateKey, checkpointBody, {
+        httpMetadata: { contentType: 'application/json' },
+      });
     }
     const checkpoint = stmt(
       env.DB,
