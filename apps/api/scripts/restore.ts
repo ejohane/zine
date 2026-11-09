@@ -254,6 +254,8 @@ const report = {
   contributions: counts.contributions,
   restoredObjects: verified,
   authoritativeTableHashes: provenTables,
+  hashComparison:
+    'Exact row values after the documented isolated-restore subscription/lease safety overlays',
   allObjectHashesReadBack: true,
   foreignKeysValid: true,
   credentialsRemoved: true,

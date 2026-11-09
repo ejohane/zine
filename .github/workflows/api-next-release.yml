@@ -75,7 +75,8 @@ jobs:
         with:
           bun-version: '1.3.4'
       - run: bun install --frozen-lockfile
-      - run: sudo apt-get update && sudo apt-get install -y sqlite3
+      - run: bun run scripts/install-ci-sqlite.ts
+        working-directory: apps/api
       - run: bun run scripts/release.ts production
         working-directory: apps/api
       - uses: actions/upload-artifact@v4

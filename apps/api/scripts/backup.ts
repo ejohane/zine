@@ -9,6 +9,16 @@ assert.ok(
   environment === 'production' || environment === 'staging',
   'Use: bun run scripts/backup.ts production|staging'
 );
+const sqliteVersion = (
+  await quietCommand('sqlite3', [':memory:', 'SELECT sqlite_version()'])
+).trim();
+try {
+  assert.equal((await quietCommand('sqlite3', [':memory:', "SELECT unistr('A')"])).trim(), 'A');
+} catch {
+  throw new Error(
+    'Backup needs SQLite >=3.50 with unistr(); CI must run scripts/install-ci-sqlite.ts before backup'
+  );
+}
 const target = environments[environment],
   startedAt = new Date().toISOString();
 const directory =
@@ -51,7 +61,12 @@ if (process.argv[3]) {
   }
   const download = new URL(state.result.signed_url);
   assert.equal(download.protocol, 'https:');
-  const response = await fetch(download, { redirect: 'error', signal: AbortSignal.timeout(60000) });
+  let response: Response;
+  try {
+    response = await fetch(download, { redirect: 'error', signal: AbortSignal.timeout(60000) });
+  } catch {
+    throw new Error('Private snapshot download failed; signed URL suppressed');
+  }
   assert.ok(response.ok, 'Private snapshot download failed');
   sql = await response.text();
   await writeFile(sqlPath, sql, { mode: 0o600 });
@@ -61,7 +76,12 @@ if (process.argv[3]) {
     { mode: 0o600 }
   );
 }
-if (!process.argv[3]) await quietCommand('sqlite3', [directory + '/database.sqlite'], sql);
+if (!process.argv[3])
+  await quietCommand(
+    'sqlite3',
+    [directory + '/database.sqlite'],
+    '.dbconfig defensive off\n' + sql
+  );
 assert.equal(
   (
     await quietCommand('sqlite3', [directory + '/database.sqlite', 'PRAGMA integrity_check'])
@@ -135,6 +155,7 @@ await Promise.all(
 artifacts.sort((a, b) => a.key.localeCompare(b.key));
 const manifest = {
   schemaVersion: 1,
+  sqliteVersion,
   startedAt,
   completedAt: new Date().toISOString(),
   environment,
