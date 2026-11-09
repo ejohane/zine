@@ -1,0 +1,70 @@
+{
+  "at": "2026-11-08T20:52:18.852Z",
+  "scope": "Commands executed locally in this working tree; GitHub CI not run",
+  "runtime": {
+    "bun": "1.3.4",
+    "node": "v25.6.0",
+    "ciNode": "22",
+    "verifiedCompatibilityNode": "v22.21.1"
+  },
+  "checks": [
+    { "command": "bun run --cwd apps/api test", "passed": 102, "files": 21 },
+    {
+      "command": "Node 22.21.1: vitest run",
+      "passed": 102,
+      "files": 21,
+      "distributionChecksum": "c170d6554fba83d41d25a76cdbad85487c077e51fa73519e41ac885aa429d8af"
+    },
+    { "command": "bun run --cwd apps/api typecheck", "result": "passed, including scripts/tests" },
+    { "command": "bun run --cwd apps/api lint", "result": "passed" },
+    { "command": "bun run --cwd apps/api build", "result": "passed, Wrangler dry run" },
+    { "command": "bun run typecheck", "result": "15 tasks passed" },
+    {
+      "command": "bun run lint",
+      "result": "15 tasks passed; one existing legacy test lint warning"
+    },
+    { "command": "bun run format:check", "result": "passed" },
+    {
+      "command": "bun run test:worker:ci",
+      "passed": 2212,
+      "skipped": 4,
+      "shards": 10,
+      "excludes": ["user-do.test.ts", "scheduler.test.ts"]
+    },
+    { "command": "bun run test:web", "vitestPassed": 102, "bunPassed": 4 }
+  ],
+  "logs": {
+    "latest-tests.log": {
+      "sha256": "b55289c7bcda9f7f8aa72ae6acf39358058981b67cbb8d7240a8b216977425c9",
+      "bytes": 10012
+    },
+    "node22-tests.log": {
+      "sha256": "0a0a0f00a73748ed0e44177707f7840a913520e8b1811889ce979326a794655a",
+      "bytes": 10001
+    },
+    "latest-build.log": {
+      "sha256": "0af67a01813ad1f94ae679b4542d2f01876d7107104a4e647cf3a7411e46cd4d",
+      "bytes": 1785
+    },
+    "root-typecheck.log": {
+      "sha256": "619ff00faab491e4450e836ea723a7a1c9256b7099edcea1ca6a70ef2dc87878",
+      "bytes": 6654
+    },
+    "root-lint.log": {
+      "sha256": "6716cf5a69bd4991ef84276a3f4426d3cdeaffcc1f02f62383759e96863ed1d9",
+      "bytes": 7385
+    },
+    "root-format.log": {
+      "sha256": "8588b8066be26077439de3d93b4db45d667641d38aebbf42762b602ce02744f4",
+      "bytes": 116
+    },
+    "legacy-worker-tests.log": {
+      "sha256": "ed0ea5e235df4b3eba2523443fc878ca4a185a2a5c791290cbde0de2d8216486",
+      "bytes": 13034
+    },
+    "legacy-web-tests.log": {
+      "sha256": "832a19fc503341c000f0e15c41a6f46392ffd9d33cce3cdc65d918a9de79d105",
+      "bytes": 6839
+    }
+  }
+}

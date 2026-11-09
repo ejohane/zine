@@ -1,0 +1,67 @@
+{
+  "at": "2026-11-08T18:23:13.385Z",
+  "origin": "https://api-next.myzine.app",
+  "authentication": "Real Clerk session for authenticated cases; deliberately omitted in the negative authentication case",
+  "results": [
+    {
+      "name": "Authentication required",
+      "status": 401,
+      "requestId": "req_1a6ed10ac0a744cfb46ae1c870a3c4e3",
+      "responseSha256": "5543c2c3042619de5150952adca35fbe79c3449298d349b6ea78a326c6519da0"
+    },
+    {
+      "name": "Unsafe loopback reference rejected",
+      "status": 422,
+      "requestId": "req_25dc98a528b9435d9ee0d5aa19ee2b55",
+      "responseSha256": "6afae447880c5084502065ab5b9902240f2c099e6ae387ee53c94aad7f071e63"
+    },
+    {
+      "name": "Unsupported protocol rejected",
+      "status": 422,
+      "requestId": "req_a5751b4a281b4e33996545b214792ee2",
+      "responseSha256": "dcc660f0f877a1cb51d7e0ef9885025bb52c8c0291e5425563fda9f286b00119"
+    },
+    {
+      "name": "Unknown capture field rejected",
+      "status": 422,
+      "requestId": "req_73220f11267641a5aa7b2c133a94ea74",
+      "responseSha256": "5523a05d9503205214b155262a4e3250ae12634016b1d01d9b89c6f34a9dda80"
+    },
+    {
+      "name": "Invalid browse boolean rejected",
+      "status": 422,
+      "requestId": "req_3585472acbfa46279fbcfc2f8b0dff1a",
+      "responseSha256": "c5fd983ec4b056018cbf1187e28f96977086d3fc8f9ac6b831df76b4e09adf72"
+    },
+    {
+      "name": "Invalid browse cursor rejected",
+      "status": 422,
+      "requestId": "req_307d55efd8ae49b98d7652c896cdc572",
+      "responseSha256": "3dfad45da1165ec91afeec31188c0ea9824a16450ab3e2af952cebfc58655545"
+    },
+    {
+      "name": "Search page size bounded",
+      "status": 422,
+      "requestId": "req_ac8ac3fcb5f241f0b9442125e9b1d283",
+      "responseSha256": "4253ea8f6fcb24aa7eceb3ef5465a0dd80f8d1f74cdc91a9daa74a7398e0b12b"
+    },
+    {
+      "name": "Unapproved browser origin rejected",
+      "status": 403,
+      "requestId": "req_a9e136d8315d4e278182f934d502cc50",
+      "responseSha256": "d826ddb1640cc3f917c7e2e518f53eec881eb442645816b87ef99092427f48ec"
+    },
+    {
+      "name": "Large request rejected",
+      "status": 413,
+      "requestId": "req_05cf0299aabe4ed2b7d2f837ee98c1da",
+      "responseSha256": "6c4828d48828ae2df37dbd2c9c31e122dd3707182fcead93b2f0e602f5a62d55"
+    },
+    {
+      "name": "Unknown route is explicit",
+      "status": 404,
+      "requestId": "req_56d30aeae96142b09e20cb20f02287b9",
+      "responseSha256": "dfb7a806a86ce45e9a7a68371943f7c7be7d6bcb444f907ec76fbcb5a044aa05"
+    }
+  ]
+}

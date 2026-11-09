@@ -1,0 +1,12 @@
+{
+  "at": "2026-11-09T02:59:01.429Z",
+  "head": "da8d917183edce6e5151f4d7339fe70a68e68e88",
+  "sourceFiles": 34,
+  "noLegacyRuntimeImports": true,
+  "modifiedTracked": ["AGENTS.md", "bun.lock"],
+  "newPaths": ["apps/api", ".github/workflows/api-next.yml"],
+  "rootDocumentationChange": true,
+  "privateDataAndBuildOutputIgnored": true,
+  "existingApplicationImplementationChanged": false,
+  "note": "One-time credential/library inspection helpers are separate from runtime code; fresh deployed bindings are independently checked in deployment.json; root AGENTS.md has an intentional API session-routing addition"
+}

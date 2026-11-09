@@ -1,0 +1,22 @@
+{
+  "at": "2026-11-08T20:33:56.977Z",
+  "scope": "Read-only fresh rewrite D1 inspection; compare retained original cooldown to independent watch/feed scopes after successful original channel job",
+  "originalWatchCooldownRetained": true,
+  "budgets": [
+    {
+      "scope": "provider:youtube",
+      "not_before": "2026-11-08T20:35:19.534Z",
+      "consecutive_limits": 9
+    },
+    {
+      "scope": "provider:youtube:feed",
+      "not_before": "2026-11-08T20:27:34.320Z",
+      "consecutive_limits": 0
+    },
+    {
+      "scope": "provider:youtube:watch",
+      "not_before": "2026-11-08T20:35:19.534Z",
+      "consecutive_limits": 9
+    }
+  ]
+}

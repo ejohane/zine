@@ -1,0 +1,25 @@
+{
+  "at": "2026-11-08T23:24:33.071Z",
+  "url": "https://api-next.myzine.app/architecture",
+  "status": 200,
+  "requestId": "req_f3a67502121444d791af256fd49de235",
+  "standalonePath": "docs/architecture.html",
+  "standaloneBytes": 47130,
+  "standaloneSha256": "ba0b75f299c27f8c6792f2087ee7899bccd9dda3da118afef59a91bec4a8c1df",
+  "normalizedHostedAndStandaloneMatch": true,
+  "interactionTests": {
+    "passed": 2,
+    "coverage": [
+      "six chapter navigation and reverse traversal",
+      "component details in both explanation depths",
+      "four save scenarios",
+      "endpoint catalog generated from OpenAPI",
+      "search and empty results"
+    ]
+  },
+  "publicWithoutLogin": true,
+  "externalScriptsOrStyles": false,
+  "liveApiMutations": false,
+  "browserVisualVerification": "not performed: local browser use disabled in Work settings",
+  "scope": "Actual deployed HTTP delivery and matching standalone artifact; DOM interaction checks are separate from visual browser verification"
+}

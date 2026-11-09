@@ -1,0 +1,9 @@
+{
+  "at": "2026-11-08T15:06:54.344Z",
+  "scope": "real Clerk password login and authenticated deployed HTTP read",
+  "issuer": "https://clerk.myzine.app",
+  "authorizedParty": "https://api-next.myzine.app",
+  "subjectHash": "4b13d1206f0bc3d4a3f6f4ee01cdae5a2417d31a63e58ff94ada8f821c4f5049",
+  "httpStatus": 200,
+  "identityMatches": true
+}

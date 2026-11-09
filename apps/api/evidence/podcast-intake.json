@@ -1,0 +1,90 @@
+{
+  "at": "2026-11-08T18:14:42.758Z",
+  "origin": "https://api-next.myzine.app",
+  "authentication": "real Clerk session",
+  "actualPublishedFeed": true,
+  "automaticSavedItems": 1,
+  "transcript": {
+    "segments": 128,
+    "timedSegments": 128,
+    "firstTimestamp": 1.76,
+    "lastTimestamp": 2866.925,
+    "sourceMethod": "published-transcript"
+  },
+  "repeatPollNoDuplicates": true,
+  "understandingCoverageAtCheck": "transcript",
+  "observations": [
+    {
+      "operation": "subscription-status",
+      "status": 200,
+      "requestId": "req_2e16cb33cb3a447db508318693abed14",
+      "responseSha256": "d5127c2393e6c5e7f2eef4b329638534c5b3ede9106f30f80dd6d6ab61298ae4"
+    },
+    {
+      "operation": "automatic-intake",
+      "status": 200,
+      "requestId": "req_4c7b427f9c8c40af9ce883dbc3155b2b",
+      "responseSha256": "7b66c1615bb2844af08475c78327b8a94ead7aba23e3c99910f61290581cad38"
+    },
+    {
+      "operation": "retained-publisher-transcript",
+      "status": 200,
+      "requestId": "req_1ac7c0b197944c48bdfcd7d7cd9b862d",
+      "responseSha256": "b712d22a296e20f9e10ad320180743230a9560ef8ef9a3a870ea10db40e707a7"
+    },
+    {
+      "operation": "explicit-repeat-poll",
+      "status": 202,
+      "requestId": "req_6979fdf4c10c488e9334d028833a2b16",
+      "responseSha256": "edf0c1246447bc70a730b2c37484fcb0017e7240ef388d3ed2cf72233fdebfa6"
+    },
+    {
+      "operation": "repeat-poll-job",
+      "status": 200,
+      "requestId": "req_4bab34c638fa43f29fd352da5097dc18",
+      "responseSha256": "23112e9e61f81dc42fa363f3a28ad94920349cc6741490ab4898ee76871b6385"
+    },
+    {
+      "operation": "repeat-poll-job",
+      "status": 200,
+      "requestId": "req_60a6d73e745b4c80ad957f39ee6df4ee",
+      "responseSha256": "23112e9e61f81dc42fa363f3a28ad94920349cc6741490ab4898ee76871b6385"
+    },
+    {
+      "operation": "repeat-poll-job",
+      "status": 200,
+      "requestId": "req_e7fe5d92f47c4ded9ae35628ae97771a",
+      "responseSha256": "23112e9e61f81dc42fa363f3a28ad94920349cc6741490ab4898ee76871b6385"
+    },
+    {
+      "operation": "repeat-poll-job",
+      "status": 200,
+      "requestId": "req_719a606e6cea4d07b75ec7a3ad064ad4",
+      "responseSha256": "23112e9e61f81dc42fa363f3a28ad94920349cc6741490ab4898ee76871b6385"
+    },
+    {
+      "operation": "repeat-poll-job",
+      "status": 200,
+      "requestId": "req_972dab12c05144fe952cfb3b6364e9d2",
+      "responseSha256": "23112e9e61f81dc42fa363f3a28ad94920349cc6741490ab4898ee76871b6385"
+    },
+    {
+      "operation": "repeat-poll-job",
+      "status": 200,
+      "requestId": "req_842d4e7d4a0d4fa3bf38b2477cecda1e",
+      "responseSha256": "23112e9e61f81dc42fa363f3a28ad94920349cc6741490ab4898ee76871b6385"
+    },
+    {
+      "operation": "repeat-poll-job",
+      "status": 200,
+      "requestId": "req_51e97807e3134101864fb657a8eb46ab",
+      "responseSha256": "bb612e6ded68d3cb15b481d9e9a42aeadc94d684a9f2136fb18e427d6a54cdac"
+    },
+    {
+      "operation": "repeat-poll-no-duplicates",
+      "status": 200,
+      "requestId": "req_c27130d42ef14ca3bce5ed663705ce1d",
+      "responseSha256": "7b66c1615bb2844af08475c78327b8a94ead7aba23e3c99910f61290581cad38"
+    }
+  ]
+}

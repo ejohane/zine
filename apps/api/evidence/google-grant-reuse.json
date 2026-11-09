@@ -1,0 +1,7 @@
+{
+  "at": "2026-11-08T18:19:12.915Z",
+  "provider": "google",
+  "status": "existing_grant_decryption_failed",
+  "oldInfrastructureChanged": false,
+  "credentialValuesPersistedLocally": false
+}

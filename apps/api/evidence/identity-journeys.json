@@ -1,0 +1,250 @@
+{
+  "at": "2026-11-08T20:34:20.058Z",
+  "origin": "https://api-next.myzine.app",
+  "authentication": "real Clerk session",
+  "scope": "Assertions on interactively issued deployed HTTP requests; real MDN redirects, X provider identity, Workers AI/Vectorize; private full responses retained separately",
+  "checks": [
+    "automatic permanent-redirect reconciliation",
+    "both capture contexts retained",
+    "old ID mutation",
+    "private inspectable receipt",
+    "URL target remains unsaved",
+    "incoming edge after explicit save",
+    "old URL filter",
+    "semantic lookup after reconciliation",
+    "original receipt still resolves",
+    "alias deletion",
+    "old receipt tombstone",
+    "fresh generation clears personal state and receipts",
+    "provider-authoritative X identity",
+    "actual X source relationships"
+  ],
+  "allAssertionsPassed": true,
+  "observations": [
+    {
+      "at": "2026-11-08T20:29:21.432Z",
+      "method": "GET",
+      "path": "/v1/items/:id/identity",
+      "status": 200,
+      "requestId": "req_f1a441f9697e450ab2bdaa0be0443b5d",
+      "responseSha256": "3f146194dad86b3dfa18a4dc1a8839b2c5dc672c15b31e6a8ceead9584514059",
+      "responseKeys": ["canonicalItemId", "contentId", "aliases", "nextCursor"],
+      "label": "manual-alias-identity"
+    },
+    {
+      "at": "2026-11-08T20:29:21.557Z",
+      "method": "GET",
+      "path": "/v1/items/:id/context",
+      "status": 200,
+      "requestId": "req_b40b715aa87e4fcf94696aa563c9be99",
+      "responseSha256": "117c66a1ed8e5bc44549e2466a5d4c0b930247164f37658cf856d67f21f5a466",
+      "responseKeys": ["entries"],
+      "label": "manual-merged-context-retention"
+    },
+    {
+      "at": "2026-11-08T20:29:33.403Z",
+      "method": "PATCH",
+      "path": "/v1/items/:id/progress",
+      "status": 200,
+      "requestId": "req_7eb5dbc8a9864c1f8390ab7b5f41cc08",
+      "responseSha256": "585a96ab42c9e518995ab3646202f9b41f8c4ef35f173a85e1dc7c8675f8e9e8",
+      "responseKeys": ["position", "unit", "completedAt", "updatedAt"],
+      "label": "manual-alias-progress-valid"
+    },
+    {
+      "at": "2026-11-08T20:29:33.557Z",
+      "method": "GET",
+      "path": "/v1/items/:id/reconciliations",
+      "status": 200,
+      "requestId": "req_4cbc1f2eb9d84d3ba6ba1488987a5443",
+      "responseSha256": "009e977a81ff09c4adbf037e3f7a705462ead9c4efde4e871155148001240cd5",
+      "responseKeys": ["events", "nextCursor"],
+      "label": "manual-successful-auto-merge-receipt"
+    },
+    {
+      "at": "2026-11-08T20:29:33.707Z",
+      "method": "GET",
+      "path": "/v1/items/:id/relationships",
+      "status": 200,
+      "requestId": "req_e7a472ed0b4d46a7a5d4348fc92cdb72",
+      "responseSha256": "85983b9577cf68a516931ca535270fdb89d4382ca288e7edbe7780e18b9717b0",
+      "responseKeys": ["relationships", "nextCursor"],
+      "label": "manual-alias-relationship-read"
+    },
+    {
+      "at": "2026-11-08T20:30:13.745Z",
+      "method": "GET",
+      "path": "/v1/items/:id/relationships",
+      "status": 200,
+      "requestId": "req_a558658e34cb42909ba08a3d40d11546",
+      "responseSha256": "273c02f55d74134f16e0f2af80bbbea36b2d751e5409f5944042268563a94b1e",
+      "responseKeys": ["relationships", "nextCursor"],
+      "label": "manual-reverse-relationship"
+    },
+    {
+      "at": "2026-11-08T20:29:33.868Z",
+      "method": "GET",
+      "path": "/v1/items",
+      "status": 200,
+      "requestId": "req_bcca6dca3b6848da99ac5a27503a6611",
+      "responseSha256": "17b32309580f64dfccb045da28d1e16bfe54a2423b4eec99c75db04205b6866f",
+      "responseKeys": ["items", "nextCursor"],
+      "label": "manual-old-url-filter"
+    },
+    {
+      "at": "2026-11-08T20:31:08.847Z",
+      "method": "POST",
+      "path": "/v1/items/search",
+      "status": 200,
+      "requestId": "req_7d668fb3e64e4f4da691be1c68a870c8",
+      "responseSha256": "5f1e489fb3fd7cc9e273959523a1625dcf7ebffe2f6424f892f70578c9ec870d",
+      "responseKeys": ["items", "nextCursor", "resultWindow", "index"],
+      "label": "manual-semantic-alias-filter"
+    },
+    {
+      "at": "2026-11-08T20:31:08.902Z",
+      "method": "POST",
+      "path": "/v1/saves",
+      "status": 201,
+      "requestId": "req_1d8e1fac9c51401692d70c11f0883f2a",
+      "responseSha256": "46b6047f2c4e570fb26b64935e5bda171c900812acbc531c27de0ec774df4201",
+      "responseKeys": ["item", "save", "enrichment"],
+      "label": "manual-alias-original-receipt-replay"
+    },
+    {
+      "at": "2026-11-08T20:32:40.075Z",
+      "method": "DELETE",
+      "path": "/v1/items/:id",
+      "status": 204,
+      "requestId": "req_842672993c9f4f4ebe8f8fc07ae28396",
+      "responseSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "responseKeys": [],
+      "label": "manual-delete-through-alias"
+    },
+    {
+      "at": "2026-11-08T20:32:40.180Z",
+      "method": "GET",
+      "path": "/v1/items/:id",
+      "status": 404,
+      "requestId": "req_5d7a9d02878340379b8ff1dac73bf260",
+      "responseSha256": "0870ef700ffe746fd61da8ac017f8a1ca2d981089f66b9491895954b3bcd463d",
+      "responseKeys": ["error"],
+      "label": "manual-canonical-deletion-visible"
+    },
+    {
+      "at": "2026-11-08T20:32:40.269Z",
+      "method": "POST",
+      "path": "/v1/saves",
+      "status": 410,
+      "requestId": "req_4f2266acd43141159e4beb7b6b98fd68",
+      "responseSha256": "cfcc9f3f08839a82b0d8d9264bf2259fc905b6d23da02cdeac239c246add66ef",
+      "responseKeys": ["error"],
+      "label": "manual-deleted-alias-receipt-tombstone"
+    },
+    {
+      "at": "2026-11-08T20:32:40.529Z",
+      "method": "POST",
+      "path": "/v1/saves",
+      "status": 201,
+      "requestId": "req_05c6d79a012e43eda1fe8828107b118e",
+      "responseSha256": "998cfb948ae3f3461abd28c210602c5803732e2bbd91df3ad0088d560e359097",
+      "responseKeys": ["item", "save", "enrichment"],
+      "label": "manual-fresh-save-through-alias"
+    },
+    {
+      "at": "2026-11-08T20:33:27.621Z",
+      "method": "GET",
+      "path": "/v1/items/:id",
+      "status": 200,
+      "requestId": "req_7294ffa1c7e847438def6584fcfd2664",
+      "responseSha256": "8900a60b8bcccdb47d5a131de64c9f33d658743f02cb7bc1ff6fb62b1430adb3",
+      "responseKeys": [
+        "id",
+        "status",
+        "archived",
+        "createdAt",
+        "savedAt",
+        "updatedAt",
+        "revision",
+        "content",
+        "context",
+        "tags",
+        "collectionIds",
+        "progress",
+        "enrichment",
+        "occurrences"
+      ],
+      "label": "manual-fresh-alias-state"
+    },
+    {
+      "at": "2026-11-08T20:33:27.781Z",
+      "method": "GET",
+      "path": "/v1/items/:id/reconciliations",
+      "status": 200,
+      "requestId": "req_86ce0446d43147baacfc84c2a43de679",
+      "responseSha256": "38ca3a9f437b8bf03e96e6dbd37257d481b3e551baddf1b9e0c7677b3ae2b748",
+      "responseKeys": ["events", "nextCursor"],
+      "label": "manual-fresh-reconciliation-state"
+    },
+    {
+      "at": "2026-11-08T20:30:39.720Z",
+      "method": "GET",
+      "path": "/v1/items/:id/identity",
+      "status": 200,
+      "requestId": "req_f42b1d167ae6439aad5198669a7511a9",
+      "responseSha256": "714e904240490625e10f2e28d0580bd2f19159df72fb26f5b796c6e0b33435e7",
+      "responseKeys": ["canonicalItemId", "contentId", "aliases", "nextCursor"],
+      "label": "manual-x-authoritative-identity"
+    },
+    {
+      "at": "2026-11-08T20:30:39.861Z",
+      "method": "GET",
+      "path": "/v1/items/:id/reconciliations",
+      "status": 200,
+      "requestId": "req_01ac3a8712624cbd9f7154a6c672a2ff",
+      "responseSha256": "4e036cc2738e95f0b5c66b19cca7f0376a766b2eab9069edcb81b4a1e727c833",
+      "responseKeys": ["events", "nextCursor"],
+      "label": "manual-x-provider-merge-receipt"
+    },
+    {
+      "at": "2026-11-08T20:30:39.914Z",
+      "method": "GET",
+      "path": "/v1/jobs/:id",
+      "status": 200,
+      "requestId": "req_ac43035d153f4f6eb7d3585aaa42a4a3",
+      "responseSha256": "7ec7308184ed0c5b9edf6367abd0cce0ec1ea252a8e063f2c339012c942bd831",
+      "responseKeys": [
+        "id",
+        "kind",
+        "itemId",
+        "status",
+        "attempts",
+        "errorCode",
+        "availableAt",
+        "createdAt",
+        "updatedAt"
+      ],
+      "label": "manual-x-context-retry-outcome"
+    },
+    {
+      "at": "2026-11-08T20:30:01.579Z",
+      "method": "GET",
+      "path": "/v1/items/:id/relationships",
+      "status": 200,
+      "requestId": "req_eb6c6bbc3fff48af802e51255dca194a",
+      "responseSha256": "029b4a3bcf026efb91bb57c26b45082b4ace3594405e1d7f000861f4752532e9",
+      "responseKeys": ["relationships", "nextCursor"],
+      "label": "manual-actual-x-source-relationships"
+    },
+    {
+      "at": "2026-11-08T20:31:09.003Z",
+      "method": "GET",
+      "path": "/v1/items/:id/relationships",
+      "status": 200,
+      "requestId": "req_409140bb90af422b808a8258099f20e9",
+      "responseSha256": "40d4ccb41c8936905303d1dedf0dad4951ba9c09729d33d61cd574abe68dcc2b",
+      "responseKeys": ["relationships", "nextCursor"],
+      "label": "manual-x-profile-incoming-source-edge"
+    }
+  ]
+}

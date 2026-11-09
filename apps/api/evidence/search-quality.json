@@ -1,0 +1,142 @@
+{
+  "at": "2026-11-08T20:46:17.866Z",
+  "origin": "https://api-next.myzine.app",
+  "authentication": "real Clerk session",
+  "corpus": "444 original-library references in fresh backend",
+  "expectedMatchWithinTop20": true,
+  "failures": 0,
+  "observations": [
+    {
+      "case": "agent-memory",
+      "mode": "keyword",
+      "query": "exact saved title",
+      "expectedItemSha256": "3b67d1a0c3e26a1c09082d8c9e309e21c0d111e1d9fd2de72989db07f35c62f3",
+      "rank": 1,
+      "resultCount": 20,
+      "pendingIndexItems": null,
+      "requestId": "req_778cf59059d24fd1b7280e356bb41ac8",
+      "responseSha256": "b237eb8d6e74030f81d13dbd088fbe3fa0df28c0f6e7617ea42e60d749cc5c4f"
+    },
+    {
+      "case": "agent-memory",
+      "mode": "semantic",
+      "query": "Memory systems for AI agents and managing their context",
+      "expectedItemSha256": "3b67d1a0c3e26a1c09082d8c9e309e21c0d111e1d9fd2de72989db07f35c62f3",
+      "rank": 1,
+      "resultCount": 20,
+      "pendingIndexItems": 0,
+      "requestId": "req_d8d4dc85d0324c2c9c173a8a8b372b9d",
+      "responseSha256": "60e1c33b61559c05d06c8dfa7d2d57b2ec426f55955ea5edc3b8fc57de34ae2d"
+    },
+    {
+      "case": "agent-memory",
+      "mode": "hybrid",
+      "query": "Memory systems for AI agents and managing their context",
+      "expectedItemSha256": "3b67d1a0c3e26a1c09082d8c9e309e21c0d111e1d9fd2de72989db07f35c62f3",
+      "rank": 1,
+      "resultCount": 20,
+      "pendingIndexItems": 0,
+      "requestId": "req_26fca3c3c3004397acc82ca2866ce8a9",
+      "responseSha256": "1e25a3b2c18dd305d5613e300cd7fb50a7f55a868b6b8bdb52e5377ade61e3e6"
+    },
+    {
+      "case": "books-and-learning",
+      "mode": "keyword",
+      "query": "exact saved title",
+      "expectedItemSha256": "0a2d4a4f4c2cf6f1e55f0b8b6c182919534c6270aaadc6075d3b2efc415b3f00",
+      "rank": 1,
+      "resultCount": 20,
+      "pendingIndexItems": null,
+      "requestId": "req_0e4a8a8347c8428f89ddece2cecbcb37",
+      "responseSha256": "4321fd221ac9339cd1cd89bfbbe759a42c40d46f368ec45e8f0ea4f9c2c4a7b6"
+    },
+    {
+      "case": "books-and-learning",
+      "mode": "semantic",
+      "query": "Why reading a book does not reliably produce understanding or long term memory",
+      "expectedItemSha256": "0a2d4a4f4c2cf6f1e55f0b8b6c182919534c6270aaadc6075d3b2efc415b3f00",
+      "rank": 1,
+      "resultCount": 20,
+      "pendingIndexItems": 0,
+      "requestId": "req_5fa4f73671754a95a4f7cb478d8e0b0d",
+      "responseSha256": "2777ca1cbc9a169fc7b56a197aafb264acbe07fe60d21c7517cdba0a8a1a47a0"
+    },
+    {
+      "case": "books-and-learning",
+      "mode": "hybrid",
+      "query": "Why reading a book does not reliably produce understanding or long term memory",
+      "expectedItemSha256": "0a2d4a4f4c2cf6f1e55f0b8b6c182919534c6270aaadc6075d3b2efc415b3f00",
+      "rank": 1,
+      "resultCount": 20,
+      "pendingIndexItems": 0,
+      "requestId": "req_16e7cf7ccab24fb5afe192b4583083c1",
+      "responseSha256": "9f3082452102512ced35b38cb9097f39a860e0bff858de14a5ce8da1862d45d0"
+    },
+    {
+      "case": "running-and-writing",
+      "mode": "keyword",
+      "query": "exact saved title",
+      "expectedItemSha256": "9c0ebf6e40405499b028cd0b76502b77f5ea28a865e7d9c4876790030145c114",
+      "rank": 1,
+      "resultCount": 20,
+      "pendingIndexItems": null,
+      "requestId": "req_56b73d8e217f4d41ae6155d292bb4e3d",
+      "responseSha256": "bfbe31741bebb5c5be4f63119c3984115e2a7e3de6f1133dd9aed74b912c1f1c"
+    },
+    {
+      "case": "running-and-writing",
+      "mode": "semantic",
+      "query": "How writing novels relates to a daily running practice",
+      "expectedItemSha256": "9c0ebf6e40405499b028cd0b76502b77f5ea28a865e7d9c4876790030145c114",
+      "rank": 1,
+      "resultCount": 20,
+      "pendingIndexItems": 0,
+      "requestId": "req_391f3aec5fdc498bb21b73d5880b2c89",
+      "responseSha256": "14758e9dea3222e16606ca689eb1722119b9aec26e9a3d0035971378353780a4"
+    },
+    {
+      "case": "running-and-writing",
+      "mode": "hybrid",
+      "query": "How writing novels relates to a daily running practice",
+      "expectedItemSha256": "9c0ebf6e40405499b028cd0b76502b77f5ea28a865e7d9c4876790030145c114",
+      "rank": 1,
+      "resultCount": 20,
+      "pendingIndexItems": 0,
+      "requestId": "req_d08179c13b9b495bb1ed5416ba8633da",
+      "responseSha256": "5021dd6da34d82116f22522022ede4f092bc5ddd323bc2f75675a1515b342687"
+    },
+    {
+      "case": "code-review",
+      "mode": "keyword",
+      "query": "exact saved title",
+      "expectedItemSha256": "e5955b20228dec5601a9cb5072f7e368031807102d1ab2038727609508c91c24",
+      "rank": 1,
+      "resultCount": 20,
+      "pendingIndexItems": null,
+      "requestId": "req_f6a13b1e48524c48b817a96051b3152d",
+      "responseSha256": "5cb7cb060d500078a692a17b0e858c19504c3f10c679dbaa124160fba501671c"
+    },
+    {
+      "case": "code-review",
+      "mode": "semantic",
+      "query": "Code review workflow on the team building Claude Code",
+      "expectedItemSha256": "e5955b20228dec5601a9cb5072f7e368031807102d1ab2038727609508c91c24",
+      "rank": 1,
+      "resultCount": 20,
+      "pendingIndexItems": 0,
+      "requestId": "req_176ec99d30044136b4f1bd6085986aa7",
+      "responseSha256": "93b68b3ebc555b8a2af350406cd3ad48354b6a8575ac838a6688c5b351b180cf"
+    },
+    {
+      "case": "code-review",
+      "mode": "hybrid",
+      "query": "Code review workflow on the team building Claude Code",
+      "expectedItemSha256": "e5955b20228dec5601a9cb5072f7e368031807102d1ab2038727609508c91c24",
+      "rank": 1,
+      "resultCount": 20,
+      "pendingIndexItems": 0,
+      "requestId": "req_2b4418bb1ba24d0f812d8bf06d713efa",
+      "responseSha256": "0c7ffba76f15ec3647f11209238fe0ae8845f31584e58ba9f49d83feea2c90ad"
+    }
+  ]
+}

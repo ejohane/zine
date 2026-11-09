@@ -1,0 +1,52 @@
+{
+  "at": "2026-11-08T18:17:50.496Z",
+  "origin": "https://api-next.myzine.app",
+  "scope": "Assertions over actual interactive HTTP observations recorded by api-console.ts; no simulated upstreams",
+  "assertions": [
+    {
+      "assertion": "Manual collection creation, membership and synthesis retain a supporting saved reference",
+      "requestIds": [
+        "req_e3286689ee7d4e8ba61a544df8724fc1",
+        "req_70e18207ea2740b388051fac2d25f7be",
+        "req_5f81303c42b043919e8ac8e64f47e506",
+        "req_1085ee93e2c94e919c79892d6b99b0cb"
+      ]
+    },
+    {
+      "assertion": "Text annotation edits succeed",
+      "requestIds": ["req_b1ce61bd42b04005a8e14f87308258fd", "req_deb4188a226a46cfb94ce76cc5ed6064"]
+    },
+    {
+      "assertion": "Personal correction wins while position, completion and archive remain independent",
+      "requestIds": ["req_26b355d915a341dd9468fb9a3a0c8a27", "req_70398ce26c4c4ddf83705a500b982efe"]
+    },
+    {
+      "assertion": "Deleting a collection retains its saved item",
+      "requestIds": ["req_13a6659b238b4b5dba264572946bbdb0", "req_3f90cf083e8e492e8f523fd49bc27726"]
+    },
+    {
+      "assertion": "Deleted items are unavailable and an old retry cannot resurrect them",
+      "requestIds": [
+        "req_fd014f83f3784a9098ede5c0fc327f43",
+        "req_5e34b9c34f3d4edebb21671554ec9179",
+        "req_33d058cfa3f042a88c965536d35e3dba"
+      ]
+    },
+    {
+      "assertion": "Intentional resave begins with fresh personal state and no old annotations",
+      "requestIds": [
+        "req_001c35221a7d416e81d3c43b28be0576",
+        "req_5945d0e0253a4cb18c470f5cf4de9f08",
+        "req_d0d7d911c99b45dbbf31c91d2299ee09"
+      ]
+    },
+    {
+      "assertion": "A real Spotify subscription delivers review-first intake without changing it to saved",
+      "requestIds": ["req_fec68118aeb245b484044a24d5ea9991"]
+    },
+    {
+      "assertion": "The export manifest excludes credentials",
+      "requestIds": ["req_09613a8d9fb1461e85c41648a534fda5"]
+    }
+  ]
+}

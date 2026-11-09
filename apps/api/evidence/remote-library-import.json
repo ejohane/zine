@@ -1,0 +1,18 @@
+{
+  "at": "2026-11-08T15:30:37.931Z",
+  "origin": "https://api-next.myzine.app",
+  "scope": "real Clerk-authenticated HTTP import and paginated readback against fresh remote resources; extraction acceptance is separate",
+  "snapshotSha256": "35ff1d49ab9425c5ec3a019c4b1e318b3036da80d5a85a44200aef612a3cbf61",
+  "expected": 444,
+  "imported": 444,
+  "uniqueRetrieved": 444,
+  "failureCount": 0,
+  "providers": {
+    "RSS": 26,
+    "SPOTIFY": 40,
+    "SUBSTACK": 11,
+    "WEB": 98,
+    "X": 23,
+    "YOUTUBE": 246
+  }
+}
