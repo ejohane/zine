@@ -119,5 +119,6 @@
   "credentialsRemoved": true,
   "subscriptionsPaused": true,
   "externalJobsPaused": true,
-  "scope": "Actual isolated Cloudflare D1 import and full referenced-object R2 write/readback. Search vectors are deliberately absent and must be rebuilt. This does not mutate the source database, bucket or Worker."
+  "scope": "Actual isolated Cloudflare D1 import and full referenced-object R2 write/readback. Search vectors are deliberately absent and must be rebuilt. This does not mutate the source database, bucket or Worker.",
+  "hashComparison": "Exact row values after the documented isolated-restore subscription/lease safety overlays"
 }

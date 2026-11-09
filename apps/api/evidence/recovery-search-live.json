@@ -1,0 +1,100 @@
+{
+  "startedAt": "2026-11-09T05:12:02.831Z",
+  "completedAt": "2026-11-09T05:39:16.544Z",
+  "origin": "https://zine-api-next-recovery.yw9bvbwb9f.workers.dev",
+  "deploymentId": "3b410f3b-2f61-4005-a29a-daea822f515a",
+  "sourceSnapshotSha256": "5da4b3e0cac545e80d2aa5158345ea9e16620d1d4b77733537284f5c4247e03a",
+  "restoredSavedItemsRead": 455,
+  "anotherOwnerDenied": true,
+  "rebuiltOwnerItems": 491,
+  "pendingIndexItems": 0,
+  "searchChecks": [
+    {
+      "case": "agent-memory",
+      "mode": "keyword",
+      "rank": 1,
+      "resultCount": 20,
+      "expectedItemSha256": "3b67d1a0c3e26a1c09082d8c9e309e21c0d111e1d9fd2de72989db07f35c62f3"
+    },
+    {
+      "case": "agent-memory",
+      "mode": "semantic",
+      "rank": 1,
+      "resultCount": 20,
+      "expectedItemSha256": "3b67d1a0c3e26a1c09082d8c9e309e21c0d111e1d9fd2de72989db07f35c62f3"
+    },
+    {
+      "case": "agent-memory",
+      "mode": "hybrid",
+      "rank": 1,
+      "resultCount": 20,
+      "expectedItemSha256": "3b67d1a0c3e26a1c09082d8c9e309e21c0d111e1d9fd2de72989db07f35c62f3"
+    },
+    {
+      "case": "books-and-learning",
+      "mode": "keyword",
+      "rank": 1,
+      "resultCount": 20,
+      "expectedItemSha256": "0a2d4a4f4c2cf6f1e55f0b8b6c182919534c6270aaadc6075d3b2efc415b3f00"
+    },
+    {
+      "case": "books-and-learning",
+      "mode": "semantic",
+      "rank": 1,
+      "resultCount": 20,
+      "expectedItemSha256": "0a2d4a4f4c2cf6f1e55f0b8b6c182919534c6270aaadc6075d3b2efc415b3f00"
+    },
+    {
+      "case": "books-and-learning",
+      "mode": "hybrid",
+      "rank": 1,
+      "resultCount": 20,
+      "expectedItemSha256": "0a2d4a4f4c2cf6f1e55f0b8b6c182919534c6270aaadc6075d3b2efc415b3f00"
+    },
+    {
+      "case": "running-and-writing",
+      "mode": "keyword",
+      "rank": 1,
+      "resultCount": 20,
+      "expectedItemSha256": "9c0ebf6e40405499b028cd0b76502b77f5ea28a865e7d9c4876790030145c114"
+    },
+    {
+      "case": "running-and-writing",
+      "mode": "semantic",
+      "rank": 1,
+      "resultCount": 20,
+      "expectedItemSha256": "9c0ebf6e40405499b028cd0b76502b77f5ea28a865e7d9c4876790030145c114"
+    },
+    {
+      "case": "running-and-writing",
+      "mode": "hybrid",
+      "rank": 1,
+      "resultCount": 20,
+      "expectedItemSha256": "9c0ebf6e40405499b028cd0b76502b77f5ea28a865e7d9c4876790030145c114"
+    },
+    {
+      "case": "code-review",
+      "mode": "keyword",
+      "rank": 1,
+      "resultCount": 20,
+      "expectedItemSha256": "e5955b20228dec5601a9cb5072f7e368031807102d1ab2038727609508c91c24"
+    },
+    {
+      "case": "code-review",
+      "mode": "semantic",
+      "rank": 1,
+      "resultCount": 20,
+      "expectedItemSha256": "e5955b20228dec5601a9cb5072f7e368031807102d1ab2038727609508c91c24"
+    },
+    {
+      "case": "code-review",
+      "mode": "hybrid",
+      "rank": 1,
+      "resultCount": 20,
+      "expectedItemSha256": "e5955b20228dec5601a9cb5072f7e368031807102d1ab2038727609508c91c24"
+    }
+  ],
+  "retainedMaterialApiReadbacks": 3,
+  "scope": "Actual isolated recovery Worker/D1/R2, fresh Vectorize index and Workers AI, authenticated with real Clerk. No original vectors were copied; authoritative retained text drove indexing. A controlled second-owner read-only PAT is bootstrapped in the isolated recovery database through the Cloudflare control plane and denied access through the normal API; it is not a second real Clerk login.",
+  "limits": "Four known real-library retrieval cases across three modes and bounded material readbacks; these are not a universal search-quality guarantee. No production data or provider subscriptions were changed."
+}

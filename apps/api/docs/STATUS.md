@@ -207,3 +207,44 @@ Recovery index progress is now past 200 processed items. The original verifier's
 30-minute deadline may expire while its legitimate backfill continues. If it exits,
 confirm cleanup, then run `verify-recovery-live.ts --resume` (now a 60-minute wait)
 without queueing another full revision. Do not run two simultaneous verifiers.
+
+## Release checkpoint: 2026-11-09 around 06:10 UTC
+
+The rewrite and production controls merged in PR #466 after all 13 applicable
+checks passed. Main source is `afb3a32e9dcdce5104f1a2c65df32ff1294e0baf`.
+The post-merge automatic staging workflow succeeded. Production promotion run
+`42569440806` and standalone backup run `42570675380` stopped at backup **before
+production migrations/deployment**: Ubuntu installed SQLite 3.45.1, while the D1
+native dump uses `unistr()` (introduced in SQLite 3.50). Production still has the
+old 17-migration/version snapshot; do not claim it has been promoted.
+
+Current branch `codex/zine-api-production-proof` starts from merged main and fixes
+that portability issue. It adds the official SQLite 3.54.1 Linux tool installer,
+verified against SQLite's published SHA3-256, and backup preflight checks before
+export. The workflow changes have not yet been pushed/observed. No Cloudflare
+credential changes were needed or made; a repeat local backup at 06:02 succeeded
+with all 491 records/299 retained objects, confirming this runner compatibility
+issue. The private download's signed URL is now suppressed on network errors.
+
+Completed recovery/search acceptance is in `recovery-search-live.json`: 491 owner
+items rebuilt, no pending index revisions, 455 saved items read with real Clerk,
+all 12 keyword/semantic/hybrid cases ranked the expected original reference first,
+and three retained-material API readbacks passed. The first 30-minute verifier
+timed out during legitimate backfill; its resumed run completed at 05:39 UTC with
+probe token/session cleanup. No recovery verifier remains running.
+
+The 45-minute observer completed at 05:18 UTC: 46 healthy authenticated library
+reads, Spotify/Substack/RSS scheduled advances, with X HTTP 402 and YouTube public
+feed 404 separately observed. `production-soak.json` identifies the old serving
+version; it is not proof of the upcoming production release. `rollback-live.json`
+records successful staging rollback/forward promotion and retained context with
+all 23 migrations preserved.
+
+Next: push/review the SQLite fix and accompanying proof/helper; manually run the
+private-backup workflow on that branch to verify Linux operation before merging.
+Then retry the full production release from the fixed main. Run
+`verify-production-live.ts EXACT_RELEASE_SHA` for controlled concurrent saves,
+scopes, pagination, completion/archive, events and real MCP checks with cleanup.
+Configure/observe the scoped monitor, run a post-release observer, and complete the
+acceptance audit/updated deployment receipt. Keep upstream provider limitations
+explicit; OAuth and the old goal-control cleanup remain deferred.

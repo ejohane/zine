@@ -65,6 +65,9 @@ bun run scripts/backup.ts production
 ```
 
 The daily GitHub backup workflow and every production release run this command.
+Local operators need SQLite 3.50 or newer because native D1 dumps use `unistr()`.
+The workflows install official SQLite 3.54.1 with its published SHA3-256 checksum;
+the backup checks this capability before starting a native export.
 It uses [Cloudflare's native point-in-time export](https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/export/)
 with `sqlite3_cli_only` so FTS does not
 prevent the snapshot. The source database is briefly unavailable during native
