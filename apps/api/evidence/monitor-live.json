@@ -1,0 +1,18 @@
+{
+  "at": "2026-11-09T06:41:12.428Z",
+  "origin": "https://api-next.myzine.app",
+  "deploymentId": "23b9f152-39a0-4450-b0fd-1da9e746e130",
+  "releaseSha": "627b63d439f1bcb781026901b754ebf363b4e373",
+  "criticalConditions": [],
+  "workflow": "https://github.com/ejohane/zine/actions/runs/42574555374",
+  "trigger": "workflow_dispatch",
+  "credentialScopes": ["ops:read"],
+  "initialCheck": {
+    "workflow": "https://github.com/ejohane/zine/actions/runs/42574383719",
+    "at": "2026-11-09T06:39:34.787Z",
+    "result": "failed",
+    "criticalConditions": ["cron_stale"],
+    "cause": "First deployment had no natural cron heartbeat yet; no heartbeat was injected."
+  },
+  "scope": "Actual GitHub Linux runner checking public health and authenticated production operations through its scoped secret. Passed after natural scheduler heartbeat; the workflow also has a 15-minute schedule."
+}

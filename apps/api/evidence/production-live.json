@@ -1,0 +1,29 @@
+{
+  "startedAt": "2026-11-09T06:37:13.210Z",
+  "completedAt": "2026-11-09T06:37:19.950Z",
+  "origin": "https://api-next.myzine.app",
+  "deploymentId": "23b9f152-39a0-4450-b0fd-1da9e746e130",
+  "sourceSha": "627b63d439f1bcb781026901b754ebf363b4e373",
+  "checks": {
+    "concurrentRequests": 15,
+    "durableReferences": 6,
+    "sharedContexts": 5,
+    "sharedOccurrences": 5,
+    "uniqueReferences": 5,
+    "noLostAcceptedSave": true,
+    "noDuplicateRetryOccurrence": true,
+    "keywordRetrieval": true,
+    "libraryPagination": true,
+    "writeTokenCannotRead": true,
+    "readTokenCannotWrite": true,
+    "archiveAndCompletionIndependent": true,
+    "createdEventsReplayed": 6,
+    "replayedEvents": 23,
+    "realMcpRead": true,
+    "mcpDeniedWrite": true
+  },
+  "contextDigest": "14a558cec666bbf730e996f070c4aede218e21e648a1bcc51bc074ef7a4dd23e",
+  "scope": "Actual released Cloudflare production service, real Clerk and ephemeral scoped PATs, official MCP client over HTTP. Only unique controlled verification references are written and removed. No auth bypass or fixture issuer.",
+  "limits": "Bounded concurrency and contract cases. Source extraction for example.com references is not asserted; accepted context remains independently durable. Upstream provider health and long-running operation are separate receipts.",
+  "cleanupConfirmed": true
+}

@@ -1,250 +1,172 @@
-# Session handoff
+# API session handoff
 
-Last reviewed: 2026-11-09 UTC. This is a handoff, not live verification. Run the startup
-checks in `../AGENTS.md` and inspect current state before acting on it.
+Last reviewed: 2026-11-09 UTC. This file records observed state, not a substitute
+for current checks. Read `../AGENTS.md`, inspect git status, then run `bun run doctor`.
 
-## Product direction
+## Direction and scope
 
-Zine is an API-first saving service. Erik wants to start building experiences on
-it. Codex will remain the implementation/operations agent, frequently in fresh
-sessions. Prioritize durable repository context, clear contracts, structured errors,
-repeatable commands and reliable releases. A broad external-developer platform is
-not the immediate target. A small SDK/helper is useful only where it removes real
-integration friction. The existing CLI and OpenAPI already provide agent entry points.
+Zine is an API-first saving service. Platforms host original media; Zine owns
+references, metadata, private context, accessible retained text and derived
+understanding with provenance. Erik owns the product; Codex is the ongoing agent
+across fresh sessions. Keep contracts, reproducible verification and operational
+context in the repository. A public developer marketplace is outside this milestone.
 
-First-party Clerk sessions and personal API tokens exist. Scoped tokens, quotas,
-events/webhooks and operational controls are implemented and have isolated/runtime
-and staging evidence. Production still serves the earlier release until the
-production workflow below is completed. New OAuth server/consent flows remain
-excluded; browser/mobile experiences still need an appropriate user session.
+Erik authorized completing [productionization.md](productionization.md), excluding
+new OAuth/consent/registration and Google-authorized live acceptance. Preserve
+existing Clerk sessions. The original native `/api/v1` service remains separate;
+no mobile integration or legacy migration was performed.
 
-## Implementation and release snapshot
+The older goal-control objective still includes Google acceptance. Erik said its
+replacement is unnecessary and may be a TODO. Do not falsely complete that older
+objective; track this authorized non-OAuth work here.
 
-- The rewrite lives entirely in `apps/api` and is deployed at
-  <https://api-next.myzine.app>. REST is `/v1`, MCP is `/mcp`.
-- Current resource names/configuration are in `../wrangler.jsonc`. D1, R2, Queues,
-  Vectorize and the Worker are separate from the original backend. Workers AI
-  derives understanding and embeddings. Cron runs every five minutes.
-- Subscription polls become due fifteen minutes after success; queue/provider
-  delays can extend the observed interval.
-- The live authenticated inspector is `/`; API reference is `/docs`; the public
-  explanatory walkthrough is `/architecture`. The walkthrough is illustrative and
-  does not make live requests or change the library.
-- Working branch: `codex/zine-api-production`, baseline commit `ce024f0c`.
-  The baseline rewrite is committed; substantial productionization work is still
-  local and uncommitted. Main was fetched and has no changes beyond the branch's
-  base. No PR or GitHub CI has run yet for this work.
-- Production currently serves Worker version `02ecfb45-1cec-471f-ab7f-18303723c01f`
-  with migrations 1–17. Local production configuration now uses the explicit
-  production label; that configuration has not yet been promoted.
-- Staging is <https://api-next-staging.myzine.app>, separate fresh resources in
-  `wrangler.staging.jsonc`, D1 `f467b228-5f55-447b-8dbc-006edea2f727`. It served
-  `785df10f-9262-4ab7-bfed-490238b111c8` for real signed-webhook evidence, with
-  migrations 1–21. Newer local changes still need a reviewed staging release.
-- Recovery is `zine-api-next-recovery` with D1
-  `29df9a64-93a0-4ada-929e-43c057b2ead8` and fresh R2/queue/vector resources.
-  See the dedicated verification config. It contains a private isolated restore,
-  no live tokens/grants/webhooks, and paused subscriptions/external jobs. A search
-  rebuild is actively running; inspect its checkpoint before restarting anything.
-- Local release, private-backup and independent-monitor workflows now exist under
-  `.github/workflows/api-next-*.yml` but are not yet published or observed in GitHub.
+## Release checkpoint
 
-## Current acceptance blocker
+- Main includes the rewrite/production controls through PR [#466](https://github.com/ejohane/zine/pull/466)
+  and the Linux backup compatibility fix through PR [#467](https://github.com/ejohane/zine/pull/467).
+- Reviewed source: `627b63d439f1bcb781026901b754ebf363b4e373`.
+- Linux private backup [42572985940](https://github.com/ejohane/zine/actions/runs/42572985940)
+  passed. The earlier production attempt stopped before migrations/deployment:
+  GitHub SQLite 3.45 lacked `unistr()`, which D1 native exports use. Workflows now
+  install checksum-verified official SQLite 3.54.1 and check the capability first.
+  No Cloudflare credential changes were needed.
+- Full production release [42573335811](https://github.com/ejohane/zine/actions/runs/42573335811)
+  succeeded. Production serves Worker `23b9f152-39a0-4450-b0fd-1da9e746e130`,
+  source `627b63d439f1bcb781026901b754ebf363b4e373`, migrations 1–23.
+  The duplicate automatic staging-only run was intentionally cancelled before
+  staging; the full workflow verified, staged, backed up and promoted the source.
+- Actual production REST/MCP concurrency acceptance passed with cleanup. The
+  scoped GitHub monitor token is configured; GitHub monitoring passed after the
+  first natural cron heartbeat. The 30-minute exact-release observer completed with 30
+  healthy authenticated observations, zero failures and successful scheduled
+  Spotify/Substack/YouTube/RSS poll advances (`production-soak.json`).
+- Staging-origin Clerk configuration was corrected in merged PR #468: staging
+  originally accepted only production-origin sessions. At the origin-boundary probe, staging deployment
+  `d1759e4a-a1d0-4bd4-9278-e660f44c5bfa` served source
+  `b40fd5af5e4a76357dd62769390b3697558aa380`. Real Clerk staging-origin
+  acceptance and production rejection both passed (`staging-origin-live.json`).
+  Production's trusted origins remain restricted. Later main pushes automatically
+  stage documentation/helper updates; inspect staging `/health` for its latest
+  stamp. Browser rendering is distinct.
 
-Live Google-authorized YouTube metadata and playlist/channel pagination need an
-approved usable grant/API key, or access to the key that decrypts the original
-Google grant. The original application supports Google integration. Its production
-Worker has an `ENCRYPTION_KEY` secret binding; the settings API exposes no value.
-The inspected local key did not decrypt the existing grant. Do not describe this
-as the original application's integration being absent.
+## Resources and behavior
 
-Public YouTube extraction and channel-feed intake have live evidence. Their
-success is separate from official authorized API acceptance. Metadata inventory
-and prior investigation are in `../evidence/google-credential-availability.json`
-and `google-grant-reuse.json`. Never paste keys into the handoff.
+Production is <https://api-next.myzine.app>; staging is
+<https://api-next-staging.myzine.app>. REST `/v1`; MCP `/mcp`; authenticated
+Inspector `/`; reference `/docs`; OpenAPI `/openapi.json`; explanatory guide
+`/architecture`. The architecture guide is illustrative, with no live mutations.
 
-## Implemented behavior and evidence
+Each environment owns its Worker, D1, R2, queue/DLQ and Vectorize index. See the
+production/staging Wrangler configs and [operations.md](operations.md). Recovery
+uses `verification/wrangler.recovery.jsonc`, D1
+`29df9a64-93a0-4ada-929e-43c057b2ead8`, and independent resources. It contains a
+private restored copy, no live grants/tokens/webhooks, paused subscriptions and a
+completed vector rebuild. No recovery verifier remains running.
 
-Read the blueprint and completion audit for the full contract. Core behavior
-includes durable saves, private context, lifecycle/progress, collections/synthesis,
-annotations, rich contributions/corrections, six-provider integration, subscriptions,
-keyword/semantic/hybrid search, strong identity reconciliation, private relationships,
-export/erasure, revocable tokens, CLI/MCP adapters and job/recovery machinery.
+Cron runs every five minutes; subscription polls become due fifteen minutes after
+success. Queue/provider delays can extend the interval. Saves and explicit context
+are durable before asynchronous extraction/understanding/indexing finish.
 
-Evidence locations:
+Implemented controls: eight scoped revocable PAT capabilities; atomic caller/owner
+request and resource ceilings; shared cron heartbeat and durable owner alerts;
+transactional events with 30-day replay; signed at-least-once webhooks with leases,
+backoff and erasure fencing; thin TypeScript client and CLI; staging/release,
+checksum-ledger migration, private backup, restore, index rebuild and rollback.
 
-- `verification.md`: artifact inventory and scope limits.
-- `completion-audit.md`: requirement-by-requirement acceptance, including the blocker.
-- `../evidence/deployment.json`: timestamped active-version/resource inspection.
-- `../evidence/library-import.json` and `remote-library-import.json`: real-library
-  capture/readback, separate from fresh provider extraction.
-- `../evidence/identity-journeys.json`, `remote-isolation.json`, `search-quality.json`
-  and `live-sources.json`: bounded live behavior checks.
-- `../evidence/erasure-concurrency.json`: controlled Worker races and isolated
-  real-library erasure; it is not deployed real-account deletion.
-- `../evidence/repository-checks.json`: recorded checks and runtime versions. The
-  architecture guide has separate interaction/delivery evidence in
-  `architecture-guide.json`; do not extrapolate a previous suite count to new code.
+## Proof and reproducible entry points
 
-Browser use was disabled during walkthrough verification. DOM interactions, static
-checks and HTTP delivery passed; visual browser review was not observed. Recheck
-current tool availability rather than assuming that limitation is permanent.
-Private `.local-data` inputs are not committed and are not required for isolated
-fixture tests. Never fabricate unavailable original-library artifacts.
+Read [verification.md](verification.md) for the full ledger and scopes. Receipts
+under `../evidence/` contain hashes/counts/assertions, not raw library content.
 
-## Active production work
+- `production-controls-live.json`: real Clerk/staging scopes, revocation,
+  idempotent save, production isolation, 25-call burst (20 accepted/five limited)
+  with retry headers and another caller unaffected.
+- `operations-live.json`: actual staging injected backlog opens/deduplicates/
+  resolves an alert without changing production or provider state.
+- `webhooks-live.json`: independent Cloudflare receiver verifies HMAC, returns 503,
+  then receives the same delivery/body on the scheduled retry five minutes later.
+- `production-live.json`: exact released-source REST/MCP; 15 concurrent save
+  requests yield six durable references with no lost/duplicate retry captures,
+  pagination, keyword retrieval, independent archive/completion, six created events
+  replayed, read/write scope boundaries; all controlled references/tokens cleaned.
+- `production-search-live.json`: all 12 real-library search cases rank the expected
+  result first on the actual new production version.
+- `production-ops-live.json` and `monitor-live.json`: natural successful cron, no
+  critical queue/cron condition, no dirty index revisions; actual GitHub runner
+  monitoring with its scoped PAT. Historical failed jobs and source errors remain
+  visible as noncritical conditions.
+- `rollback-policy-live.json`: actual production read-only preflight rejects the
+  pre-scope version 02ec before deployment and accepts the current tagged release's
+  matching private manifest. Six policy tests cover invalid tags/receipt identities
+  and missing scope migration. Production rollback must retain migrations 18–23
+  and their policy floor; use forward repair until a compatible older release exists.
+- `rollback-live.json`: actual staging rollback/forward promotion, exact-version
+  readback and retained context; all 23 migrations remain current.
+- `backup-latest.json`: private R2 archive with full round-trip hash readback;
+  30-day backup retention, public bucket access disabled.
+- `recovery-restore.json`: 491 items, 5,473 contributions, 21 authoritative table
+  hashes after documented isolated subscription/lease overlays, valid foreign keys,
+  all 299 retained objects copied/read back with matching hashes.
+- `recovery-search-live.json`: all 491 owner items rebuilt, zero pending revisions,
+  455 saved items read, 12 keyword/semantic/hybrid checks rank the expected result
+  first, three retained-material API readbacks. Primary real Clerk; another-owner
+  denial uses a controlled isolated PAT, not a second real Clerk login.
+- `production-checks.json`: 130 Node 22 API tests across 28 files; scoped auth/export,
+  atomic quotas, lifecycle/erasure races, signed retry/leases/retention, recovery
+  and client retry cases. Controlled upstream tests do not prove provider access.
 
-Erik authorized completing all discussed productionization work except OAuth.
-Follow [productionization.md](productionization.md) for the acceptance requirements,
-current work order and proof. This supersedes the earlier planning-only wording.
+Read scripts before running mutating probes. These require the approved login
+profile (see shared agent-secrets skill), and close real Clerk sessions:
 
-New OAuth flows/consent and Google-authorized acceptance are excluded from this
-production task. Preserve existing Clerk verification. Scoped PATs, operational
-controls, client helpers, events/webhooks, staging/release/recovery and live proof
-are included. The original Google acceptance issue remains a separately deferred
-item; it must not silently block this authorized non-OAuth work.
+```sh
+secretsctl run zine.test -- bun run scripts/verify-production-live.ts EXACT_RELEASE_SHA
+secretsctl run zine.test -- bun run scripts/configure-monitor.ts
+gh workflow run api-next-monitor.yml --repo ejohane/zine
+secretsctl run zine.test -- bun run scripts/soak.ts 30 EXACT_RELEASE_SHA
+```
 
-The goal tool rejected creating a replacement while the older goal remained
-unfinished. Erik said replacing it is unnecessary and can be a TODO. Track the
-work in the repository and continue; do not mark the older objective complete to
-work around the tracker.
+The first writes/removes unique controlled verification references and revokes its
+scoped PATs. Monitor configuration sends an ops-read-only token to GitHub through
+stdin and revokes older named monitor tokens. The soak is read-only. Check current
+processes/private progress before starting another observer.
 
-## Productionization checkpoint: 2026-11-09 around 04:50 UTC
+## Limits and deferred work
 
-Completed evidence (inspect timestamps and exact scopes):
+- New OAuth and Google-authorized metadata/pagination acceptance are deferred.
+  The original app supports Google integration; its encrypted grant could not be
+  reused with approved available keys. Do not claim that integration is absent.
+- X currently reports upstream `provider_http_402`; no provider-plan/billing
+  changes were made. The earlier public YouTube feed 404 recovered: YouTube, Spotify,
+  Substack and both RSS subscriptions advanced during the new production observation.
+  Saves remain durable and inaccessible source failures are explicit.
+- Captions/paywalls/inaccessible pages can prevent rich extraction. Imported
+  metadata or accepted jobs do not prove extracted content or a full transcript.
+- Browser visual verification of the Inspector/architecture guide was unavailable
+  earlier. DOM interaction and delivery receipts are separate from visual review.
+  No native/UI verification is claimed for this API-only task.
+- Private inputs/snapshots/logs live in ignored `.local-data/`; another checkout
+  may not have them. Do not fabricate original-library artifacts. Backups and
+  credential values must never enter this PUBLIC repository.
 
-- `production-controls-live.json`: real Clerk + staging scopes/revocation,
-  exactly-once context under idempotent save retry, keyword readback, production
-  isolation, 25-call burst with exactly 20 allowed/five limited and another caller
-  unaffected. The lower caller cap is intentional in staging.
-- `webhooks-live.json`: separate Cloudflare receiver verified HMAC, returned 503,
-  then accepted identical delivery/body on the scheduled retry five minutes later.
-  Configuration propagation initially caused an invalid-signature attempt; the
-  verifier now waits for its exact read secret to become active before sending.
-- `operations-live.json`: actual staging fault injection opens/deduplicates/resolves
-  a durable backlog alert. No real provider/library/production mutation.
-- `backup-latest.json`: private content-addressed R2 archive, downloaded again to
-  verify its hash; 30-day backup lifecycle configured.
-- `recovery-restore.json`: native point-in-time production snapshot restored into
-  fresh resources, 491 items/5,473 contributions, all 21 authoritative table hashes
-  matching, foreign keys valid, and all 299 objects written/read back with matching
-  hashes. This is a full data-restore receipt, not index/search acceptance.
+## Final audit and next action
 
-Important recovery findings were fixed: omit completed-job artifact references
-from backup; import parent tables before children across D1 processing batches;
-use individual count queries because D1 limits compound SELECTs; and seed vector
-request revisions above the source revisions to avoid historical job-ID collisions.
-`test/recovery.test.ts` uses a synthetic SQLite snapshot restored into actual D1
-and verifies private text, FTS, credential scrubbing and successful scheduling
-past old job IDs. The active recovery was repaired only in its derived revision
-state using `repair-recovery-index.ts`; no source/production state was modified.
+All P1–P12 productionization requirements were inspected against their receipts;
+see [productionization.md](productionization.md). The proof package is in PR #469.
+The original source/controls PR #466, Linux backup fix #467 and staging-origin fix
+#468 are merged. Inspect its actual merge/check state when starting a fresh session; production
+release identity above is independent of later documentation-only main commits.
+There are no local observers or development servers left running. Cloudflare's
+staging/recovery/proof resources remain for reproducible operation; retained data
+and credentials remain private. `doctor-production.json` records a clean Node 22
+startup check; its public-health scope is separate from authenticated evidence.
 
-The 128-test Node 22 suite passed before the new recovery regression and owner
-retention migration. Run the current complete suite before release; do not repeat
-128 as the final count. Latest focused recovery/event checks passed, as did types.
-Migrations 22 (release ledger) and 23 (owner-specific replay retention) are local
-additions; recovery is being updated to these, staging/production are not yet.
+For a new experience, start with `client/README.md`, `docs/usage.md`, OpenAPI and the
+existing CLI. Use the actual production `releaseSha`, preserve save idempotency
+keys across retries, and handle asynchronous processing and explicit source errors.
+Configure any new web origin deliberately; use scoped PATs for trusted agents.
 
-Active long-lived processes (do not silently restart/duplicate):
-
-- `secretsctl run zine.test -- bun run scripts/soak.ts 45`, PTY session `48684`.
-  Started `2026-11-09T04:33:29Z`, expected through about `05:18:29Z`.
-  Private checkpoint `.local-data/soak-progress.json`; final public artifact is
-  `evidence/production-soak.json`. It only reads production and closes its real
-  Clerk session at the end. At the last check it had zero failed observations.
-- `secretsctl run zine.test -- bun run scripts/verify-recovery-live.ts`, PTY session
-  `9359`, started around 04:40 UTC, waits up to 30 minutes for indexing, then tests
-  12 known retrieval cases and retained material. Check
-  `.local-data/recovery-index-progress.json` and `.local-data/recovery-live.log`.
-  Its second owner is a controlled read-only PAT bootstrap in the isolated DB;
-  cleanup revokes that probe. Source snapshot had one real owner, so do not claim
-  another real Clerk identity was tested.
-
-Next actions:
-
-1. Finish the active recovery/search proof; explicit one-second queue batch timeout
-   is being deployed to recovery to reduce single-job batching delay, while keeping
-   provider cooldowns and global AI serialization intact. Check its deploy log and
-   actual queue settings. Do not clear quotas/cooldowns to accelerate acceptance.
-2. Review/package remaining source, generated architecture guide, proof artifacts
-   and runbooks. Run current API checks and root gates; ensure no private backup,
-   credentials, raw library files or build artifacts are staged (repo is PUBLIC).
-3. Commit, publish a ready scoped PR, watch/fix CI and merge when ready. Apply the
-   create-pr workflow already read for this task. No source push has happened yet.
-4. Observe staging release of the exact merged source, then use
-   `verify-rollback-live.ts 785df10f-9262-4ab7-bfed-490238b111c8` to prove real
-   rollback/readback/forward promotion. Run production workflow only after staging.
-5. After production promotion, configure the scoped monitor via
-   `configure-monitor.ts`; dispatch/observe its GitHub workflow and backup/release
-   workflows. Run authenticated production checks and bounded save bursts with
-   cleanup. Observe the soak result and confirm real provider polling advances.
-6. Complete P1–P12 with current evidence, release SHA/version and limitations;
-   update this handoff. The old goal-control cleanup remains merely a TODO.
-
-Runbooks: `production-controls.md`, `events.md`, `operations.md`; typed helper:
-`client/index.ts`. The standalone walkthrough must be regenerated after final
-OpenAPI changes. Browser use was disabled earlier; no new visual-browser claim.
-
-### Subsequent review notes
-
-The current source has 23 migrations. Exported event/webhook/subscription sections
-now use their corresponding scopes instead of widening library-read privileges.
-The newest focused 15 authorization/usage/operations tests pass; the last full
-Node-22 run was 129 tests before the additional portability-scope regression (so
-expect 130 in the final source). A temporary public-feed fallback experiment and
-its two tests were removed: YouTube's documented XML topic returned an empty
-generic feed, which cannot establish channel intake. Do not cite the experimental
-131-test count as the final suite or claim that fallback was shipped.
-
-The production observer found X `provider_http_402` and a transient public YouTube
-feed `source_not_found` despite prior successful polls. Spotify, Substack and RSS
-show actual scheduled advances; health/authenticated library observations have no
-failures so far. Record provider degradation in the final audit. No billing change
-or OAuth work was authorized or performed. `verify-youtube-feed-live.ts` is a
-repeatable staging probe but has not passed under the current feed condition.
-
-Recovery index progress is now past 200 processed items. The original verifier's
-30-minute deadline may expire while its legitimate backfill continues. If it exits,
-confirm cleanup, then run `verify-recovery-live.ts --resume` (now a 60-minute wait)
-without queueing another full revision. Do not run two simultaneous verifiers.
-
-## Release checkpoint: 2026-11-09 around 06:10 UTC
-
-The rewrite and production controls merged in PR #466 after all 13 applicable
-checks passed. Main source is `afb3a32e9dcdce5104f1a2c65df32ff1294e0baf`.
-The post-merge automatic staging workflow succeeded. Production promotion run
-`42569440806` and standalone backup run `42570675380` stopped at backup **before
-production migrations/deployment**: Ubuntu installed SQLite 3.45.1, while the D1
-native dump uses `unistr()` (introduced in SQLite 3.50). Production still has the
-old 17-migration/version snapshot; do not claim it has been promoted.
-
-Current branch `codex/zine-api-production-proof` starts from merged main and fixes
-that portability issue. It adds the official SQLite 3.54.1 Linux tool installer,
-verified against SQLite's published SHA3-256, and backup preflight checks before
-export. The workflow changes have not yet been pushed/observed. No Cloudflare
-credential changes were needed or made; a repeat local backup at 06:02 succeeded
-with all 491 records/299 retained objects, confirming this runner compatibility
-issue. The private download's signed URL is now suppressed on network errors.
-
-Completed recovery/search acceptance is in `recovery-search-live.json`: 491 owner
-items rebuilt, no pending index revisions, 455 saved items read with real Clerk,
-all 12 keyword/semantic/hybrid cases ranked the expected original reference first,
-and three retained-material API readbacks passed. The first 30-minute verifier
-timed out during legitimate backfill; its resumed run completed at 05:39 UTC with
-probe token/session cleanup. No recovery verifier remains running.
-
-The 45-minute observer completed at 05:18 UTC: 46 healthy authenticated library
-reads, Spotify/Substack/RSS scheduled advances, with X HTTP 402 and YouTube public
-feed 404 separately observed. `production-soak.json` identifies the old serving
-version; it is not proof of the upcoming production release. `rollback-live.json`
-records successful staging rollback/forward promotion and retained context with
-all 23 migrations preserved.
-
-Next: push/review the SQLite fix and accompanying proof/helper; manually run the
-private-backup workflow on that branch to verify Linux operation before merging.
-Then retry the full production release from the fixed main. Run
-`verify-production-live.ts EXACT_RELEASE_SHA` for controlled concurrent saves,
-scopes, pagination, completion/archive, events and real MCP checks with cleanup.
-Configure/observe the scoped monitor, run a post-release observer, and complete the
-acceptance audit/updated deployment receipt. Keep upstream provider limitations
-explicit; OAuth and the old goal-control cleanup remain deferred.
+Remaining decisions: OAuth/Google-authorized live acceptance and X account/provider
+access are deferred. Goal-control cleanup is an administrative TODO. GitHub monitor
+and daily backup workflows are active; their executable paths were observed via
+manual dispatch. Natural GitHub scheduled-trigger execution is not claimed by
+those receipts. Continue observing normal scheduled runs through routine operations.

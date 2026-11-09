@@ -1,0 +1,9 @@
+{
+  "at": "2026-11-09T06:47:07.563Z",
+  "origin": "https://api-next-staging.myzine.app",
+  "deploymentId": "d1759e4a-a1d0-4bd4-9278-e660f44c5bfa",
+  "sourceSha": "b40fd5af5e4a76357dd62769390b3697558aa380",
+  "stagingSessionAccepted": true,
+  "productionRejectedStagingSession": true,
+  "scope": "Real Clerk FAPI password sign-in using staging origin, actual signed azp claim and deployed HTTP authentication. No fixture issuer or bypass. Browser rendering/interactive login is not claimed."
+}

@@ -4,6 +4,8 @@ import { createHash } from 'node:crypto';
 import { realSession } from './clerk-session';
 import { ZineClient } from '../client';
 const minutes = Number(process.argv[2] ?? 45);
+const expectedSha = process.argv[3];
+if (expectedSha) assert.match(expectedSha, /^[a-f0-9]{40}$/, 'Expected source SHA must be exact');
 assert.ok(
   Number.isInteger(minutes) && minutes >= 30 && minutes <= 240,
   'Use a duration from 30 to 240 minutes'
@@ -15,6 +17,7 @@ const startedAt = new Date().toISOString(),
   deadline = Date.now() + minutes * 60000;
 const observations: unknown[] = [];
 const versions = new Set<string>(),
+  releaseShas = new Set<string>(),
   advances = new Map<string, number>(),
   lastSuccess = new Map<string, string>();
 let failures = 0,
@@ -26,7 +29,9 @@ try {
       const response = await fetch(origin + '/health', { signal: AbortSignal.timeout(15000) });
       assert.equal(response.status, 200);
       const health = (await response.json()) as { deploymentId: string; releaseSha?: string };
+      if (expectedSha) assert.equal(health.releaseSha, expectedSha, 'Observed a different release');
       versions.add(health.deploymentId);
+      if (health.releaseSha) releaseShas.add(health.releaseSha);
       const library = await client.list({}, { limit: 1 });
       assert.ok(Array.isArray(library.items));
       authReads++;
@@ -132,6 +137,8 @@ try {
     failures,
     authenticatedLibraryReads: authReads,
     versions: [...versions],
+    expectedSourceSha: expectedSha ?? null,
+    observedSourceShas: [...releaseShas],
     successfulPollAdvances: Object.fromEntries(advances),
     observationSha256: createHash('sha256').update(JSON.stringify(observations)).digest('hex'),
     scope:

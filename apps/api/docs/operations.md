@@ -50,6 +50,19 @@ not establish provider behavior; run the appropriate authenticated acceptance to
 bun run scripts/rollback.ts staging EXPLICIT_WORKER_VERSION_UUID
 ```
 
+Production rollback additionally requires the target's exact tagged-source release
+manifest in the private backup bucket, with matching Worker/version/source and all
+productionization migrations 18–23. Missing/foreign/older manifests fail before
+promotion. In particular, **do not use pre-scope production version
+`02ecfb45-1cec-471f-ab7f-18303723c01f`**: it would remove scoped-token enforcement.
+It is rejected by the command. Until another compatible reviewed production
+release exists, use a forward repair. `rollback-policy-live.json` records actual
+read-only rejection/acceptance preflights; no production rollback was performed.
+
+```sh
+bun run scripts/rollback.ts production EXPLICIT_WORKER_VERSION_UUID --check-only
+```
+
 Select a reviewed version belonging to that Worker. The command verifies actual
 serving-version readback. It follows [Cloudflare rollback semantics](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/)
 and restores code/configuration only: **D1, R2, queues and
@@ -153,3 +166,31 @@ inspect job error categories and due times, and correlate request IDs with Worke
 observability. Honor quotas/cooldowns; do not reset them to make a probe pass.
 Only retry failed owned jobs after identifying the cause. Keep raw diagnostics
 private, and add a reproducible regression for a real invariant failure.
+
+## Verify the released API
+
+Use the exact `releaseSha` from public `/health` and the successful production
+workflow. The following helpers authenticate with real Clerk through the approved
+profile and do not bypass owner/capability checks:
+
+```sh
+secretsctl run zine.test -- bun run scripts/verify-production-live.ts EXACT_RELEASE_SHA
+secretsctl run zine.test -- bun run scripts/verify-production-ops.ts EXACT_RELEASE_SHA
+secretsctl run zine.test -- bun run scripts/verify-search-quality.ts EXACT_RELEASE_SHA
+secretsctl run zine.test -- bun run scripts/soak.ts 30 EXACT_RELEASE_SHA
+secretsctl run zine.test -- bun run scripts/verify-staging-origin.ts
+```
+
+The save/MCP probe creates unique controlled references and revokes its temporary
+scoped tokens after cleanup. The operational probe and soak do not mutate library
+or scheduling state. Search verification needs the private original-library mapping;
+its absence in a fresh checkout is an explicit missing input, not permission to
+invent expected results. Keep a single soak running and inspect its private
+checkpoint before starting another. Tests and public receipts document the actual
+bounded cases rather than claiming future uptime or universal correctness.
+
+Each new browser experience needs its own approved CORS origin and signed Clerk
+party in the target environment. Staging explicitly accepts its own origin while
+production rejects staging-origin sessions. Trusted servers/agents can instead use
+appropriately scoped PATs. Never broaden origin checks to compensate for a login
+configuration failure. New OAuth client authorization remains a separate task.

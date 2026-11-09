@@ -1,0 +1,63 @@
+{
+  "at": "2026-11-09T06:55:18.385447+00:00",
+  "workflows": [
+    {
+      "name": "API release",
+      "state": "active",
+      "path": ".github/workflows/api-next-release.yml"
+    },
+    {
+      "name": "API service monitor",
+      "state": "active",
+      "path": ".github/workflows/api-next-monitor.yml"
+    },
+    {
+      "name": "API private backup",
+      "state": "active",
+      "path": ".github/workflows/api-next-backup.yml"
+    }
+  ],
+  "observedSuccessfulRuns": [
+    {
+      "conclusion": "success",
+      "databaseId": 42572985940,
+      "event": "workflow_dispatch",
+      "headSha": "83873edbb24a840f9938a8398ac4c12a72ff5cf4",
+      "startedAt": "2026-11-09T06:25:58Z",
+      "status": "completed",
+      "updatedAt": "2026-11-09T06:28:26Z",
+      "url": "https://github.com/ejohane/zine/actions/runs/42572985940"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 42573335811,
+      "event": "workflow_dispatch",
+      "headSha": "627b63d439f1bcb781026901b754ebf363b4e373",
+      "startedAt": "2026-11-09T06:29:28Z",
+      "status": "completed",
+      "updatedAt": "2026-11-09T06:36:26Z",
+      "url": "https://github.com/ejohane/zine/actions/runs/42573335811"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 42574555374,
+      "event": "workflow_dispatch",
+      "headSha": "627b63d439f1bcb781026901b754ebf363b4e373",
+      "startedAt": "2026-11-09T06:41:05Z",
+      "status": "completed",
+      "updatedAt": "2026-11-09T06:41:15Z",
+      "url": "https://github.com/ejohane/zine/actions/runs/42574555374"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 42574725290,
+      "event": "push",
+      "headSha": "b40fd5af5e4a76357dd62769390b3697558aa380",
+      "startedAt": "2026-11-09T06:42:42Z",
+      "status": "completed",
+      "updatedAt": "2026-11-09T06:46:24Z",
+      "url": "https://github.com/ejohane/zine/actions/runs/42574725290"
+    }
+  ],
+  "scope": "Public GitHub metadata: actual Linux backup, full production promotion, independent scoped monitoring and staging configuration deployment. Scheduled triggers are configured and workflows active; these listed observations were manual dispatch or push, not a claim of a natural scheduled GitHub trigger."
+}

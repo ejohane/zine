@@ -1,0 +1,11 @@
+{
+  "at": "2026-11-09T07:18:12.628525+00:00",
+  "origin": "https://api-next.myzine.app",
+  "servingVersion": "23b9f152-39a0-4450-b0fd-1da9e746e130",
+  "sourceSha": "627b63d439f1bcb781026901b754ebf363b4e373",
+  "untaggedPreScopeVersionRejected": "02ecfb45-1cec-471f-ab7f-18303723c01f",
+  "currentReviewedManifestAccepted": true,
+  "deploymentUnchanged": true,
+  "policyTests": 6,
+  "scope": "Actual read-only Cloudflare version/manifest preflight: pre-scope production release rejected before deployment; current reviewed production manifest accepted. Six focused policy tests cover missing tags, foreign source/version/environment and pre-scope migrations. No rollback was executed by this probe."
+}

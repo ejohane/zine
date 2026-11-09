@@ -2,6 +2,13 @@ import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { realSession } from './clerk-session';
+const expectedSha = process.argv[2];
+if (expectedSha) assert.match(expectedSha, /^[a-f0-9]{40}$/);
+const health = (await fetch('https://api-next.myzine.app/health').then((r) => r.json())) as {
+  deploymentId: string;
+  releaseSha?: string;
+};
+if (expectedSha) assert.equal(health.releaseSha, expectedSha, 'Expected release is not serving');
 const snapshot = JSON.parse(await readFile('.local-data/library-snapshot.json', 'utf8')) as {
   items: { id: string; canonicalUrl: string; title: string }[];
 };
@@ -93,13 +100,18 @@ try {
   const artifact = {
     at: new Date().toISOString(),
     origin: 'https://api-next.myzine.app',
+    deploymentId: health.deploymentId,
+    sourceSha: health.releaseSha ?? null,
     authentication: 'real Clerk session',
     corpus: '444 original-library references in fresh backend',
     expectedMatchWithinTop20: failures === 0,
     failures,
     observations,
   };
-  await writeFile('evidence/search-quality.json', JSON.stringify(artifact, null, 2) + '\n');
+  await writeFile(
+    expectedSha ? 'evidence/production-search-live.json' : 'evidence/search-quality.json',
+    JSON.stringify(artifact, null, 2) + '\n'
+  );
   console.log(JSON.stringify(artifact));
   if (failures) process.exitCode = 1;
 } finally {

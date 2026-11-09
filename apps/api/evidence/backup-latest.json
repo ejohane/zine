@@ -1,14 +1,14 @@
 {
-  "at": "2026-11-09T06:03:48.309Z",
+  "at": "2026-11-09T06:36:04.180Z",
   "environment": "production",
   "bucket": "zine-api-next-backups",
-  "key": "backups/production/2026-11-09T06-02-24-327Z/b3919c2712449c61be9bda8a7acb728ca04fec3a261e7eef40e9731bdddffaf0.tar.gz",
-  "archiveSha256": "b3919c2712449c61be9bda8a7acb728ca04fec3a261e7eef40e9731bdddffaf0",
+  "key": "backups/production/2026-11-09T06-33-56-760Z/59cfb3678aa12d873a17a7c6d5e1711729c2abe7182528742643d90649f8afa6.tar.gz",
+  "archiveSha256": "59cfb3678aa12d873a17a7c6d5e1711729c2abe7182528742643d90649f8afa6",
   "remoteArchiveHashVerified": true,
-  "bytes": 12015096,
+  "bytes": 12028564,
   "items": 491,
   "referencedObjects": 299,
-  "snapshotSqlSha256": "2b4e2151d435d4825392881af8a6b6f25dce009d90fe4b87f57df5ee417af693",
+  "snapshotSqlSha256": "42deb71f3c1e4966c8ee162a4b3c6de703318f1220b57ceac67625be74a119d3",
   "retentionDays": 30,
   "scope": "Private content-addressed R2 archive. No raw database, library text, credentials or object bodies are included in this public summary."
 }

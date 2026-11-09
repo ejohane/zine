@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "at": "2026-11-09T06:36:20.085Z",
+  "environment": "production",
+  "sourceSha": "627b63d439f1bcb781026901b754ebf363b4e373",
+  "worker": "zine-api-next",
+  "origin": "https://api-next.myzine.app",
+  "deploymentId": "23b9f152-39a0-4450-b0fd-1da9e746e130",
+  "previousVersions": [
+    {
+      "version_id": "02ecfb45-1cec-471f-ab7f-18303723c01f",
+      "percentage": 100
+    }
+  ],
+  "preDeployBackup": {
+    "at": "2026-11-09T06:36:04.180Z",
+    "environment": "production",
+    "bucket": "zine-api-next-backups",
+    "key": "backups/production/2026-11-09T06-33-56-760Z/59cfb3678aa12d873a17a7c6d5e1711729c2abe7182528742643d90649f8afa6.tar.gz",
+    "archiveSha256": "59cfb3678aa12d873a17a7c6d5e1711729c2abe7182528742643d90649f8afa6",
+    "remoteArchiveHashVerified": true,
+    "bytes": 12028564,
+    "items": 491,
+    "referencedObjects": 299,
+    "snapshotSqlSha256": "42deb71f3c1e4966c8ee162a4b3c6de703318f1220b57ceac67625be74a119d3",
+    "retentionDays": 30,
+    "scope": "Private content-addressed R2 archive. No raw database, library text, credentials or object bodies are included in this public summary."
+  },
+  "resources": [
+    {
+      "type": "r2_bucket",
+      "name": "ARTIFACTS",
+      "resource": "zine-api-next-artifacts"
+    },
+    {
+      "type": "d1",
+      "name": "DB",
+      "resource": "0e55836b-07de-426b-9977-b783b0ea6652"
+    },
+    {
+      "type": "queue",
+      "name": "JOBS",
+      "resource": "zine-api-next-jobs"
+    },
+    {
+      "type": "vectorize",
+      "name": "VECTORS",
+      "resource": "zine-api-next-vectors"
+    }
+  ],
+  "migrations": [
+    {
+      "name": "0001_foundation.sql",
+      "sha256": "58ffdd6eb2f0aa2d1e977604a4bbe6bff45360e9e1344491f7c86b5fe2d0040a"
+    },
+    {
+      "name": "0002_semantic_index.sql",
+      "sha256": "0a8160469f00dcc5a40cd74e0b5e95eaa1633a8dcba1351a859bb66ffd223e6a"
+    },
+    {
+      "name": "0003_access_tokens.sql",
+      "sha256": "8fec51e4702791f627f96a30e4c2ecd396aaaf57b8dc96d048616ae71e71bd1d"
+    },
+    {
+      "name": "0004_outbox_dispatch.sql",
+      "sha256": "7d0f199492442ce03bf46ac60f9a444f978446e178d852a48374fc3f5b65dee0"
+    },
+    {
+      "name": "0005_provider_budgets.sql",
+      "sha256": "de773d24b820fb4b49ab5f9b6b0bba909e6dee95490fb412d0e744706eeb4d39"
+    },
+    {
+      "name": "0006_private_classification.sql",
+      "sha256": "c955841316525108742d61508a39bb8f17d255d80e246d0e83dbdcb098bcf2a2"
+    },
+    {
+      "name": "0007_subscription_sync.sql",
+      "sha256": "0ba0f3cf2cffb0e601485bfabd01ef3c52f7321cd40523a7bb0309e305804306"
+    },
+    {
+      "name": "0008_connections.sql",
+      "sha256": "35a03681eb2ad8621770ff9768a31a8189dbe135a8ba4ef51e70551b43c8cc85"
+    },
+    {
+      "name": "0009_portability.sql",
+      "sha256": "ffe6eddfa0d2777bc36ec58a62547236adb38d3ca97113bc8af3a86da615fc2e"
+    },
+    {
+      "name": "0010_understanding.sql",
+      "sha256": "9ca3f5e008b321a797bfaab95b2953ed69c40f2bff8b8e6eba6eea7cedd1f9b9"
+    },
+    {
+      "name": "0011_understanding_artifact_ownership.sql",
+      "sha256": "30b8c6cbbe62d0ed3e46fc790ac78313fa4d7e3488c10a0ec77b050563d8c34c"
+    },
+    {
+      "name": "0012_source_validators.sql",
+      "sha256": "43cc2736d4e6197790f4b0fad416638f4308a4b93a34c9c408eea9fff609b259"
+    },
+    {
+      "name": "0013_search_material.sql",
+      "sha256": "c5faeeb895f60fc7d8910fef80498bed1f349b2817a1e87c3a9bbd7c4b38a465"
+    },
+    {
+      "name": "0014_source_provider_ids.sql",
+      "sha256": "6fd53aae24c411413594a76c083ed238c23312318abb172c84ec7991110e9712"
+    },
+    {
+      "name": "0015_identity_reconciliation.sql",
+      "sha256": "0813efe449acaf2502159a664256cc2a7307c0d292eb30948bc3e4ffa6aa1a2f"
+    },
+    {
+      "name": "0016_youtube_quota_scopes.sql",
+      "sha256": "e839df64f5c7026bc360b722ebabbe804293fe57c7bfb5cf7c551d235712ebe8"
+    },
+    {
+      "name": "0017_material_artifact_ownership.sql",
+      "sha256": "23f984e30d72b740144d9b711bcd078f9df16b4aee504f6abca82d1062a6f648"
+    },
+    {
+      "name": "0018_token_scopes.sql",
+      "sha256": "17340b68f52c2f7c96e1705a6f3d93b4cfefc473989c47b91edb075f7d45c9c4"
+    },
+    {
+      "name": "0019_usage_controls.sql",
+      "sha256": "39118ef857616f9b2e127662144db1e8337a0a357e4dc9e3cf4212640e8f54f5"
+    },
+    {
+      "name": "0020_operations.sql",
+      "sha256": "1c6f310bcc66f029fb5edd2059998b1063bcc5ce1a8f5c42c14d181cbd2010a5"
+    },
+    {
+      "name": "0021_events_webhooks.sql",
+      "sha256": "863af21fcc96573b0cf3e20dcbf2086086b45894d51bafff469f3c9af10b7d59"
+    },
+    {
+      "name": "0022_release_integrity.sql",
+      "sha256": "342a9f10d0309fe82e030482bce0c430236514f566df054023867f617b4f32a2"
+    },
+    {
+      "name": "0023_owner_event_retention.sql",
+      "sha256": "3d24588478364e84a324185f9c0e7643e43e37df80d8d92fe6a57415f92c69aa"
+    }
+  ],
+  "checks": {
+    "activeVersionAt100Percent": true,
+    "exactServingSource": true,
+    "contractPresent": true,
+    "anonymousLibraryDenied": true
+  },
+  "limitations": "Deployment/readiness receipt. Real authentication, provider operation, recovery and webhook delivery have separate acceptance artifacts. Worker rollback does not roll back D1/R2/queues/vectors.",
+  "workflow": "https://github.com/ejohane/zine/actions/runs/42573335811"
+}
