@@ -139,16 +139,11 @@ export async function listItems(
     filters.status === 'received'
       ? 'COALESCE(p.ingested_at,p.created_at)'
       : 'COALESCE(p.saved_at,p.created_at)';
-  const sourceOrder =
-    filters.status === 'received'
-      ? "json_extract(r.payload_json,'$.state')='INBOX' AND json_extract(r.payload_json,'$.ingested_at')=p.ingested_at"
-      : "json_extract(r.payload_json,'$.bookmarked_at')=p.saved_at";
   const tie =
     filters.status === 'dismissed'
       ? 'p.id'
-      : `COALESCE((SELECT r.legacy_id FROM legacy_import_records r
-        WHERE r.owner_id=p.owner_id AND r.item_id=p.id AND r.section='items'
-          AND r.payload_json IS NOT NULL AND ${sourceOrder} ORDER BY r.legacy_id DESC LIMIT 1),p.id)`;
+      : `CASE WHEN p.legacy_sort_anchor=p.status || ':' || ${ordering}
+          THEN COALESCE(p.legacy_sort_id,p.id) ELSE p.id END`;
   if (cursor) {
     const after = decode(cursor, signature);
     where.push(`(${ordering},${tie},p.id)<(?,?,?)`);

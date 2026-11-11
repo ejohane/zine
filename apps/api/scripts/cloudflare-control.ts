@@ -40,3 +40,20 @@ export async function cloudflare<T>(path: string, method = 'GET', body?: unknown
     );
   return value.result;
 }
+
+export function cloudflareR2Object(bucket: string, key: string): Promise<Response> {
+  const token = process.env.CLOUDFLARE_API_TOKEN;
+  if (!token) throw new Error('Cloudflare credential missing');
+  const segments = key.split('/');
+  if (segments.some((part) => !part || part === '.' || part === '..'))
+    throw new Error('Unexpected R2 object path');
+  const path = segments.map(encodeURIComponent).join('/');
+  return fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucket)}/objects/${path}`,
+    {
+      headers: { authorization: 'Bearer ' + token },
+      redirect: 'error',
+      signal: AbortSignal.timeout(60000),
+    }
+  );
+}
