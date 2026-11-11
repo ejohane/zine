@@ -41,7 +41,7 @@ export function chooseLegacyLifecycle(rows: LegacyItem[]) {
       savedFirst ||
       explicitFirst ||
       pb.decisionAt.localeCompare(pa.decisionAt) ||
-      a.id.localeCompare(b.id)
+      b.id.localeCompare(a.id)
     );
   })[0];
 }

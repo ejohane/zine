@@ -107,12 +107,16 @@ export function filterSql(owner: string, filters: Filters) {
 function encode(value: unknown) {
   return btoa(JSON.stringify(value));
 }
-function decode(cursor: string, signature: string): { id: string; sort: string | number } {
+function decode(
+  cursor: string,
+  signature: string
+): { id: string; sort: string | number; tie?: string } {
   try {
     const value = JSON.parse(atob(cursor));
     if (
       value.signature !== signature ||
       typeof value.id !== 'string' ||
+      (value.tie !== undefined && typeof value.tie !== 'string') ||
       !['string', 'number'].includes(typeof value.sort)
     )
       throw new Error();
@@ -135,14 +139,24 @@ export async function listItems(
     filters.status === 'received'
       ? 'COALESCE(p.ingested_at,p.created_at)'
       : 'COALESCE(p.saved_at,p.created_at)';
+  const sourceOrder =
+    filters.status === 'received'
+      ? "json_extract(r.payload_json,'$.state')='INBOX' AND json_extract(r.payload_json,'$.ingested_at')=p.ingested_at"
+      : "json_extract(r.payload_json,'$.bookmarked_at')=p.saved_at";
+  const tie =
+    filters.status === 'dismissed'
+      ? 'p.id'
+      : `COALESCE((SELECT r.legacy_id FROM legacy_import_records r
+        WHERE r.owner_id=p.owner_id AND r.item_id=p.id AND r.section='items'
+          AND r.payload_json IS NOT NULL AND ${sourceOrder} ORDER BY r.legacy_id DESC LIMIT 1),p.id)`;
   if (cursor) {
     const after = decode(cursor, signature);
-    where.push(`(${ordering}<? OR (${ordering}=? AND p.id<?))`);
-    params.push(after.sort, after.sort, after.id);
+    where.push(`(${ordering},${tie},p.id)<(?,?,?)`);
+    params.push(after.sort, after.tie ?? after.id, after.id);
   }
-  const rows = await all<{ id: string; sort: string }>(
+  const rows = await all<{ id: string; sort: string; tie: string }>(
     env.DB,
-    `SELECT p.id,${ordering} AS sort FROM personal_items p JOIN content_items c ON c.id=p.content_id WHERE ${where.join(' AND ')} ORDER BY sort DESC,p.id DESC LIMIT ?`,
+    `SELECT p.id,${ordering} AS sort,${tie} AS tie FROM personal_items p JOIN content_items c ON c.id=p.content_id WHERE ${where.join(' AND ')} ORDER BY sort DESC,tie DESC,p.id DESC LIMIT ?`,
     ...params,
     limit + 1
   );
@@ -152,7 +166,9 @@ export async function listItems(
   return {
     items,
     nextCursor:
-      rows.length > limit && last ? encode({ signature, id: last.id, sort: last.sort }) : null,
+      rows.length > limit && last
+        ? encode({ signature, id: last.id, sort: last.sort, tie: last.tie })
+        : null,
   };
 }
 

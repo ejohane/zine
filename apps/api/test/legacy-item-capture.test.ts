@@ -131,6 +131,30 @@ describe('legacy item capture', () => {
         savedAt: later,
         progress: { position: 90 },
       });
+      const equalDateSource = item({
+        id: 'zz-later-source-id',
+        canonical_url: 'https://example.com/equal-date',
+        bookmarked_at: later,
+        updated_at: later,
+      });
+      await runtime.db.batch(
+        (await createLegacyItemsSql(owner, 0, [[equalDateSource]], 'migration-equal-date')).map(
+          (sql) => runtime.db.prepare(sql)
+        )
+      );
+      const tieWinner = await legacyIdentity(owner, equalDateSource);
+      const first = await listItems(env, owner, { status: 'saved', tagMatch: 'any' }, 1);
+      expect(first.items[0].id).toBe(tieWinner.itemId);
+      expect(first.nextCursor).toBeTruthy();
+      const second = await listItems(
+        env,
+        owner,
+        { status: 'saved', tagMatch: 'any' },
+        1,
+        first.nextCursor!
+      );
+      expect(second.items[0].id).toBe(identity.itemId);
+      await deleteItem(env, owner, tieWinner.itemId);
       await deleteItem(env, owner, identity.itemId);
       expect((await exportSection(env, owner, 'legacyImport', '', 10)).records).toHaveLength(2);
       await eraseAccountData(env, owner);
