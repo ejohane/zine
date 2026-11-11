@@ -60,3 +60,16 @@ describe('conservative late identity evidence', () => {
     ).toBe(false);
   });
 });
+
+it('recognizes X article URLs as one article identity separate from posts', () => {
+  const canonical = 'https://x.com/i/article/12345';
+  expect(identify('https://twitter.com/writer/article/12345?utm_source=share')).toEqual({
+    key: 'x:article:12345',
+    url: canonical,
+    platform: 'x',
+    kind: 'article',
+    externalId: '12345',
+  });
+  expect(identify(canonical).key).toBe('x:article:12345');
+  expect(identify('https://x.com/writer/status/12345').key).toBe('x:post:12345');
+});

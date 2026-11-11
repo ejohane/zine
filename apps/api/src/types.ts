@@ -47,6 +47,7 @@ export interface PersonalRow {
   status: 'received' | 'saved' | 'dismissed' | 'deleted';
   archived: number;
   created_at: string;
+  ingested_at: string | null;
   saved_at: string | null;
   updated_at: string;
   revision: number;

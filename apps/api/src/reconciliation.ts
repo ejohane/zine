@@ -314,6 +314,13 @@ export async function reconcileVerifiedIdentity(
     );
     if (suppressed) {
       statements.push(
+        stmt(
+          env.DB,
+          'UPDATE legacy_import_records SET item_id=?,payload_json=NULL,applied_json=NULL WHERE owner_id=? AND item_id=?',
+          targetId,
+          owner,
+          sourceItemId
+        ),
         ...[
           'context_entries',
           'annotations',
@@ -413,6 +420,22 @@ export async function reconcileVerifiedIdentity(
         );
       statements.push(
         stmt(env.DB, 'DELETE FROM progress WHERE item_id=?', sourceItemId),
+        stmt(
+          env.DB,
+          'UPDATE personal_items SET ingested_at=CASE WHEN ingested_at IS NULL OR ingested_at>? THEN ? ELSE ingested_at END WHERE id=? AND owner_id=? AND ? IS NOT NULL',
+          source.ingested_at,
+          source.ingested_at,
+          targetId,
+          owner,
+          source.ingested_at
+        ),
+        stmt(
+          env.DB,
+          'UPDATE legacy_import_records SET item_id=?,applied_json=NULL WHERE owner_id=? AND item_id=?',
+          targetId,
+          owner,
+          sourceItemId
+        ),
         stmt(
           env.DB,
           'UPDATE material_artifacts SET item_id=? WHERE owner_id=? AND item_id=?',
@@ -555,7 +578,7 @@ export async function reconcileVerifiedIdentity(
       ),
       stmt(
         env.DB,
-        "UPDATE personal_items SET status='deleted',archived=0,saved_at=NULL,content_type=NULL,updated_at=?,revision=revision+1,generation=generation+1 WHERE id=?",
+        "UPDATE personal_items SET status='deleted',archived=0,saved_at=NULL,ingested_at=NULL,content_type=NULL,updated_at=?,revision=revision+1,generation=generation+1 WHERE id=?",
         timestamp,
         sourceItemId
       ),

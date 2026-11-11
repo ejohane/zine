@@ -131,16 +131,18 @@ export async function listItems(
 ) {
   const { where, params } = filterSql(owner, filters);
   const signature = await digest(canonicalJson({ owner, filters }));
+  const ordering =
+    filters.status === 'received'
+      ? 'COALESCE(p.ingested_at,p.created_at)'
+      : 'COALESCE(p.saved_at,p.created_at)';
   if (cursor) {
     const after = decode(cursor, signature);
-    where.push(
-      '(COALESCE(p.saved_at,p.created_at)<? OR (COALESCE(p.saved_at,p.created_at)=? AND p.id<?))'
-    );
+    where.push(`(${ordering}<? OR (${ordering}=? AND p.id<?))`);
     params.push(after.sort, after.sort, after.id);
   }
   const rows = await all<{ id: string; sort: string }>(
     env.DB,
-    `SELECT p.id,COALESCE(p.saved_at,p.created_at) AS sort FROM personal_items p JOIN content_items c ON c.id=p.content_id WHERE ${where.join(' AND ')} ORDER BY sort DESC,p.id DESC LIMIT ?`,
+    `SELECT p.id,${ordering} AS sort FROM personal_items p JOIN content_items c ON c.id=p.content_id WHERE ${where.join(' AND ')} ORDER BY sort DESC,p.id DESC LIMIT ?`,
     ...params,
     limit + 1
   );

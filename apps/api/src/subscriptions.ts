@@ -40,6 +40,7 @@ export interface SubscriptionRow {
   last_error_code: string | null;
   created_at: string;
   updated_at: string;
+  intake_since_at?: string | null;
   feed_etag?: string | null;
   feed_last_modified?: string | null;
 }
@@ -638,6 +639,7 @@ export async function syncSubscription(
   if (!claimed.meta.changes) return { received: 0, status: 'busy_or_unsubscribed' };
   try {
     const subscription = await subscriptionOwned(env, owner, subscriptionId);
+    const intakeSince = subscription.intake_since_at ?? subscription.created_at;
     const revision = (subscription as SubscriptionRow & { revision: number }).revision;
     const route = await stmt(
       env.DB,
@@ -703,7 +705,7 @@ export async function syncSubscription(
     // Keep every original entry in a private snapshot, but process a bounded
     // slice so large feeds cannot exceed a Worker's D1 subrequest budget.
     const hasNewArrivals = cursor.pending.some(
-      (entry) => (entry.eventAt ?? entry.publishedAt ?? '') >= subscription.created_at
+      (entry) => (entry.eventAt ?? entry.publishedAt ?? '') >= intakeSince
     );
     const batchLimit = subscription.initialized || hasNewArrivals ? 20 : 500;
     const feed = { entries: cursor.pending.slice(0, batchLimit) };
@@ -726,7 +728,7 @@ export async function syncSubscription(
     // Keep every matching arrival since that boundary, plus one preceding item.
     const baseline = matches.filter((entry) => {
       const arrival = entry.eventAt ?? entry.publishedAt;
-      return !arrival || arrival < subscription.created_at;
+      return !arrival || arrival < intakeSince;
     });
     if (!subscription.initialized) {
       cursor.candidate = newestFirst([
@@ -738,13 +740,13 @@ export async function syncSubscription(
       const arrival = entry.eventAt ?? entry.publishedAt;
       const cutoff =
         entry.eventAt || !entry.publishedPrecision
-          ? subscription.created_at
+          ? intakeSince
           : entry.publishedPrecision === 'year'
-            ? `${subscription.created_at.slice(0, 4)}-01-01T00:00:00.000Z`
+            ? `${intakeSince.slice(0, 4)}-01-01T00:00:00.000Z`
             : entry.publishedPrecision === 'month'
-              ? `${subscription.created_at.slice(0, 7)}-01T00:00:00.000Z`
-              : `${subscription.created_at.slice(0, 10)}T00:00:00.000Z`;
-      if (!subscription.initialized && (!arrival || arrival < subscription.created_at)) continue;
+              ? `${intakeSince.slice(0, 7)}-01T00:00:00.000Z`
+              : `${intakeSince.slice(0, 10)}T00:00:00.000Z`;
+      if (!subscription.initialized && (!arrival || arrival < intakeSince)) continue;
       if (subscription.initialized && arrival && arrival < cutoff) continue;
       if (!(await stillActive())) return { received, status: 'settings_changed' };
       const result = await ingestEntry(env, subscription, entry);
