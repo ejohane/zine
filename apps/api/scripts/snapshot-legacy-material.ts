@@ -5,12 +5,10 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { verifyArticleBodyArtifactIntegrity } from '../../worker/src/article-body/artifact';
 import type { ArticleBodyArtifact } from '../../worker/src/article-body/types';
-import { accountId } from './cloudflare-control';
+import { cloudflareR2Object } from './cloudflare-control';
 
 const [directory, ...extra] = process.argv.slice(2);
 assert.ok(directory && !extra.length, 'Provide a completed private source snapshot directory');
-const token = process.env.CLOUDFLARE_API_TOKEN;
-assert.ok(token, 'Cloudflare credential missing');
 const expectedOwner = 'user_31ejjz59G6mTX1SIyErOi0fwu4A';
 const manifest = JSON.parse(await readFile(resolve(directory, 'manifest.json'), 'utf8')) as {
   owner: string;
@@ -73,21 +71,8 @@ for (let offset = 0; offset < references.length; offset += 8) {
   results.push(
     ...(await Promise.all(
       references.slice(offset, offset + 8).map(async (reference) => {
-        const parts = reference.key.split('/');
-        assert.ok(
-          parts.every((part) => part && part !== '.' && part !== '..'),
-          'Unexpected R2 key format'
-        );
         assert.match(reference.id, /^[0-9A-HJKMNP-TV-Z]{26}$/i);
-        const key = parts.map(encodeURIComponent).join('/');
-        const response = await fetch(
-          `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/zine-article-content-prod/objects/${key}`,
-          {
-            headers: { authorization: 'Bearer ' + token },
-            redirect: 'error',
-            signal: AbortSignal.timeout(30000),
-          }
-        );
+        const response = await cloudflareR2Object('zine-article-content-prod', reference.key);
         const metadata = {
           id: reference.id,
           itemId: reference.itemId,

@@ -3,7 +3,7 @@ import { quietCommand } from './quiet-command';
 import { archiveBackup } from './backup-storage';
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { cloudflare, environments } from './cloudflare-control';
+import { cloudflare, cloudflareR2Object, environments } from './cloudflare-control';
 const environment = process.argv[2];
 assert.ok(
   environment === 'production' || environment === 'staging',
@@ -105,16 +105,15 @@ for (const { name } of tables) {
   ]);
   counts[name] = Number(output.trim());
 }
-const keys = JSON.parse(
-  await quietCommand('sqlite3', [
-    '-json',
-    directory + '/database.sqlite',
-    `SELECT artifact_key FROM contributions WHERE artifact_key IS NOT NULL
+const keyRows = await quietCommand('sqlite3', [
+  '-json',
+  directory + '/database.sqlite',
+  `SELECT artifact_key FROM contributions WHERE artifact_key IS NOT NULL
  UNION SELECT state_key AS artifact_key FROM understanding_runs WHERE state_key IS NOT NULL AND status='processing'
  UNION SELECT json_extract(cursor_json,'$.stateKey') AS artifact_key FROM subscriptions WHERE json_extract(cursor_json,'$.stateKey') IS NOT NULL
  UNION SELECT json_extract(payload_json,'$.feedEntryArtifactKey') AS artifact_key FROM jobs WHERE status IN ('pending','running','failed') AND COALESCE(json_extract(payload_json,'$.feedMetadataApplied'),0)=0 AND json_extract(payload_json,'$.feedEntryArtifactKey') IS NOT NULL`,
-  ])
-) as { artifact_key: string }[];
+]);
+const keys = JSON.parse(keyRows.trim() || '[]') as { artifact_key: string }[];
 await mkdir(directory + '/objects', { mode: 0o700, recursive: true });
 const artifacts: { key: string; file: string; bytes: number; sha256: string }[] = [];
 let next = 0;
@@ -123,26 +122,26 @@ await Promise.all(
     while (next < keys.length) {
       const { artifact_key: key } = keys[next++];
       const file = 'objects/' + createHash('sha256').update(key).digest('hex');
+      let bytes: Uint8Array;
       for (let retry = 0; ; retry++) {
         try {
-          await quietCommand('bunx', [
-            'wrangler@4.158.0',
-            'r2',
-            'object',
-            'get',
-            target.bucket + '/' + key,
-            '--remote',
-            '--file',
-            directory + '/' + file,
-          ]);
+          const response = await cloudflareR2Object(target.bucket, key);
+          if (response.status === 404) throw new Error('Referenced backup artifact not_found');
+          if (response.status === 429 && retry < 4) {
+            const seconds = Number(response.headers.get('retry-after')) || 30;
+            await new Promise((resolve) => setTimeout(resolve, Math.min(seconds, 60) * 1000));
+            continue;
+          }
+          if (response.status !== 200) throw new Error('Backup artifact HTTP ' + response.status);
+          bytes = new Uint8Array(await response.arrayBuffer());
           break;
         } catch (error) {
-          if (retry >= 2 || String(error).includes('not_found')) throw error;
+          if (retry >= 4 || String(error).includes('not_found')) throw error;
           await new Promise((resolve) => setTimeout(resolve, 1000 * (retry + 1)));
         }
       }
+      await writeFile(directory + '/' + file, bytes, { mode: 0o600 });
       await chmod(directory + '/' + file, 0o600);
-      const bytes = await readFile(directory + '/' + file);
       artifacts.push({
         key,
         file,
