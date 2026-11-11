@@ -117,29 +117,34 @@ await quietCommand('bunx', [
   'RELEASE_SHA:' + sha,
 ]);
 let health: { deploymentId: string; releaseSha?: string; status: string } | undefined;
-for (let attempt = 0; attempt < 30; attempt++) {
+let activeVersionConfirmed = false;
+// The serving edge and the deployment control plane can converge at different
+// times. Verify both views in the same bounded observation loop.
+for (let attempt = 0; attempt < 60; attempt++) {
   const response = await fetch(target.origin + '/health', {
     signal: AbortSignal.timeout(15000),
     redirect: 'error',
   });
   if (response.ok) {
     health = (await response.json()) as typeof health;
-    if (health?.releaseSha === sha) break;
+    if (health?.releaseSha === sha && health.status === 'ok') {
+      const deployments = await cloudflare<{
+        deployments: { versions: { version_id: string; percentage: number }[] }[];
+      }>('workers/scripts/' + target.worker + '/deployments');
+      const active = deployments.deployments[0]?.versions ?? [];
+      activeVersionConfirmed = active.some(
+        (version) => version.version_id === health?.deploymentId && version.percentage === 100
+      );
+      if (activeVersionConfirmed) break;
+    }
   }
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+  if (attempt < 59) await new Promise((resolve) => setTimeout(resolve, 1000));
 }
 assert.ok(
   health?.releaseSha === sha && health.status === 'ok',
   'Serving release identity did not converge'
 );
-const deployments = await cloudflare<{
-  deployments: { versions: { version_id: string; percentage: number }[] }[];
-}>('workers/scripts/' + target.worker + '/deployments');
-assert.ok(
-  deployments.deployments[0].versions.some(
-    (v) => v.version_id === health.deploymentId && v.percentage === 100
-  )
-);
+assert.ok(activeVersionConfirmed, 'Deployment listing did not confirm the serving version at 100%');
 const bindings = await cloudflare<{
   bindings: {
     type: string;
