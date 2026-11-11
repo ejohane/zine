@@ -185,3 +185,58 @@ backfill, and verify the returned artwork and rendered Next cards. The backfill
 command defaults to read-only. Use `--apply 5` for the first batch and check the
 returned artwork before proceeding with a larger batch. It accepts a private JSON export of
 `{url, imageUrl}` records. Keep the export out of source control.
+
+## Legacy library migration in progress
+
+On November 11, 2026, an owner-scoped production inventory showed why the
+earlier 444-bookmark import was incomplete. The legacy bookmark endpoint hides
+finished records by default. The first fresh D1 inventory found 1,385 saved
+records, 2,828 inbox records and 998 archived records. A subsequent live
+snapshot captured 5,215 item rows, with exact original timestamps. It also
+captured 552 versioned article references, 3,668 consumption events, 27 tags,
+two smart collections, 74 YouTube/Spotify subscriptions, 18 RSS feeds and 74
+newsletter feeds. Provider connection secrets, tokens and mailbox credentials
+were excluded. The source remains live, so snapshots are bounded observations.
+
+Verified production changes to the historical import:
+
+- The [private recovery workflow](https://github.com/ejohane/zine/actions/runs/43063631293)
+  archived and hash-verified 504 Next item rows and 303 retained objects before
+  writes.
+- 443 mapped saves now have their exact legacy save timestamps. One newer
+  Next save decision was preserved. Both D1 and real Clerk REST readback
+  matched the dates and order. The REST pass observed 444 unique import
+  references across five pages. The repeat dry run proposed zero writes.
+- 27 missing progress rows were added without replacing any Next progress.
+  D1 and authenticated REST matched all projected positions, units, completion
+  dates and update dates. The repeat dry run proposed zero writes.
+
+- All 801 referenced legacy R2 objects were retrieved privately, including 513
+  current versioned bodies. The versioned objects passed their original
+  content-hash verification. Three retained articles were imported into the
+  existing Next library with provenance. A separate authenticated readback
+  located all three contributions by source digest.
+
+The isolated migration worktree contains the capture, catch-up, organization,
+subscription and material commands. Its capture plan found 5,202 canonical
+groups and retained 13 duplicate route records separately. The previously
+unsupported X Article now has a local identity and capture path. Existing
+tags on the 444 historical items were checked independently. All 35
+assignments present in the source snapshot matched Next. The two smart
+collections have 287 and 10 effective members. Their rules and override
+records remain distinct from the native Next membership snapshot.
+
+The next production step is to release migration 24 and exercise a bounded
+capture with authenticated readback. Then apply the fresh owner capture plan,
+project organization and eligible public routes, archive source histories,
+and carry over the remaining retained material. Next can poll public
+YouTube, Spotify and RSS routes. The eight active Gmail newsletter
+definitions require a connector and fresh mailbox consent. The legacy Home
+and X Following editorial archives belong to their existing workflows.
+Legacy credentials, token hashes and mailbox identifiers stay on the source.
+
+Private manifests and proof live under `apps/api/.local-data/legacy-migration/`
+in the isolated worktree. Keep private rows, payloads and mappings out of
+source control. Default worker test execution hit macOS loopback exhaustion.
+The same 107 Worker CI suites passed under Node 22 using isolated
+single-runtime processes.

@@ -156,6 +156,19 @@ export function identify(input: string): Identity {
     };
   }
   if (['x.com', 'twitter.com', 'mobile.twitter.com'].includes(host)) {
+    if (
+      parts.length === 3 &&
+      /^[A-Za-z0-9_]{1,15}$/.test(parts[0]) &&
+      parts[1] === 'article' &&
+      /^\d+$/.test(parts[2])
+    )
+      return {
+        key: `x:article:${parts[2]}`,
+        url: `https://x.com/i/article/${parts[2]}`,
+        platform: 'x',
+        kind: 'article',
+        externalId: parts[2],
+      };
     const status = parts.indexOf('status');
     if (status >= 0 && /^\d+$/.test(parts[status + 1] ?? ''))
       return {

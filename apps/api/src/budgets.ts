@@ -10,6 +10,7 @@ export function budgetScope(url: string) {
       : identity.kind === 'video'
         ? 'provider:youtube:watch'
         : 'provider:youtube:channel';
+  if (identity.platform === 'x' && identity.kind === 'article') return 'host:x.com';
   return ['spotify', 'x'].includes(identity.platform)
     ? `provider:${identity.platform}`
     : `host:${new URL(identity.url).hostname}`;

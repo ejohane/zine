@@ -7,6 +7,8 @@ import type { AppEnv, Env } from './types';
 // Explicit export projections exclude access-token hashes and encrypted grants.
 // Cursors enumerate a live library, not an implicit point-in-time snapshot.
 const sections: Record<string, string> = {
+  legacyImport:
+    "SELECT section,legacy_id,item_id,payload_json,section||':'||legacy_id AS exportKey FROM legacy_import_records WHERE owner_id=? AND payload_json IS NOT NULL",
   items:
     'SELECT p.*,p.id AS exportKey,c.canonical_url,c.platform,c.kind FROM personal_items p JOIN content_items c ON c.id=p.content_id WHERE p.owner_id=?',
   occurrences: 'SELECT o.*,o.id AS exportKey FROM save_occurrences o WHERE o.owner_id=?',
@@ -28,7 +30,7 @@ const sections: Record<string, string> = {
   routes:
     'SELECT d.*,d.id AS exportKey FROM source_routes d JOIN sources s ON s.id=d.source_id WHERE s.owner_id=?',
   subscriptions:
-    'SELECT id,source_id,route_id,auto_save,filters_json,status,initialized,next_poll_at,last_success_at,last_error_code,created_at,updated_at,id AS exportKey FROM subscriptions WHERE owner_id=?',
+    'SELECT id,source_id,route_id,auto_save,filters_json,status,initialized,next_poll_at,last_success_at,last_error_code,created_at,updated_at,intake_since_at,id AS exportKey FROM subscriptions WHERE owner_id=?',
   subscriptionSeen:
     "SELECT d.*,d.subscription_id||':'||d.entry_key AS exportKey FROM subscription_seen d JOIN subscriptions s ON s.id=d.subscription_id WHERE s.owner_id=?",
   enrichment: 'SELECT d.*,d.id AS exportKey FROM contributions d WHERE d.owner_id=?',
@@ -152,6 +154,7 @@ export async function eraseAccountData(env: Env, owner: string) {
       'webhooks',
       'operational_alerts',
       'api_tokens',
+      'legacy_import_records',
       'item_relationships',
       'item_aliases',
       'reconciliation_events',
@@ -196,6 +199,7 @@ portabilityRoutes.get('/export', (c) =>
     consistency: 'live',
     sections: Object.keys(sections).filter((section) => {
       const scopes = c.get('principal').scopes;
+      if (section === 'legacyImport') return scopes === undefined;
       const required = requiredScope('GET', '/v1/export/' + section);
       return (
         scopes === undefined ||
@@ -208,12 +212,19 @@ portabilityRoutes.get('/export', (c) =>
   })
 );
 portabilityRoutes.get('/export/:section', async (c) => {
+  const section = c.req.param('section');
+  if (section === 'legacyImport' && c.get('principal').scopes !== undefined)
+    throw new ApiError(
+      403,
+      'interactive_login_required',
+      'Export legacy records through interactive sign-in'
+    );
   const limit = z.coerce.number().int().min(1).max(10).default(10).parse(c.req.query('limit'));
   return c.json(
     await exportSection(
       c.env,
       c.get('principal').userId,
-      c.req.param('section'),
+      section,
       c.req.query('cursor') ?? '',
       limit
     )

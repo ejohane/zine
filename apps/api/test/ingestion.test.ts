@@ -251,6 +251,42 @@ describe('automatic arrival and durable jobs', () => {
     );
   });
 
+  it('retains the original subscription date while polling only past the migration boundary', async () => {
+    const sub = await subscription(false);
+    const createdAt = '2025-01-01T00:00:00.000Z';
+    const intakeSince = '2026-01-01T00:00:00.000Z';
+    await stmt(
+      env.DB,
+      'UPDATE subscriptions SET created_at=?,intake_since_at=?,initialized=1 WHERE id=?',
+      createdAt,
+      intakeSince,
+      sub.id
+    ).run();
+    const original = { ...entry(), publishedAt: '2025-12-01T00:00:00.000Z' };
+    const arrival = { ...entry(), publishedAt: '2026-01-02T00:00:00.000Z' };
+    const load: Parameters<typeof syncSubscription>[3] = async () => ({
+      title: 'source',
+      url: 'https://example.com/feed',
+      entries: [arrival, original],
+      newestFirst: true,
+    });
+    expect(await syncSubscription(env, sub.id, owner, load)).toMatchObject({ received: 1 });
+    expect(
+      await stmt(env.DB, 'SELECT created_at FROM subscriptions WHERE id=?', sub.id).first(
+        'created_at'
+      )
+    ).toBe(createdAt);
+    expect(
+      (
+        await stmt(
+          env.DB,
+          'SELECT c.canonical_url FROM personal_items p JOIN content_items c ON c.id=p.content_id WHERE p.owner_id=?',
+          owner
+        ).all()
+      ).results
+    ).toEqual([{ canonical_url: arrival.url }]);
+  });
+
   it('bounds arrivals from a delayed initial poll and resumes without losing the preceding baseline', async () => {
     const sub = await subscription(false);
     const cutoff = new Date(Date.now() - 3600000).toISOString();

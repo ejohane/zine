@@ -39,6 +39,7 @@ const item = z.object({
   archived: z.boolean(),
   createdAt: z.string(),
   savedAt: nullableString,
+  ingestedAt: nullableString,
   updatedAt: z.string(),
   revision: z.number().int(),
   content: z

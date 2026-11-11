@@ -103,6 +103,7 @@ const articleSchema = z
 export const fieldValueSchemas: Partial<Record<ContributionInput['field'], z.ZodType>> = {
   type: z.enum([
     'unknown',
+    'book',
     'article',
     'newsletter_issue',
     'post',

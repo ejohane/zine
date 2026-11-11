@@ -67,7 +67,7 @@ const postParams = {
 const postText = (post: Post) => post.note_tweet?.text ?? post.text;
 export async function extractX(env: Env, url: string): Promise<Extraction> {
   const identity = identify(url);
-  if (identity.kind === 'video') return extractWeb(identity.url);
+  if (identity.kind === 'video' || identity.kind === 'article') return extractWeb(identity.url);
   const provenance = { sourceUrl: identity.url, method: 'x-api', inputContributionIds: [] };
   const contributions: ContributionInput[] = [];
   const add = (field: ContributionInput['field'], value: unknown) => {

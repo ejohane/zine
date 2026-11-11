@@ -354,6 +354,7 @@ async function getCanonicalItem(env: Env, owner: string, itemId: string, include
     status: personal.status,
     archived: !!personal.archived,
     createdAt: personal.created_at,
+    ingestedAt: personal.ingested_at,
     savedAt: personal.saved_at,
     updatedAt: personal.updated_at,
     revision: personal.revision,
@@ -475,6 +476,12 @@ async function deleteCanonicalItem(env: Env, owner: string, itemId: string) {
     const statements = [
       stmt(
         env.DB,
+        'UPDATE legacy_import_records SET payload_json=NULL,applied_json=NULL WHERE owner_id=? AND item_id=?',
+        owner,
+        itemId
+      ),
+      stmt(
+        env.DB,
         'DELETE FROM item_relationships WHERE owner_id=? AND (source_item_id=? OR target_content_id=?)',
         owner,
         itemId,
@@ -553,7 +560,7 @@ async function deleteCanonicalItem(env: Env, owner: string, itemId: string) {
       ),
       stmt(
         env.DB,
-        "UPDATE personal_items SET status='deleted',archived=0,saved_at=NULL,content_type=NULL,updated_at=?,decision_at=?,decision_origin='explicit',revision=revision+1 WHERE id=?",
+        "UPDATE personal_items SET status='deleted',archived=0,saved_at=NULL,ingested_at=NULL,content_type=NULL,updated_at=?,decision_at=?,decision_origin='explicit',revision=revision+1 WHERE id=?",
         timestamp,
         timestamp,
         itemId
