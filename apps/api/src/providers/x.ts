@@ -1,4 +1,4 @@
-import { identify } from '../identity';
+import { creatorImageReference, identify } from '../identity';
 import { providerJson, ProviderError } from '../remote';
 import { extractWeb } from './web';
 import type { Env } from '../types';
@@ -88,6 +88,7 @@ export async function extractX(env: Env, url: string): Promise<Extraction> {
     add('creator', result.data.name);
     add('description', result.data.description);
     add('thumbnail', result.data.profile_image_url);
+    add('creatorImageUrl', creatorImageReference(result.data.profile_image_url));
     add('source', {
       id: result.data.id,
       name: result.data.name,
@@ -174,6 +175,7 @@ export async function extractX(env: Env, url: string): Promise<Extraction> {
   add('title', text.slice(0, 200));
   add('description', text);
   if (author) {
+    add('creatorImageUrl', creatorImageReference(author.profile_image_url));
     add('creator', { name: author.name, url: `https://x.com/${author.username}`, id: author.id });
     add('source', {
       id: author.id,
@@ -248,16 +250,22 @@ export async function xSourcePage(env: Env, url: string, cursor?: string, extern
     max_results: '100',
     ...(cursor ? { pagination_token: cursor } : {}),
   });
-  const entries: FeedEntry[] = (Array.isArray(response.data) ? response.data : []).map((post) => ({
-    id: `x:post:${post.id}`,
-    url: `https://x.com/i/status/${post.id}`,
-    title: postText(post).slice(0, 200),
-    text: postText(post),
-    publishedAt: post.created_at,
-    kind: post.attachments?.media_keys?.length ? 'post' : 'post',
-    enclosures: [],
-    transcripts: [],
-  }));
+  const users = new Map((response.includes?.users ?? []).map((user) => [user.id, user]));
+  const entries: FeedEntry[] = (Array.isArray(response.data) ? response.data : []).map((post) => {
+    const author = post.author_id ? users.get(post.author_id) : undefined;
+    return {
+      id: `x:post:${post.id}`,
+      url: `https://x.com/i/status/${post.id}`,
+      title: postText(post).slice(0, 200),
+      text: postText(post),
+      publishedAt: post.created_at,
+      creator: author?.name,
+      creatorImageUrl: creatorImageReference(author?.profile_image_url),
+      kind: 'post',
+      enclosures: [],
+      transcripts: [],
+    };
+  });
   return {
     title: source.name,
     url: source.url,

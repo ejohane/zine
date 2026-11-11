@@ -1,4 +1,4 @@
-import { identify } from '../identity';
+import { creatorImageReference, identify } from '../identity';
 import { providerJson, ProviderError } from '../remote';
 import type { Env } from '../types';
 import type { FeedEntry } from './feed';
@@ -109,6 +109,7 @@ function member(item: SpotifyItem): FeedEntry {
     title: item.name,
     description: item.description,
     creator: item.artists?.map((a) => a.name).join(', ') || item.publisher,
+    creatorImageUrl: creatorImageReference(item.show?.images?.[0]?.url),
     publishedAt: releaseDate(item),
     ...(['day', 'month', 'year'].includes(item.release_date_precision ?? '')
       ? { publishedPrecision: item.release_date_precision as 'day' | 'month' | 'year' }
@@ -147,6 +148,8 @@ export async function extractSpotify(env: Env, url: string): Promise<Extraction>
   add('title', item.name);
   add('description', item.description);
   add('thumbnail', item.images?.[0]?.url ?? item.album?.images?.[0]?.url);
+  const show = item.type === 'show' ? item : item.show;
+  add('creatorImageUrl', creatorImageReference(show?.images?.[0]?.url));
   add(
     'creator',
     item.artists?.map((artist) => artist.name).join(', ') ||

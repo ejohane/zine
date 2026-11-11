@@ -43,6 +43,7 @@ function feedContributions(entry: FeedEntry, sourceUrl = entry.url): Contributio
     ['publishedAt', entry.publishedAt],
     ['durationSeconds', entry.durationSeconds],
     ['thumbnail', entry.thumbnail],
+    ['creatorImageUrl', entry.creatorImageUrl],
     ['links', entry.enclosures],
     ['structuredData', { feedEntry: entry }],
   ];

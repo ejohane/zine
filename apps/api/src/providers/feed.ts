@@ -1,6 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
 import { parseHTML } from 'linkedom';
-import { publicUrl } from '../identity';
+import { creatorImageReference, publicUrl } from '../identity';
 import { ProviderError } from '../remote';
 
 export interface FeedEntry {
@@ -17,6 +17,7 @@ export interface FeedEntry {
   kind: string;
   durationSeconds?: number;
   thumbnail?: string;
+  creatorImageUrl?: string;
   enclosures: { url: string; type?: string }[];
   transcripts: { url: string; type?: string; language?: string }[];
 }
@@ -119,6 +120,8 @@ export function parseFeed(body: string, url: string): Feed {
   throw new ProviderError('unsupported_feed', false);
 }
 function rssFeed(channel: Obj, url: string): Feed {
+  const feedImage =
+    mediaMetadata(channel, url).thumbnail ?? absolute(text(object(channel.image).url), url);
   const entries = array(channel.item)
     .map((value): FeedEntry => {
       const item = object(value);
@@ -156,10 +159,8 @@ function rssFeed(channel: Obj, url: string): Feed {
           ? 'video'
           : enclosureKind([...enclosures, ...media.enclosures].map((e) => e.type)),
         durationSeconds: duration(item['itunes:duration']) ?? media.durationSeconds,
-        thumbnail:
-          media.thumbnail ??
-          mediaMetadata(channel, url).thumbnail ??
-          absolute(text(object(channel.image).url), url),
+        thumbnail: media.thumbnail ?? feedImage,
+        creatorImageUrl: creatorImageReference(feedImage),
         enclosures: uniqueEnclosures([...enclosures, ...media.enclosures]),
         transcripts,
       };
@@ -212,6 +213,7 @@ function atomFeed(feed: Obj, url: string): Feed {
           ? 'video'
           : enclosureKind([...enclosures, ...media.enclosures].map((e) => e.type)),
         thumbnail: media.thumbnail ?? mediaMetadata(feed, url).thumbnail,
+        creatorImageUrl: creatorImageReference(absolute(text(feed.icon) || text(feed.logo), url)),
         durationSeconds: media.durationSeconds,
         enclosures: uniqueEnclosures([...enclosures, ...media.enclosures]),
         transcripts: [],
@@ -253,6 +255,9 @@ function jsonFeed(value: unknown, url: string): Feed {
         title: text(item.title) || 'Untitled',
         description: text(item.summary) || undefined,
         thumbnail: absolute(text(item.image) || text(item.banner_image) || text(feed.icon), url),
+        creatorImageUrl: creatorImageReference(
+          absolute(text(author.avatar) || text(feed.icon) || text(feed.favicon), url)
+        ),
         text: text(item.content_text) || clean(text(item.content_html)),
         html: text(item.content_html) || undefined,
         creator: text(author.name) || undefined,

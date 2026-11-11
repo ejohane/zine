@@ -1,5 +1,5 @@
 import { googleToken } from '../connections';
-import { identify } from '../identity';
+import { creatorImageReference, identify } from '../identity';
 import { ProviderError, providerJson } from '../remote';
 import type { Env } from '../types';
 import type { ContributionInput } from '../enrichment';
@@ -150,10 +150,11 @@ export async function youtubeApiExtraction(
   add('language', snippet.defaultAudioLanguage ?? snippet.defaultLanguage);
   add('topics', snippet.tags);
   const thumbnails = object(snippet.thumbnails);
-  add(
-    'thumbnail',
-    object(thumbnails.maxres ?? thumbnails.high ?? thumbnails.medium ?? thumbnails.default).url
-  );
+  const thumbnail = object(
+    thumbnails.maxres ?? thumbnails.high ?? thumbnails.medium ?? thumbnails.default
+  ).url;
+  add('thumbnail', thumbnail);
+  if (identity.kind === 'channel') add('creatorImageUrl', creatorImageReference(thumbnail));
   add('durationSeconds', isoDuration(text(details.duration)));
   add('structuredData', item);
   const channelId = identity.kind === 'channel' ? text(item.id) : text(snippet.channelId);

@@ -264,6 +264,23 @@ describe('independent Worker + D1 + R2 foundation', () => {
       body: { field: 'transcript', value: transcript, provenance: { method: 'agent' } },
     });
     expect(contribution.status).toBe(201);
+    const creatorImageUrl = 'https://example.com/publisher.jpg';
+    const thumbnail = 'https://example.com/article.jpg';
+    for (const [field, value] of [
+      ['creatorImageUrl', creatorImageUrl],
+      ['thumbnail', thumbnail],
+    ]) {
+      expect(
+        (
+          await request(`/v1/items/${a.body.item.id}/enrichment`, {
+            method: 'POST',
+            body: { field, value, provenance: { method: 'agent' } },
+          })
+        ).status
+      ).toBe(201);
+    }
+    const ownItem = await request(`/v1/items/${a.body.item.id}`);
+    expect(ownItem.body.content).toMatchObject({ creatorImageUrl, thumbnail });
     const own = await request(`/v1/items/${a.body.item.id}/transcript`);
     expect(own.status).toBe(200);
     expect(own.body.value).toEqual(transcript);
@@ -271,6 +288,8 @@ describe('independent Worker + D1 + R2 foundation', () => {
     const b = await request('/v1/saves', { method: 'POST', token: otherToken, body: { url } });
     expect(b.body.item.contentId).toBe(a.body.item.contentId);
     expect(b.body.item.id).not.toBe(a.body.item.id);
+    const otherItem = await request(`/v1/items/${b.body.item.id}`, { token: otherToken });
+    expect(otherItem.body.content).not.toHaveProperty('creatorImageUrl');
     expect((await request(`/v1/items/${a.body.item.id}`, { token: otherToken })).status).toBe(404);
     expect(
       (await request(`/v1/items/${b.body.item.id}/transcript`, { token: otherToken })).status
