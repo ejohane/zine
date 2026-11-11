@@ -48,6 +48,7 @@ const item = z.object({
       platform: z.string(),
       type: z.string(),
       title: z.string().optional(),
+      creatorImageUrl: z.url().optional(),
       description: z.string().optional(),
       summary: z.string().optional(),
       durationSeconds: z.number().optional(),

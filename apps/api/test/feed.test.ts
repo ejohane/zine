@@ -5,7 +5,7 @@ import { identify } from '../src/identity';
 describe('feed and source identity contracts', () => {
   it('retains RSS podcast enclosures, transcript references and rich text', () => {
     const feed = parseFeed(
-      `<?xml version="1.0"?><rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"><channel><title>Example</title><link>https://example.com/</link><item><guid isPermaLink="false">episode-1</guid><title>Episode &amp; discussion</title><link>https://example.com/episode</link><description><![CDATA[<p>Actual <b>discussion</b></p><script>bad()</script>]]></description><pubDate>Fri, 06 Nov 2026 10:00:00 GMT</pubDate><enclosure url="https://example.com/episode.mp3" type="audio/mpeg"/><itunes:duration>1:02:03</itunes:duration><podcast:transcript url="https://example.com/transcript.vtt" type="text/vtt" language="en"/></item></channel></rss>`,
+      `<?xml version="1.0"?><rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"><channel><title>Example</title><link>https://example.com/</link><itunes:image href="https://example.com/show.jpg"/><item><itunes:image href="https://example.com/episode.jpg"/><guid isPermaLink="false">episode-1</guid><title>Episode &amp; discussion</title><link>https://example.com/episode</link><description><![CDATA[<p>Actual <b>discussion</b></p><script>bad()</script>]]></description><pubDate>Fri, 06 Nov 2026 10:00:00 GMT</pubDate><enclosure url="https://example.com/episode.mp3" type="audio/mpeg"/><itunes:duration>1:02:03</itunes:duration><podcast:transcript url="https://example.com/transcript.vtt" type="text/vtt" language="en"/></item></channel></rss>`,
       'https://example.com/feed'
     );
     expect(feed.entries).toHaveLength(1);
@@ -13,6 +13,8 @@ describe('feed and source identity contracts', () => {
       id: 'episode-1',
       title: 'Episode & discussion',
       kind: 'podcast_episode',
+      creatorImageUrl: 'https://example.com/show.jpg',
+      thumbnail: 'https://example.com/episode.jpg',
       durationSeconds: 3723,
       text: 'Actual discussion',
       publishedAt: '2026-11-06T10:00:00.000Z',

@@ -3,7 +3,7 @@ import { parsePublishedTranscript } from './transcript';
 import { parseHTML } from 'linkedom';
 import { acquireBudget, budgetScope, releaseBudget } from '../budgets';
 import { id } from '../lib';
-import { identify } from '../identity';
+import { creatorImageReference, identify } from '../identity';
 import { fetchPublic, ProviderError } from '../remote';
 import type { Env } from '../types';
 import type { ContributionInput } from '../enrichment';
@@ -253,6 +253,18 @@ export async function extractYouTube(env: Env, url: string, owner?: string): Pro
         : '') ||
       document.querySelector('meta[itemprop="channelId"]')?.getAttribute('content') ||
       '';
+    const videoOwner = findObject(initial, 'videoOwnerRenderer');
+    const ownerChannelId = str(obj(obj(videoOwner?.navigationEndpoint).browseEndpoint).browseId);
+    const channelAvatar =
+      identity.kind === 'channel'
+        ? channel?.avatar
+        : ownerChannelId && ownerChannelId === channelId
+          ? videoOwner?.thumbnail
+          : undefined;
+    add(
+      'creatorImageUrl',
+      creatorImageReference(obj(arr(obj(channelAvatar).thumbnails).at(-1)).url)
+    );
     if (channelId)
       add('source', {
         id: channelId,
@@ -343,7 +355,12 @@ export async function extractYouTube(env: Env, url: string, owner?: string): Pro
       contributions: apiExtraction
         ? [
             ...apiExtraction.contributions,
-            ...contributions.filter((value) => value.field === 'transcript'),
+            ...contributions.filter(
+              (value) =>
+                value.field === 'transcript' ||
+                (value.field === 'creatorImageUrl' &&
+                  !apiExtraction?.contributions.some((entry) => entry.field === 'creatorImageUrl'))
+            ),
           ]
         : contributions,
       components: apiExtraction

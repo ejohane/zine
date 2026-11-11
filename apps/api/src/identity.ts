@@ -1,6 +1,16 @@
 import { ApiError, canonicalItemId, ownedItem, stableId, stmt } from './lib';
 import type { Env } from './types';
 
+export function creatorImageReference(value: unknown): string | undefined {
+  if (typeof value !== 'string' || value.length > 8192) return undefined;
+  try {
+    const url = publicUrl(value);
+    return url.protocol === 'https:' ? url.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function publicUrl(input: string): URL {
   let url: URL;
   try {

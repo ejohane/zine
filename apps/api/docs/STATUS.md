@@ -170,3 +170,18 @@ access are deferred. Goal-control cleanup is an administrative TODO. GitHub moni
 and daily backup workflows are active; their executable paths were observed via
 manual dispatch. Natural GitHub scheduled-trigger execution is not claimed by
 those receipts. Continue observing normal scheduled runs through routine operations.
+
+## Creator artwork rollout pending
+
+Item responses now have an optional `content.creatorImageUrl` independent of
+`content.thumbnail`. Provider ingestion can supply publisher, show, or channel
+artwork. The Next web cards prefer the new field and retain their initials
+fallback.
+
+The owner-scoped legacy artwork dry run matched 425 of 455 production saves
+without ambiguous matches or writes. The live contract still lacks the field.
+After the reviewed API release, rerun the dry run, apply the owner-scoped
+backfill, and verify the returned artwork and rendered Next cards. The backfill
+command defaults to read-only. Use `--apply 5` for the first batch and check the
+returned artwork before proceeding with a larger batch. It accepts a private JSON export of
+`{url, imageUrl}` records. Keep the export out of source control.

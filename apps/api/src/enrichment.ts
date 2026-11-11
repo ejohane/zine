@@ -12,7 +12,7 @@ import {
   parseBody,
   stmt,
 } from './lib';
-import { publicUrl } from './identity';
+import { creatorImageReference, publicUrl } from './identity';
 import { reserveArtifactUsage } from './usage';
 import { visibleContributions } from './items';
 import type { AppEnv, Env, Principal } from './types';
@@ -21,6 +21,7 @@ export const fields = [
   'type',
   'title',
   'creator',
+  'creatorImageUrl',
   'description',
   'thumbnail',
   'publishedAt',
@@ -132,6 +133,7 @@ export const fieldValueSchemas: Partial<Record<ContributionInput['field'], z.Zod
       .strict(),
   ]),
   description: z.string().max(100000),
+  creatorImageUrl: z.string().refine((value) => !!creatorImageReference(value)),
   thumbnail: z.string().url().max(8192),
   publishedAt: z.iso.datetime({ offset: true }),
   durationSeconds: z.number().nonnegative().finite(),
@@ -152,7 +154,7 @@ export function searchableSegments(
   field: string,
   value: unknown
 ): { text: string; anchor?: unknown }[] {
-  if (field === 'structuredData') return [];
+  if (field === 'structuredData' || field === 'creatorImageUrl') return [];
   if (
     field === 'thread' &&
     value &&
