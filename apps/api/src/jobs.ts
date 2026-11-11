@@ -678,7 +678,20 @@ async function maintenance(env: Env) {
   // Retain unreferenced checkpoints for one hour to cover in-flight R2 writes.
   const snapshots = await all<{ artifact_key: string }>(
     env.DB,
-    `SELECT p.artifact_key FROM subscription_snapshots p LEFT JOIN subscriptions s ON s.id=p.subscription_id WHERE p.created_at<? AND (s.cursor_json IS NULL OR json_extract(s.cursor_json,'$.stateKey')!=p.artifact_key) AND NOT EXISTS(SELECT 1 FROM jobs j JOIN personal_items i ON i.id=j.item_id WHERE j.owner_id=i.owner_id AND i.status!='deleted' AND i.generation=json_extract(j.payload_json,'$.generation') AND j.status IN ('pending','running','failed') AND COALESCE(json_extract(j.payload_json,'$.feedMetadataApplied'),0)=0 AND json_extract(j.payload_json,'$.feedEntryArtifactKey')=p.artifact_key) LIMIT 100`,
+    `SELECT p.artifact_key FROM subscription_snapshots p
+    LEFT JOIN subscriptions s ON s.id=p.subscription_id
+    WHERE p.created_at<?
+      AND (s.cursor_json IS NULL OR json_extract(s.cursor_json,'$.stateKey')!=p.artifact_key)
+      AND NOT EXISTS(
+        SELECT 1 FROM jobs j INDEXED BY jobs_unapplied_feed_artifact
+        JOIN personal_items i ON i.id=j.item_id
+        WHERE j.owner_id=i.owner_id AND i.status!='deleted'
+          AND i.generation=json_extract(j.payload_json,'$.generation')
+          AND j.status IN ('pending','running','failed')
+          AND COALESCE(json_extract(j.payload_json,'$.feedMetadataApplied'),0)=0
+          AND json_extract(j.payload_json,'$.feedEntryArtifactKey') IS NOT NULL
+          AND json_extract(j.payload_json,'$.feedEntryArtifactKey')=p.artifact_key
+      ) LIMIT 100`,
     new Date(Date.now() - 3600000).toISOString()
   );
   for (const snapshot of snapshots) {
@@ -734,9 +747,10 @@ export async function collectMaterialArtifacts(env: Env) {
       EXISTS(SELECT 1 FROM contributions WHERE artifact_key=?) OR
       EXISTS(SELECT 1 FROM understanding_runs WHERE state_key=? AND status='processing') OR
       EXISTS(SELECT 1 FROM subscriptions WHERE json_extract(cursor_json,'$.stateKey')=?) OR
-      EXISTS(SELECT 1 FROM jobs j JOIN personal_items i ON i.id=j.item_id
+      EXISTS(SELECT 1 FROM jobs j INDEXED BY jobs_unapplied_feed_artifact JOIN personal_items i ON i.id=j.item_id
         WHERE j.owner_id=i.owner_id AND i.status!='deleted' AND i.generation=json_extract(j.payload_json,'$.generation')
         AND j.status IN ('pending','running','failed') AND COALESCE(json_extract(j.payload_json,'$.feedMetadataApplied'),0)=0
+        AND json_extract(j.payload_json,'$.feedEntryArtifactKey') IS NOT NULL
         AND json_extract(j.payload_json,'$.feedEntryArtifactKey')=?)`,
       key,
       key,
