@@ -1,0 +1,26 @@
+{
+  "name": "@zine/next-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync:native": "python3 scripts/sync-native.py",
+    "dev": "vite --host 0.0.0.0 --port 5194 --strictPort",
+    "build": "tsc --noEmit && vite build && node scripts/build-worker.mjs",
+    "preview": "vite preview --host 0.0.0.0 --port 4194 --strictPort",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src scripts --ext .ts,.tsx,.mjs",
+    "test": "bun test src/model.test.ts src/live-api.test.ts"
+  },
+  "dependencies": {
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "lucide-react": "^1.8.0"
+  },
+  "devDependencies": {
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "vite": "^8.0.8",
+    "typescript": "~5.9.2"
+  }
+}

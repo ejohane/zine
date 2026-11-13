@@ -18,6 +18,9 @@ export function requiredScope(method: string, path: string): TokenScope | null |
   const read = method === 'GET' || method === 'HEAD';
   // Existing interactive-only guards retain authority over credential/account operations.
   if (/^\/v1\/(?:tokens|account)(?:\/|$)/.test(path)) return null;
+  if (path === '/v1/home' && read) return 'library:read';
+  if (path === '/v1/home/preview' && method === 'POST') return 'library:read';
+  if (path === '/v1/home/edition' && method === 'PUT') return 'library:write';
   if (path === '/v1/me') return null;
   if (/^\/v1\/connections(?:\/|$)/.test(path)) return read ? 'library:read' : null;
   if (path === '/v1/export/events') return read ? 'events:read' : 'unsupported';

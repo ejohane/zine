@@ -153,6 +153,7 @@ for (const name of [
   'contributions',
   'enrichment_components',
   'item_relationships',
+  'home_editions',
   'item_aliases',
   'reconciliation_events',
   'search_documents',

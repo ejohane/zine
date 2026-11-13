@@ -59,6 +59,21 @@
         "typescript": "^5.7.2",
       },
     },
+    "apps/next-web": {
+      "name": "@zine/next-web",
+      "version": "0.1.0",
+      "dependencies": {
+        "lucide-react": "^1.8.0",
+        "react": "19.2.3",
+        "react-dom": "19.2.3",
+      },
+      "devDependencies": {
+        "@types/react-dom": "^19.2.3",
+        "@vitejs/plugin-react": "^6.0.1",
+        "typescript": "~5.9.2",
+        "vite": "^8.0.8",
+      },
+    },
     "apps/web": {
       "name": "@zine/web",
       "version": "0.0.1",
@@ -933,6 +948,8 @@
     "@zine/editorial": ["@zine/editorial@workspace:apps/editorial"],
 
     "@zine/editorial-schema": ["@zine/editorial-schema@workspace:packages/editorial-schema"],
+
+    "@zine/next-web": ["@zine/next-web@workspace:apps/next-web"],
 
     "@zine/shared": ["@zine/shared@workspace:packages/shared"],
 

@@ -142,3 +142,38 @@ Internal alias and MCP dispatch preserve the original operation generation.
 Google refresh also checks the encrypted grant it originally read. A stale refresh
 response cannot overwrite or expire a different connection installed while that
 refresh was pending. Disconnect removes only this service's local connection.
+
+## Personal Home
+
+`GET /v1/home` returns one ordered list of sections. Jump back in and Just
+saved are computed from the current library. Editorial sections contain a
+title and ordered cards. Completion, archive, deletion, ownership, and format
+eligibility are checked during every read. Live sections win duplicate cards.
+A collection is omitted when fewer than two eligible cards survive.
+
+`POST /v1/home/preview` renders an unpublished draft through the same
+assembler. Both read operations require `library:read` for personal tokens.
+An authorized editorial caller can use `PUT /v1/home/edition` with
+`library:write`, supplying `expectedEditionId` from its Home read (or null
+before the first edition) and the `draft` returned by the preview tool.
+Publication uses a conditional atomic write; a 409 means to rebuild using
+current state. Preview and model failures leave the published edition intact.
+
+From `apps/api`, the `scripts/home-preview.ts` command supports three modes:
+
+- `candidates` checks recent saves and hybrid search and prints only counts.
+  It works against the existing Next deployment with the approved Clerk login.
+- `draft` makes one OpenAI Responses call and prints the validated draft and
+  token usage. It requires an allowlisted `OPENAI_API_KEY` for a Zine project
+  under the linked API organization. The request sends bounded titles,
+  summaries, and card metadata. It sets `store: false`.
+- `preview` runs the same generation and adds the assembled Home response.
+  Use an API environment with the preview route deployed. The command does
+  not publish or print credentials. Treat draft and preview output as private.
+
+The model defaults to `gpt-6.1-sol` and can be overridden with
+`ZINE_HOME_MODEL`. Set `ZINE_HOME_IMPORT_THROUGH` to the end of a known bulk
+import when those timestamps should be treated as unknown recency. This setting
+does not rewrite saves or change the live Just saved order. Set
+`ZINE_HOME_COMPARE_MODEL=gpt-6.1-terra` to compare both models on the same
+shortlist before enabling a daily trigger.

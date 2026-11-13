@@ -565,6 +565,28 @@ async function deleteCanonicalItem(env: Env, owner: string, itemId: string) {
         timestamp,
         itemId
       ),
+      // A collection title can reflect the deleted item's material. Drop the whole group.
+      stmt(
+        env.DB,
+        `WITH RECURSIVE removed(id) AS (
+          SELECT ? UNION SELECT alias_item_id FROM item_aliases a
+          JOIN removed r ON r.id=a.canonical_item_id WHERE a.owner_id=?
+        )
+        UPDATE home_editions SET sections_json=json_set(sections_json,'$.collections',
+          (SELECT json_group_array(json(kept.value)) FROM (
+            SELECT section.value FROM json_each(home_editions.sections_json,'$.collections') section
+            WHERE NOT EXISTS (SELECT 1 FROM json_each(section.value,'$.itemIds') item
+              JOIN removed ON removed.id=item.value)
+            ORDER BY section.key
+          ) kept))
+        WHERE owner_id=? AND EXISTS (
+          SELECT 1 FROM json_each(sections_json,'$.collections') section
+          JOIN json_each(section.value,'$.itemIds') item JOIN removed ON removed.id=item.value
+        )`,
+        itemId,
+        owner,
+        owner
+      ),
       // Keep a scrubbed idempotency tombstone so an old HTTP retry cannot
       // accidentally resurrect an item the user deliberately deleted.
       stmt(

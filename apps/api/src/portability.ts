@@ -19,6 +19,8 @@ const sections: Record<string, string> = {
     'SELECT d.*,d.item_id AS exportKey FROM progress d JOIN personal_items p ON p.id=d.item_id WHERE p.owner_id=?',
   annotations:
     'SELECT d.*,d.id AS exportKey FROM annotations d JOIN personal_items p ON p.id=d.item_id WHERE p.owner_id=?',
+  homeEdition:
+    'SELECT id,generated_at,sections_json,id AS exportKey FROM home_editions WHERE owner_id=?',
   collections: 'SELECT d.*,d.id AS exportKey FROM collections d WHERE d.owner_id=?',
   collectionMembers:
     "SELECT d.*,d.collection_id||':'||d.item_id AS exportKey FROM collection_members d JOIN collections c ON c.id=d.collection_id WHERE c.owner_id=?",
@@ -162,6 +164,7 @@ export async function eraseAccountData(env: Env, owner: string) {
       'jobs',
       'idempotency',
       'search_sessions',
+      'home_editions',
       'search_documents',
       'contributions',
       'enrichment_components',

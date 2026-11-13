@@ -15,6 +15,7 @@ import {
   saveSchema,
   updateProgress,
 } from './items';
+import { getHome, homeDraftSchema, homePublishSchema, publishHome } from './home';
 import { personalRoutes } from './personal';
 import { relationshipRoutes } from './relationships';
 import { reconciliationRoutes } from './reconciliation';
@@ -159,6 +160,21 @@ app.post('/v1/saves', async (c) => {
   if (!result.replayed) c.executionCtx.waitUntil(dispatchOutbox(c.env, c.get('principal').userId));
   return c.json(result.body, result.status as ContentfulStatusCode);
 });
+app.get('/v1/home', async (c) => c.json(await getHome(c.env, c.get('principal').userId)));
+app.post('/v1/home/preview', async (c) =>
+  c.json(
+    await getHome(c.env, c.get('principal').userId, await parseBody(c.req.raw, homeDraftSchema))
+  )
+);
+app.put('/v1/home/edition', async (c) =>
+  c.json(
+    await publishHome(
+      c.env,
+      c.get('principal').userId,
+      await parseBody(c.req.raw, homePublishSchema)
+    )
+  )
+);
 app.get('/v1/items', async (c) => {
   const q = c.req.query();
   const bool = (key: string) =>

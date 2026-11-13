@@ -1,0 +1,33 @@
+{
+  "id": "/next/",
+  "name": "Zine Next",
+  "short_name": "Zine Next",
+  "description": "A fresh place for your curiosity. The Zine experiment channel.",
+  "start_url": "/next/",
+  "scope": "/next/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f3f3f8",
+  "theme_color": "#f3f3f8",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/next/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/next/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/next/icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
