@@ -256,3 +256,15 @@ Private manifests, hashes and live readback receipts are under
 107 Worker CI suites passed in isolated Node 22 processes after the default
 parallel runner hit macOS loopback exhaustion. No source data or proof
 payloads belong in the repository.
+
+## Home editorial backend
+
+Migration 0027 adds one published Home edition per owner. The authenticated
+Home read combines the current edition with eligible saved items and progress.
+The preview command produces a draft for review. Publication uses the current
+edition ID as a compare-and-swap condition. See [Personal Home](usage.md#personal-home).
+
+The standalone Next clients are in `apps/next-ios` and `apps/next-web`. The web
+Home still uses its local composition. The card-role prototype is a design
+reference for a future Home contract. Edition generation currently runs on
+demand with the preview CLI.

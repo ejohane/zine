@@ -1,0 +1,70 @@
+name: ZineNext
+options:
+  bundleIdPrefix: app.zine
+  deploymentTarget:
+    iOS: '27.1'
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    DEVELOPMENT_TEAM: TRA7965NM5
+    CODE_SIGN_STYLE: Automatic
+    TARGETED_DEVICE_FAMILY: '1,2'
+    MARKETING_VERSION: '0.1.0'
+    CURRENT_PROJECT_VERSION: '4'
+targets:
+  ZineNext:
+    type: application
+    platform: iOS
+    preBuildScripts:
+      - name: Require Duo SDK
+        script: bash "$SRCROOT/scripts/check-sdk.sh"
+        basedOnDependencyAnalysis: false
+    sources: [Sources, Resources]
+    info:
+      path: Configuration/Info.plist
+      properties:
+        CFBundleDisplayName: Zine Next
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations: {}
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.zine.next
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+  ZineNextTests:
+    type: bundle.unit-test
+    platform: iOS
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+    sources: [Tests]
+    dependencies:
+      - target: ZineNext
+  ZineNextUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+    sources: [UITests]
+    dependencies:
+      - target: ZineNext
+schemes:
+  ZineNext:
+    build:
+      targets:
+        ZineNext: all
+    test:
+      targets: [ZineNextTests, ZineNextUITests]

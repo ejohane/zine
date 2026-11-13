@@ -1,0 +1,4448 @@
+{
+  "itemList": {
+    "items": [
+      {
+        "id": "FEBA96B0-D3A1-5FF4-939C-4199241F9398",
+        "status": "saved",
+        "archived": false,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_0",
+          "url": "https://www.newyorker.com/magazine/2008/06/09/haruki-murakami-the-running-novelist",
+          "platform": "web",
+          "type": "article",
+          "title": "The Running Novelist",
+          "description": "Haruki Murakami on learning how to go the distance as a writer and a runner.",
+          "summary": "Haruki Murakami on learning how to go the distance as a writer and a runner.",
+          "topics": ["attention", "craft"]
+        },
+        "context": [
+          {
+            "id": "mock_context_0",
+            "text": "For a quieter way to think about practice and attention.",
+            "origin": "explicit",
+            "contributor": "mock-experience",
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z"
+          }
+        ],
+        "tags": ["attention", "craft"],
+        "collectionIds": ["craft"],
+        "progress": {
+          "position": 0.28,
+          "unit": "fraction",
+          "completedAt": null,
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "summary": {
+              "contributionId": "mock_summary_0",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            },
+            "topics": {
+              "contributionId": "mock_topics_0",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "article",
+              "status": "available",
+              "reasonCode": null
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_0",
+            "route": "save",
+            "contributor": "mock-experience",
+            "subscriptionId": null,
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "DFD16166-1AEF-5BB9-92B2-282E25A8E4AE",
+        "status": "saved",
+        "archived": false,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_1",
+          "url": "https://open.spotify.com/episode/7MIVje74gQ0Wj0qK1bSgyE",
+          "platform": "spotify",
+          "type": "podcast_episode",
+          "title": "The MacBook Pro (with touch)",
+          "description": "John’s initial reactions to using the new MacBook Pro.",
+          "summary": "John’s initial reactions to using the new MacBook Pro.",
+          "topics": ["technology", "product"],
+          "durationSeconds": 900
+        },
+        "context": [
+          {
+            "id": "mock_context_1",
+            "text": "Come back to the hardware discussion on the next walk.",
+            "origin": "explicit",
+            "contributor": "mock-experience",
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z"
+          }
+        ],
+        "tags": ["technology", "product"],
+        "collectionIds": [],
+        "progress": {
+          "position": 320,
+          "unit": "seconds",
+          "completedAt": null,
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "summary": {
+              "contributionId": "mock_summary_1",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            },
+            "topics": {
+              "contributionId": "mock_topics_1",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "transcript",
+              "status": "available",
+              "reasonCode": null
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_1",
+            "route": "save",
+            "contributor": "mock-experience",
+            "subscriptionId": null,
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "9D6A1586-3AB5-5522-B73A-5DDE64BFBC0C",
+        "status": "saved",
+        "archived": false,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_2",
+          "url": "https://open.spotify.com/episode/4naJmXtr0gpvPMifePblbr",
+          "platform": "spotify",
+          "type": "podcast_episode",
+          "title": "It's Been A While",
+          "description": "Changes are afoot, so the boys must catch up.",
+          "summary": "Changes are afoot, so the boys must catch up.",
+          "topics": ["technology", "product"],
+          "durationSeconds": 3960
+        },
+        "context": [
+          {
+            "id": "mock_context_2",
+            "text": "An idea for how to build products with more care.",
+            "origin": "explicit",
+            "contributor": "mock-experience",
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z"
+          }
+        ],
+        "tags": ["technology", "product"],
+        "collectionIds": ["craft"],
+        "progress": {
+          "position": null,
+          "unit": null,
+          "completedAt": null,
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "summary": {
+              "contributionId": "mock_summary_2",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            },
+            "topics": {
+              "contributionId": "mock_topics_2",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "transcript",
+              "status": "unavailable",
+              "reasonCode": "transcript_not_available"
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_2",
+            "route": "save",
+            "contributor": "mock-experience",
+            "subscriptionId": null,
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "6B450C0B-3040-548C-883F-C072C637EC6B",
+        "status": "saved",
+        "archived": false,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_3",
+          "url": "https://x.com/addyosmani/status/2119332146485891501",
+          "platform": "x",
+          "type": "post",
+          "title": "Your coding agents made you a manager",
+          "description": "The skills for managing agents are pretty much the skills for managing a team, and you don't need to be a manager to learn them. If you're spending all day with a coding agent, you are managing.",
+          "summary": "The skills for managing agents are pretty much the skills for managing a team, and you don't need to be a manager to learn them. If you're spending all day with a coding agent, you are managing.",
+          "topics": ["AI", "design"]
+        },
+        "context": [
+          {
+            "id": "mock_context_3",
+            "text": "Useful context for the agent workflow I am exploring.",
+            "origin": "explicit",
+            "contributor": "mock-experience",
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z"
+          }
+        ],
+        "tags": ["AI", "design"],
+        "collectionIds": ["ai-design"],
+        "progress": {
+          "position": null,
+          "unit": null,
+          "completedAt": null,
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "summary": {
+              "contributionId": "mock_summary_3",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            },
+            "topics": {
+              "contributionId": "mock_topics_3",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "available",
+              "reasonCode": null
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_3",
+            "route": "save",
+            "contributor": "mock-experience",
+            "subscriptionId": null,
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "CDAEB875-6DEF-58AA-BA39-A1CF193A933A",
+        "status": "saved",
+        "archived": false,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_4",
+          "url": "https://x.com/teddy_riker/status/2047312986696454584",
+          "platform": "x",
+          "type": "post",
+          "title": "Designing for Agents",
+          "description": "If you spend time in the same corner of X as I do, scrolling past the \"How I built a second brain with Obsidian\" and \"Anthropic just KILLED [insert industry] FOREVER\" posts, you've probably also seen",
+          "summary": "If you spend time in the same corner of X as I do, scrolling past the \"How I built a second brain with Obsidian\" and \"Anthropic just KILLED [insert industry] FOREVER\" posts, you've probably also seen",
+          "topics": ["AI", "design"]
+        },
+        "context": [
+          {
+            "id": "mock_context_4",
+            "text": "For a quieter way to think about practice and attention.",
+            "origin": "explicit",
+            "contributor": "mock-experience",
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z"
+          }
+        ],
+        "tags": ["AI", "design"],
+        "collectionIds": ["ai-design"],
+        "progress": {
+          "position": null,
+          "unit": null,
+          "completedAt": null,
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "summary": {
+              "contributionId": "mock_summary_4",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            },
+            "topics": {
+              "contributionId": "mock_topics_4",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "available",
+              "reasonCode": null
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_4",
+            "route": "save",
+            "contributor": "mock-experience",
+            "subscriptionId": null,
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "070A506D-CE56-5CCD-B930-1D1455A1D6AE",
+        "status": "saved",
+        "archived": false,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_5",
+          "url": "https://www.youtube.com/watch?v=pFscaR3gkfU",
+          "platform": "youtube",
+          "type": "video",
+          "title": "Good Taste vs. Slop: What Makes The Difference?",
+          "description": "How do you develop good taste in the age of AI Slop? Get 160+ lab tests for just $365 and save an extra $25 at https://functionhealth.com/modernwisdom - Get access to every episode 10 hours before YouTube by subscribing for free on Spotify - https://spotify.modernwisdom.com or Apple Podcasts - https://apple.modernwisdom.com Get my free Reading List of 100 life-changing books here - https://chriswillx.com/books/ Try my productivity energy drink Neutonic here - https://neutonic.com/modernwisdom - Get in touch in the comments below or head to... Instagram: https://www.instagram.com/chriswillx Twitter: https://www.twitter.com/chriswillx Email: https://chriswillx.com/contact/",
+          "summary": "How do you develop good taste in the age of AI Slop? Get 160+ lab tests for just $365 and save an extra $25 at https://functionhealth.com/modernwisdom - Get access to every episode 10 hours before YouTube by subscribing for free on Spotify - https://spotify.modernwisdom.com or Apple Podcasts - https://apple.modernwisdom.com Get my free Reading List of 100 life-changing books here - https://chriswillx.com/books/ Try my productivity energy drink Neutonic here - https://neutonic.com/modernwisdom - Get in touch in the comments below or head to... Instagram: https://www.instagram.com/chriswillx Twitter: https://www.twitter.com/chriswillx Email: https://chriswillx.com/contact/",
+          "topics": ["AI", "design"],
+          "durationSeconds": 780
+        },
+        "context": [
+          {
+            "id": "mock_context_5",
+            "text": "Come back to the hardware discussion on the next walk.",
+            "origin": "explicit",
+            "contributor": "mock-experience",
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z"
+          }
+        ],
+        "tags": ["AI", "design"],
+        "collectionIds": ["ai-design"],
+        "progress": {
+          "position": null,
+          "unit": null,
+          "completedAt": null,
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "summary": {
+              "contributionId": "mock_summary_5",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            },
+            "topics": {
+              "contributionId": "mock_topics_5",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "transcript",
+              "status": "unavailable",
+              "reasonCode": "transcript_not_available"
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_5",
+            "route": "save",
+            "contributor": "mock-experience",
+            "subscriptionId": null,
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "BD92B205-9659-5B63-B613-D8567357F281",
+        "status": "saved",
+        "archived": false,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_6",
+          "url": "https://andymatuschak.org/books/",
+          "platform": "web",
+          "type": "article",
+          "title": "Why books don't work",
+          "description": "Designing media to reflect how people think and learn",
+          "summary": "Designing media to reflect how people think and learn",
+          "topics": ["attention", "craft"]
+        },
+        "context": [
+          {
+            "id": "mock_context_6",
+            "text": "An idea for how to build products with more care.",
+            "origin": "explicit",
+            "contributor": "mock-experience",
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z"
+          }
+        ],
+        "tags": ["attention", "craft"],
+        "collectionIds": ["craft", "ai-design"],
+        "progress": {
+          "position": null,
+          "unit": null,
+          "completedAt": null,
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "summary": {
+              "contributionId": "mock_summary_6",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            },
+            "topics": {
+              "contributionId": "mock_topics_6",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "article",
+              "status": "pending",
+              "reasonCode": null
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_6",
+            "route": "save",
+            "contributor": "mock-experience",
+            "subscriptionId": null,
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "8F0124AB-9225-528A-89B5-E2CE0E782B00",
+        "status": "saved",
+        "archived": false,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_7",
+          "url": "https://www.youtube.com/watch?v=GtJKFhztgdM",
+          "platform": "youtube",
+          "type": "video",
+          "title": "Coding Isn't About Code Anymore",
+          "description": "AI has given engineers a new job, which is much more akin to gardening rather than coding, so let's talk about it Thank you Coderabbit for sponsoring! Check them out at: https://soydev.link/coderabbit Want to sponsor a video? Learn more here: https://soydev.link/sponsor-me Check out my Twitch, Twitter, Discord more at https://t3.gg S/O @Ph4seon3 for the awesome edit 🙏",
+          "summary": "AI has given engineers a new job, which is much more akin to gardening rather than coding, so let's talk about it Thank you Coderabbit for sponsoring! Check them out at: https://soydev.link/coderabbit Want to sponsor a video? Learn more here: https://soydev.link/sponsor-me Check out my Twitch, Twitter, Discord more at https://t3.gg S/O @Ph4seon3 for the awesome edit 🙏",
+          "topics": ["AI", "design"],
+          "durationSeconds": 2700
+        },
+        "context": [
+          {
+            "id": "mock_context_7",
+            "text": "Useful context for the agent workflow I am exploring.",
+            "origin": "explicit",
+            "contributor": "mock-experience",
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z"
+          }
+        ],
+        "tags": ["AI", "design"],
+        "collectionIds": ["ai-design"],
+        "progress": {
+          "position": null,
+          "unit": null,
+          "completedAt": null,
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "summary": {
+              "contributionId": "mock_summary_7",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            },
+            "topics": {
+              "contributionId": "mock_topics_7",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "transcript",
+              "status": "unavailable",
+              "reasonCode": "transcript_not_available"
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_7",
+            "route": "save",
+            "contributor": "mock-experience",
+            "subscriptionId": null,
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "AD7A97E4-9162-5D52-9A68-0AFF8B75F903",
+        "status": "saved",
+        "archived": false,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_8",
+          "url": "https://x.com/addyosmani/status/2117512471930167377",
+          "platform": "x",
+          "type": "post",
+          "title": "Critical thinking when agents do the work",
+          "description": "Back in the day, critical thinking was taught as approaching new info with humble curiosity and a healthy dose of skepticism - take in different views, form your own opinion. Still true, but",
+          "summary": "Back in the day, critical thinking was taught as approaching new info with humble curiosity and a healthy dose of skepticism - take in different views, form your own opinion. Still true, but",
+          "topics": ["AI", "design"]
+        },
+        "context": [
+          {
+            "id": "mock_context_8",
+            "text": "For a quieter way to think about practice and attention.",
+            "origin": "explicit",
+            "contributor": "mock-experience",
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z"
+          }
+        ],
+        "tags": ["AI", "design"],
+        "collectionIds": ["ai-design"],
+        "progress": {
+          "position": null,
+          "unit": null,
+          "completedAt": null,
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "summary": {
+              "contributionId": "mock_summary_8",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            },
+            "topics": {
+              "contributionId": "mock_topics_8",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "available",
+              "reasonCode": null
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_8",
+            "route": "save",
+            "contributor": "mock-experience",
+            "subscriptionId": null,
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "395D1F1A-16EA-5BB8-90C6-520CC651D0AD",
+        "status": "saved",
+        "archived": false,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_9",
+          "url": "https://lucumr.pocoo.org/2026/11/9/irontown",
+          "platform": "web",
+          "type": "article",
+          "title": "AI and Irontown",
+          "description": "Thoughts on reconciling incompatible needs.",
+          "topics": ["AI", "design"]
+        },
+        "context": [
+          {
+            "id": "mock_context_9",
+            "text": "Come back to the hardware discussion on the next walk.",
+            "origin": "explicit",
+            "contributor": "mock-experience",
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z"
+          }
+        ],
+        "tags": ["AI", "design"],
+        "collectionIds": ["ai-design"],
+        "progress": {
+          "position": null,
+          "unit": null,
+          "completedAt": null,
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "topics": {
+              "contributionId": "mock_topics_9",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "processing",
+              "reasonCode": null
+            },
+            {
+              "component": "article",
+              "status": "unavailable",
+              "reasonCode": "source_access_limited"
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_9",
+            "route": "save",
+            "contributor": "mock-experience",
+            "subscriptionId": null,
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "A1F9744F-AD8F-5771-A0A1-7FE7E32233EE",
+        "status": "saved",
+        "archived": false,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_10",
+          "url": "https://open.spotify.com/episode/6OZjnUBX1jbOekRTGNaATa",
+          "platform": "spotify",
+          "type": "podcast_episode",
+          "title": "How Cisco Got Bullwhipped",
+          "description": "In the late 1990s, Cisco sat at the heart of the Internet boom - selling networking equipment like routers and switches. To demonstrate the Internet’s revolutionary potential, Cisco made itself into the nimble, fast-moving corporation of the future. A highly praised e-commerce website. Rapid, daily financial reports. And sophisticated data sharing with outsourcing manufacturers. All made possible with the web. So as the Telecom bubble began to implode, Cisco management felt confident enough to double down. They got bullwhipped. In this video, we look at how Cisco misread the signals.",
+          "topics": ["technology", "product"],
+          "durationSeconds": 1860
+        },
+        "context": [],
+        "tags": ["technology", "product"],
+        "collectionIds": [],
+        "progress": {
+          "position": null,
+          "unit": null,
+          "completedAt": null,
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "topics": {
+              "contributionId": "mock_topics_10",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "failed",
+              "reasonCode": "provider_timeout"
+            },
+            {
+              "component": "transcript",
+              "status": "unavailable",
+              "reasonCode": "transcript_not_available"
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_10",
+            "route": "save",
+            "contributor": "mock-experience",
+            "subscriptionId": null,
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "3848D18D-0153-5E11-ADA0-CC203D45EB52",
+        "status": "saved",
+        "archived": false,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_11",
+          "url": "https://www.youtube.com/watch?v=kODgReWwrWM",
+          "platform": "youtube",
+          "type": "video",
+          "title": "Ep 08 - \"Nobody's Going to Write the Next React\"",
+          "description": "Recorded October 30, 2026. Armin Ronacher and Mario Zechner of Earendil join Dillon and Rhys. Mario explains his \"software is dead\" tweet, admits he always pushes to main, and the group figures out whether code review was ever more than theater. Dillon walks through Cloudflare's Engineering Codex and AI code reviewer, Armin tells the story of two agents passing ZIP files to each other over WhatsApp, and Armin and Mario explain what Earendil wants to be next year.",
+          "summary": "Recorded October 30, 2026. Armin Ronacher and Mario Zechner of Earendil join Dillon and Rhys. Mario explains his \"software is dead\" tweet, admits he always pushes to main, and the group figures out whether code review was ever more than theater. Dillon walks through Cloudflare's Engineering Codex and AI code reviewer, Armin tells the story of two agents passing ZIP files to each other over WhatsApp, and Armin and Mario explain what Earendil wants to be next year.",
+          "topics": ["AI", "design"],
+          "durationSeconds": 3960
+        },
+        "context": [],
+        "tags": ["AI", "design"],
+        "collectionIds": [],
+        "progress": {
+          "position": null,
+          "unit": null,
+          "completedAt": null,
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "summary": {
+              "contributionId": "mock_summary_11",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            },
+            "topics": {
+              "contributionId": "mock_topics_11",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "transcript",
+              "status": "unavailable",
+              "reasonCode": "transcript_not_available"
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_11",
+            "route": "save",
+            "contributor": "mock-experience",
+            "subscriptionId": null,
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "4268063B-600D-5C28-B81A-B7C7A9BA1D75",
+        "status": "saved",
+        "archived": false,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_12",
+          "url": "https://x.com/poteto/status/2069824386283319343",
+          "platform": "x",
+          "type": "post",
+          "title": "Loops You Can Trust",
+          "description": "The best way to manage agents starts with a three minute egg. Suppose you run several restaurants that serve breakfasts to big bursts of morning traffic. Every customer orders the same meal: an egg,",
+          "summary": "The best way to manage agents starts with a three minute egg. Suppose you run several restaurants that serve breakfasts to big bursts of morning traffic. Every customer orders the same meal: an egg,",
+          "topics": ["AI", "design"]
+        },
+        "context": [],
+        "tags": ["AI", "design"],
+        "collectionIds": [],
+        "progress": {
+          "position": null,
+          "unit": null,
+          "completedAt": "2026-11-09T12:00:00.000Z",
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "summary": {
+              "contributionId": "mock_summary_12",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            },
+            "topics": {
+              "contributionId": "mock_topics_12",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "available",
+              "reasonCode": null
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_12",
+            "route": "save",
+            "contributor": "mock-experience",
+            "subscriptionId": null,
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "65988F4D-F797-574C-95DB-B7FF2974E235",
+        "status": "saved",
+        "archived": false,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_13",
+          "url": "https://seangoedecke.com/working-with-designers",
+          "platform": "web",
+          "type": "article",
+          "title": "Working with designers",
+          "description": "I love working with designers, in part because (unlike managers and product managers) they’re culturally different from engineers. However, having more than one…",
+          "summary": "I love working with designers, in part because (unlike managers and product managers) they’re culturally different from engineers. However, having more than one…",
+          "topics": ["AI", "design"]
+        },
+        "context": [],
+        "tags": ["AI", "design"],
+        "collectionIds": ["ai-design"],
+        "progress": {
+          "position": null,
+          "unit": null,
+          "completedAt": null,
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "summary": {
+              "contributionId": "mock_summary_13",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            },
+            "topics": {
+              "contributionId": "mock_topics_13",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "article",
+              "status": "unavailable",
+              "reasonCode": "source_access_limited"
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_13",
+            "route": "save",
+            "contributor": "mock-experience",
+            "subscriptionId": null,
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "DE1D021C-791B-5CBC-AB1C-F8C6A71F3AA1",
+        "status": "saved",
+        "archived": false,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_14",
+          "url": "https://open.spotify.com/episode/7uL5OXOWudZz28P4Xn3twN",
+          "platform": "spotify",
+          "type": "podcast_episode",
+          "title": "The Future Called. It's Using CSS2.",
+          "description": "This week, Robbie and Adam sip on Chicken Cock Small Batch Kentucky Bourbon and dive into building mobile apps with Claude, CSS infinity, MySpace's comeback, and whether 2026 is just 2006 but way more expensive. They dig into the Doorway app for ADHD task tracking, voice dictation workflows, AI keyboards, Steve Yegge's hot takes on CICD and code review, mental health in the age of agents, design system chaos, LLM failures, why Opus 5 still wins, and skull.style as the future of passive income. Along the way, they debate MySpace's return and nostalgia culture, retro gaming and digital ownership, CSS layers and Tailwind quirks, prop for that and responsive border radiuses, infinity pixels breaking browsers, treating agents nice versus yelling at them, caveman prompting versus verbose explanations, dark factories and internal bleeding, human code review being dead, agent overload and mental",
+          "summary": "This week, Robbie and Adam sip on Chicken Cock Small Batch Kentucky Bourbon and dive into building mobile apps with Claude, CSS infinity, MySpace's comeback, and whether 2026 is just 2006 but way more expensive. They dig into the Doorway app for ADHD task tracking, voice dictation workflows, AI keyboards, Steve Yegge's hot takes on CICD and code review, mental health in the age of agents, design system chaos, LLM failures, why Opus 5 still wins, and skull.style as the future of passive income. Along the way, they debate MySpace's return and nostalgia culture, retro gaming and digital ownership, CSS layers and Tailwind quirks, prop for that and responsive border radiuses, infinity pixels breaking browsers, treating agents nice versus yelling at them, caveman prompting versus verbose explanations, dark factories and internal bleeding, human code review being dead, agent overload and mental",
+          "topics": ["technology", "product"],
+          "durationSeconds": 4020
+        },
+        "context": [],
+        "tags": ["technology", "product"],
+        "collectionIds": ["ai-design"],
+        "progress": {
+          "position": null,
+          "unit": null,
+          "completedAt": null,
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "summary": {
+              "contributionId": "mock_summary_14",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            },
+            "topics": {
+              "contributionId": "mock_topics_14",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "transcript",
+              "status": "unavailable",
+              "reasonCode": "transcript_not_available"
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_14",
+            "route": "save",
+            "contributor": "mock-experience",
+            "subscriptionId": null,
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "6CE6D1B6-4CC3-5892-9BE6-4782F2ABFEEE",
+        "status": "saved",
+        "archived": false,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_15",
+          "url": "https://www.youtube.com/watch?v=afoJu8f9GMA",
+          "platform": "youtube",
+          "type": "video",
+          "title": "Torrenters are building epic media collections | The Vergecast",
+          "description": "All around the internet, groups of media fans are hunting for and curating some of the best movie, music, and TV collections anywhere. And they're doing it all via BitTorrent. Verge contributor and Lowpass writer Janko Roettgers takes us into the world of private torrent trackers, where some people are saving culture and some people are just in it for the flicks. 0:00 Torrents Return 01:20 Private Trackers Explained 04:04 Rules Ratios And Leechers 05:56 The Prestige Ladder 10:00 Bounties And Salinger 12:55 Piracy Ethics Today 17:16 Streaming Backlash 19:45 What Private Really Means 22:12 Anti Piracy Crackdowns 25:44 Why People Do It 27:14 Is BitTorrent Growing 28:45 Curation Beats Algorithms 31:51 Enough Phone Kickstarter 33:50 Phone Prices Subscribe: http://goo.gl/G5RXGs Like The Verge on Facebook: https://goo.gl/2P1aGc Follow on X: https://goo.gl/XTWX61 Follow on Instagram: https://goo",
+          "summary": "All around the internet, groups of media fans are hunting for and curating some of the best movie, music, and TV collections anywhere. And they're doing it all via BitTorrent. Verge contributor and Lowpass writer Janko Roettgers takes us into the world of private torrent trackers, where some people are saving culture and some people are just in it for the flicks. 0:00 Torrents Return 01:20 Private Trackers Explained 04:04 Rules Ratios And Leechers 05:56 The Prestige Ladder 10:00 Bounties And Salinger 12:55 Piracy Ethics Today 17:16 Streaming Backlash 19:45 What Private Really Means 22:12 Anti Piracy Crackdowns 25:44 Why People Do It 27:14 Is BitTorrent Growing 28:45 Curation Beats Algorithms 31:51 Enough Phone Kickstarter 33:50 Phone Prices Subscribe: http://goo.gl/G5RXGs Like The Verge on Facebook: https://goo.gl/2P1aGc Follow on X: https://goo.gl/XTWX61 Follow on Instagram: https://goo",
+          "topics": ["AI", "design"],
+          "durationSeconds": 2220
+        },
+        "context": [],
+        "tags": ["AI", "design"],
+        "collectionIds": ["ai-design"],
+        "progress": {
+          "position": null,
+          "unit": null,
+          "completedAt": null,
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "summary": {
+              "contributionId": "mock_summary_15",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            },
+            "topics": {
+              "contributionId": "mock_topics_15",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "transcript",
+              "status": "unavailable",
+              "reasonCode": "transcript_not_available"
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_15",
+            "route": "save",
+            "contributor": "mock-experience",
+            "subscriptionId": null,
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "12B8B9CF-BCC5-5707-83DE-5BFB529A1AD1",
+        "status": "saved",
+        "archived": false,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_16",
+          "url": "https://www.anthropic.com/research/components-of-agent-memory",
+          "platform": "web",
+          "type": "article",
+          "title": "The components of agent memory",
+          "description": "For Claude to learn from experience, it has to decide what’s worth remembering before it knows what’s next. Here’s how “dreaming” helps it organize memory and correct mistakes.",
+          "summary": "For Claude to learn from experience, it has to decide what’s worth remembering before it knows what’s next. Here’s how “dreaming” helps it organize memory and correct mistakes.",
+          "topics": ["AI", "design"]
+        },
+        "context": [],
+        "tags": ["AI", "design"],
+        "collectionIds": ["ai-design"],
+        "progress": {
+          "position": null,
+          "unit": null,
+          "completedAt": null,
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "summary": {
+              "contributionId": "mock_summary_16",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            },
+            "topics": {
+              "contributionId": "mock_topics_16",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "article",
+              "status": "unavailable",
+              "reasonCode": "source_access_limited"
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_16",
+            "route": "save",
+            "contributor": "mock-experience",
+            "subscriptionId": null,
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "40FB3139-E95B-597B-A8C0-089D2CA6857C",
+        "status": "saved",
+        "archived": false,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_17",
+          "url": "https://open.spotify.com/episode/17Ab3JNXhAiVCVTJfFS13F",
+          "platform": "spotify",
+          "type": "podcast_episode",
+          "title": "716: Take the Null",
+          "description": "Pre-show: Siri AI foibles The High Line 🗣️ ATP Holiday Store is here! 🗣️ Follow-up: Fineliner Fineliner 🤝🏻 ATP Graffiti shirt (via Nick Foster) Download for use in Fineliner (in Fineliner’s settings, Font, Import Profile; note that this will overwrite your icons and avatar, too) Palm Vx PalmOS emulator Why Overcast Radio LLC? MacBook PROLED Allison points out some dimensional errors on our part You can completely turn off the touch screen (via Gui Rambo) Pinch-to-zoom Glowing Apple logo implementation software details Avoiding keyboard marks with a microfiber keyboard dust cover (via Keith Huss) Rounded corners (via Jeff) Video Reimar Servas show us why rounded corners are bad (via Marcin Wichary) iPhone Duo iPhone Duo will welcome you… sometimes? (YouTube timestamp link to 1m15s) Crackgate Andy Ihnatko notes Crackgate is a thing Jay Peters at The Verge with a statement from Apple Curiou",
+          "summary": "Pre-show: Siri AI foibles The High Line 🗣️ ATP Holiday Store is here! 🗣️ Follow-up: Fineliner Fineliner 🤝🏻 ATP Graffiti shirt (via Nick Foster) Download for use in Fineliner (in Fineliner’s settings, Font, Import Profile; note that this will overwrite your icons and avatar, too) Palm Vx PalmOS emulator Why Overcast Radio LLC? MacBook PROLED Allison points out some dimensional errors on our part You can completely turn off the touch screen (via Gui Rambo) Pinch-to-zoom Glowing Apple logo implementation software details Avoiding keyboard marks with a microfiber keyboard dust cover (via Keith Huss) Rounded corners (via Jeff) Video Reimar Servas show us why rounded corners are bad (via Marcin Wichary) iPhone Duo iPhone Duo will welcome you… sometimes? (YouTube timestamp link to 1m15s) Crackgate Andy Ihnatko notes Crackgate is a thing Jay Peters at The Verge with a statement from Apple Curiou",
+          "topics": ["technology", "product"],
+          "durationSeconds": 8340
+        },
+        "context": [],
+        "tags": ["technology", "product"],
+        "collectionIds": [],
+        "progress": {
+          "position": null,
+          "unit": null,
+          "completedAt": null,
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "summary": {
+              "contributionId": "mock_summary_17",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            },
+            "topics": {
+              "contributionId": "mock_topics_17",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "transcript",
+              "status": "unavailable",
+              "reasonCode": "transcript_not_available"
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_17",
+            "route": "save",
+            "contributor": "mock-experience",
+            "subscriptionId": null,
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "CC3475AD-E773-55BC-9FBF-25F4B4553F44",
+        "status": "received",
+        "archived": false,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": null,
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_18",
+          "url": "https://www.youtube.com/watch?v=ZV58g_JzIso",
+          "platform": "youtube",
+          "type": "video",
+          "title": "Liam Pace | The Nine Club #414",
+          "description": "Liam Pace discusses growing up skating bowls at Santa Rita skate park in Tucson AZ, his backyard mini ramp, running from the cops in full pads at 13 years old, knocking his front tooth out at Washington Street & skating the same day with it wired back in, blacking out on big tricks, 23 broken bones, turning his first leg plate into a ring, getting on Foundation through Mike Sinclair at 18 then moving to Madness with Bill Weiss, the Madness promo video he’s working on, Hell Ride, Swampfest, X Games, and much more! Subscribe for more legendary interviews, deep dives, and unfiltered conversations with the people who shaped skateboarding. Drop your favorite story or moment from this episode in the comments below. Liam Pace: https://www.instagram.com/liampace_ ------------------------------------------------ Become a Channel Member & Receive Perks: https://www.youtube.com/TheNineClub/join Nin",
+          "summary": "Liam Pace discusses growing up skating bowls at Santa Rita skate park in Tucson AZ, his backyard mini ramp, running from the cops in full pads at 13 years old, knocking his front tooth out at Washington Street & skating the same day with it wired back in, blacking out on big tricks, 23 broken bones, turning his first leg plate into a ring, getting on Foundation through Mike Sinclair at 18 then moving to Madness with Bill Weiss, the Madness promo video he’s working on, Hell Ride, Swampfest, X Games, and much more! Subscribe for more legendary interviews, deep dives, and unfiltered conversations with the people who shaped skateboarding. Drop your favorite story or moment from this episode in the comments below. Liam Pace: https://www.instagram.com/liampace_ ------------------------------------------------ Become a Channel Member & Receive Perks: https://www.youtube.com/TheNineClub/join Nin",
+          "topics": ["attention", "craft"],
+          "durationSeconds": 5700
+        },
+        "context": [],
+        "tags": ["attention", "craft"],
+        "collectionIds": ["craft"],
+        "progress": {
+          "position": null,
+          "unit": null,
+          "completedAt": null,
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "summary": {
+              "contributionId": "mock_summary_18",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            },
+            "topics": {
+              "contributionId": "mock_topics_18",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "transcript",
+              "status": "unavailable",
+              "reasonCode": "transcript_not_available"
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_18",
+            "route": "subscription",
+            "contributor": "mock-experience",
+            "subscriptionId": "following-craft",
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "F1272971-65BF-554A-9FFE-ED0BFDF4C3AB",
+        "status": "saved",
+        "archived": false,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_19",
+          "url": "https://disquiet.com/2026/09/29/on-craft-process-and-networks/",
+          "platform": "web",
+          "type": "article",
+          "title": "On Craft, Process, and Networks – Disquiet",
+          "description": "If you’re making music and are concerned your creative efforts are being buried in an avalanche of rote AI-produced and AI-promoted competition, the bad news is you’re not wrong.",
+          "summary": "If you’re making music and are concerned your creative efforts are being buried in an avalanche of rote AI-produced and AI-promoted competition, the bad news is you’re not wrong.",
+          "topics": ["AI", "design"]
+        },
+        "context": [],
+        "tags": ["AI", "design"],
+        "collectionIds": [],
+        "progress": {
+          "position": null,
+          "unit": null,
+          "completedAt": null,
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "summary": {
+              "contributionId": "mock_summary_19",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            },
+            "topics": {
+              "contributionId": "mock_topics_19",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "article",
+              "status": "unavailable",
+              "reasonCode": "source_access_limited"
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_19",
+            "route": "save",
+            "contributor": "mock-experience",
+            "subscriptionId": null,
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "CDF1AF17-020E-5F6E-9C26-3BCCA3F2519A",
+        "status": "received",
+        "archived": false,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": null,
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_20",
+          "url": "https://open.spotify.com/episode/49dc00qoUl6XRHKdWWeUPg",
+          "platform": "spotify",
+          "type": "podcast_episode",
+          "title": "We now have Kerr’s Law (Changelog Interviews #689)",
+          "description": "Dave Kerr created hacker laws, and now he finds himself reviewing agent-written code for them. Back on the show after six years, Dave names what he sees limiting teams today: keeping everyone’s mental model in sync with what’s actually been built. Adam declares it Kerr’s Law on the spot. We get into why Dave’s team treats code review as a deliberate slowdown, how Shellwright lets agents bring evidence to a pull request, and what living with bipolar disorder has taught Dave about noticing when the excitement of these tools stops being healthy.",
+          "summary": "Dave Kerr created hacker laws, and now he finds himself reviewing agent-written code for them. Back on the show after six years, Dave names what he sees limiting teams today: keeping everyone’s mental model in sync with what’s actually been built. Adam declares it Kerr’s Law on the spot. We get into why Dave’s team treats code review as a deliberate slowdown, how Shellwright lets agents bring evidence to a pull request, and what living with bipolar disorder has taught Dave about noticing when the excitement of these tools stops being healthy.",
+          "topics": ["technology", "product"],
+          "durationSeconds": 8820
+        },
+        "context": [],
+        "tags": ["technology", "product"],
+        "collectionIds": [],
+        "progress": {
+          "position": null,
+          "unit": null,
+          "completedAt": null,
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "summary": {
+              "contributionId": "mock_summary_20",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            },
+            "topics": {
+              "contributionId": "mock_topics_20",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "transcript",
+              "status": "unavailable",
+              "reasonCode": "transcript_not_available"
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_20",
+            "route": "subscription",
+            "contributor": "mock-experience",
+            "subscriptionId": "following-video",
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "9A05F49B-CC6B-5DFD-B74D-C1D83CEFBA06",
+        "status": "saved",
+        "archived": true,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "savedAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "revision": 1,
+        "content": {
+          "id": "mock_content_21",
+          "url": "https://www.youtube.com/watch?v=kBqRubi7dSk",
+          "platform": "youtube",
+          "type": "video",
+          "title": "Making Agents Ship in Complex Brownfield Codebases | Dex Horothy, CEO of HumanLayer",
+          "description": "In this episode of The Build System, I sit down with Dex, CEO of HumanLayer, father of the term “context engineering”, and one of the most prominent thought leaders in the AI coding ecosystem. We break down how teams are actually building with AI today, beyond demos and hype. The conversation digs into why most agent workflows don’t hold up in production, and what changes when you’re working inside large, messy, brownfield systems. We cover: - why most “agent” examples online fail in real environments - the gap between teams seeing ~15–30% gains and those reaching 2–3x productivity - why coding itself is not the main bottleneck in software engineering - the risks of pushing too far toward fully autonomous systems - how AI is starting to reshape team structure and ownership A big theme throughout is that the real leverage comes from improving the entire workflow around coding, not just ge",
+          "summary": "In this episode of The Build System, I sit down with Dex, CEO of HumanLayer, father of the term “context engineering”, and one of the most prominent thought leaders in the AI coding ecosystem. We break down how teams are actually building with AI today, beyond demos and hype. The conversation digs into why most agent workflows don’t hold up in production, and what changes when you’re working inside large, messy, brownfield systems. We cover: - why most “agent” examples online fail in real environments - the gap between teams seeing ~15–30% gains and those reaching 2–3x productivity - why coding itself is not the main bottleneck in software engineering - the risks of pushing too far toward fully autonomous systems - how AI is starting to reshape team structure and ownership A big theme throughout is that the real leverage comes from improving the entire workflow around coding, not just ge",
+          "topics": ["AI", "design"],
+          "durationSeconds": 5220
+        },
+        "context": [],
+        "tags": ["AI", "design"],
+        "collectionIds": ["ai-design"],
+        "progress": {
+          "position": null,
+          "unit": null,
+          "completedAt": null,
+          "updatedAt": "2026-11-09T12:00:00.000Z"
+        },
+        "enrichment": {
+          "fields": {
+            "summary": {
+              "contributionId": "mock_summary_21",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            },
+            "topics": {
+              "contributionId": "mock_topics_21",
+              "category": "derived",
+              "provenance": {
+                "method": "mock_fixture",
+                "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                "coverage": "metadata_only",
+                "sourceCoverage": "unknown",
+                "inputContributionIds": []
+              }
+            }
+          },
+          "components": [
+            {
+              "component": "metadata",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "understanding",
+              "status": "available",
+              "reasonCode": null
+            },
+            {
+              "component": "transcript",
+              "status": "unavailable",
+              "reasonCode": "transcript_not_available"
+            }
+          ]
+        },
+        "occurrences": [
+          {
+            "id": "mock_occurrence_21",
+            "route": "save",
+            "contributor": "mock-experience",
+            "subscriptionId": null,
+            "createdAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      }
+    ],
+    "nextCursor": null
+  },
+  "collectionList": {
+    "collections": [
+      {
+        "id": "craft",
+        "name": "A little more intentional",
+        "description": "Practice, attention, and making things with care.",
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "notes": [
+          {
+            "id": "mock_synthesis_craft",
+            "text": "Sample synthesis: these saves connect deliberate practice with how we return to the things we value.",
+            "itemIds": [
+              "FEBA96B0-D3A1-5FF4-939C-4199241F9398",
+              "BD92B205-9659-5B63-B613-D8567357F281"
+            ],
+            "contributor": "mock-experience",
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "id": "ai-design",
+        "name": "Designing with AI",
+        "description": "Tools, taste, and working alongside agents.",
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z",
+        "notes": [
+          {
+            "id": "mock_synthesis_ai",
+            "text": "Sample synthesis: the collection brings together product judgment, agent workflows, and the value of keeping a critical eye.",
+            "itemIds": [
+              "6B450C0B-3040-548C-883F-C072C637EC6B",
+              "070A506D-CE56-5CCD-B930-1D1455A1D6AE"
+            ],
+            "contributor": "mock-experience",
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      }
+    ],
+    "nextCursor": null
+  },
+  "sourceList": {
+    "sources": [
+      {
+        "id": "source-craft",
+        "url": "https://disquiet.com/",
+        "name": "Disquiet",
+        "platform": "web",
+        "routes": [
+          {
+            "id": "route-craft",
+            "url": "https://disquiet.com/feed/",
+            "kind": "rss"
+          }
+        ]
+      },
+      {
+        "id": "source-video",
+        "url": "https://www.youtube.com/@thenineclub",
+        "name": "The Nine Club",
+        "platform": "youtube",
+        "routes": [
+          {
+            "id": "route-video",
+            "url": "https://www.youtube.com/@thenineclub",
+            "kind": "youtube_channel"
+          }
+        ]
+      }
+    ],
+    "nextCursor": null
+  },
+  "subscriptionList": {
+    "subscriptions": [
+      {
+        "id": "following-craft",
+        "sourceId": "source-craft",
+        "routeId": "route-craft",
+        "autoSave": false,
+        "filters": {},
+        "status": "active",
+        "initialized": true,
+        "nextPollAt": "2026-11-09T12:15:00.000Z",
+        "lastSuccessAt": "2026-11-09T12:00:00.000Z",
+        "lastErrorCode": null,
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z"
+      },
+      {
+        "id": "following-video",
+        "sourceId": "source-video",
+        "routeId": "route-video",
+        "autoSave": true,
+        "filters": {},
+        "status": "active",
+        "initialized": true,
+        "nextPollAt": "2026-11-09T12:15:00.000Z",
+        "lastSuccessAt": null,
+        "lastErrorCode": "provider_cooldown",
+        "createdAt": "2026-11-09T12:00:00.000Z",
+        "updatedAt": "2026-11-09T12:00:00.000Z"
+      }
+    ],
+    "nextCursor": null
+  },
+  "details": {
+    "FEBA96B0-D3A1-5FF4-939C-4199241F9398": {
+      "annotations": {
+        "annotations": [
+          {
+            "id": "mock_highlight",
+            "kind": "highlight",
+            "text": "A sample thought to revisit.",
+            "anchor": {
+              "type": "text",
+              "exact": "A useful collection connects what you discover with why you wanted to keep it."
+            },
+            "contributor": "mock-experience",
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      "relationships": {
+        "relationships": [
+          {
+            "id": "mock_relation_0",
+            "kind": "related",
+            "direction": "outgoing",
+            "source": {
+              "itemId": "FEBA96B0-D3A1-5FF4-939C-4199241F9398",
+              "url": "https://www.newyorker.com/magazine/2008/06/09/haruki-murakami-the-running-novelist"
+            },
+            "target": {
+              "itemId": "BD92B205-9659-5B63-B613-D8567357F281",
+              "contentId": "mock_content_6",
+              "url": "https://andymatuschak.org/books/",
+              "platform": "web",
+              "type": "article"
+            },
+            "contributor": "mock-experience",
+            "provenance": {
+              "method": "mock_fixture",
+              "description": "Illustrative personal connection, not identity reconciliation.",
+              "inputContributionIds": []
+            },
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z"
+          }
+        ],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": []
+      },
+      "material": {
+        "field": "article",
+        "value": {
+          "text": "This is illustrative preview text, not a quotation from the original work. A useful collection connects what you discover with why you wanted to keep it. Leave room to revisit the idea later.",
+          "coverage": "partial"
+        },
+        "provenance": {
+          "method": "mock_fixture",
+          "description": "Synthetic reading/transcript sample for layout only; not the author’s or speaker’s words.",
+          "sourceCoverage": "partial",
+          "inputContributionIds": []
+        }
+      }
+    },
+    "DFD16166-1AEF-5BB9-92B2-282E25A8E4AE": {
+      "annotations": {
+        "annotations": [
+          {
+            "id": "mock_timestamp",
+            "kind": "timestamp",
+            "text": "The part to come back to on a walk.",
+            "anchor": {
+              "type": "time",
+              "startSeconds": 320,
+              "endSeconds": 350
+            },
+            "contributor": "mock-experience",
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      },
+      "relationships": {
+        "relationships": [],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": []
+      },
+      "material": {
+        "field": "transcript",
+        "value": {
+          "language": "en",
+          "segments": [
+            {
+              "startSeconds": 320,
+              "endSeconds": 350,
+              "text": "Illustrative transcript segment. This is where a passage about your saved idea would appear."
+            },
+            {
+              "startSeconds": 350,
+              "endSeconds": 390,
+              "text": "A second sample passage shows how a timestamp can take you back to a useful moment."
+            }
+          ]
+        },
+        "provenance": {
+          "method": "mock_fixture",
+          "description": "Synthetic reading/transcript sample for layout only; not the author’s or speaker’s words.",
+          "sourceCoverage": "partial",
+          "inputContributionIds": []
+        }
+      }
+    },
+    "9D6A1586-3AB5-5522-B73A-5DDE64BFBC0C": {
+      "annotations": {
+        "annotations": []
+      },
+      "relationships": {
+        "relationships": [],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": []
+      }
+    },
+    "6B450C0B-3040-548C-883F-C072C637EC6B": {
+      "annotations": {
+        "annotations": []
+      },
+      "relationships": {
+        "relationships": [
+          {
+            "id": "mock_relation_3",
+            "kind": "related",
+            "direction": "outgoing",
+            "source": {
+              "itemId": "6B450C0B-3040-548C-883F-C072C637EC6B",
+              "url": "https://x.com/addyosmani/status/2119332146485891501"
+            },
+            "target": {
+              "itemId": "CDAEB875-6DEF-58AA-BA39-A1CF193A933A",
+              "contentId": "mock_content_4",
+              "url": "https://x.com/teddy_riker/status/2047312986696454584",
+              "platform": "web",
+              "type": "post"
+            },
+            "contributor": "mock-experience",
+            "provenance": {
+              "method": "mock_fixture",
+              "description": "Illustrative personal connection, not identity reconciliation.",
+              "inputContributionIds": []
+            },
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z"
+          }
+        ],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": []
+      }
+    },
+    "CDAEB875-6DEF-58AA-BA39-A1CF193A933A": {
+      "annotations": {
+        "annotations": []
+      },
+      "relationships": {
+        "relationships": [],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": []
+      }
+    },
+    "070A506D-CE56-5CCD-B930-1D1455A1D6AE": {
+      "annotations": {
+        "annotations": []
+      },
+      "relationships": {
+        "relationships": [],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": []
+      }
+    },
+    "BD92B205-9659-5B63-B613-D8567357F281": {
+      "annotations": {
+        "annotations": []
+      },
+      "relationships": {
+        "relationships": [
+          {
+            "id": "mock_relation_6",
+            "kind": "related",
+            "direction": "outgoing",
+            "source": {
+              "itemId": "BD92B205-9659-5B63-B613-D8567357F281",
+              "url": "https://andymatuschak.org/books/"
+            },
+            "target": {
+              "itemId": "FEBA96B0-D3A1-5FF4-939C-4199241F9398",
+              "contentId": "mock_content_0",
+              "url": "https://www.newyorker.com/magazine/2008/06/09/haruki-murakami-the-running-novelist",
+              "platform": "web",
+              "type": "article"
+            },
+            "contributor": "mock-experience",
+            "provenance": {
+              "method": "mock_fixture",
+              "description": "Illustrative personal connection, not identity reconciliation.",
+              "inputContributionIds": []
+            },
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z"
+          }
+        ],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": []
+      }
+    },
+    "8F0124AB-9225-528A-89B5-E2CE0E782B00": {
+      "annotations": {
+        "annotations": []
+      },
+      "relationships": {
+        "relationships": [],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": []
+      }
+    },
+    "AD7A97E4-9162-5D52-9A68-0AFF8B75F903": {
+      "annotations": {
+        "annotations": []
+      },
+      "relationships": {
+        "relationships": [],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": []
+      }
+    },
+    "395D1F1A-16EA-5BB8-90C6-520CC651D0AD": {
+      "annotations": {
+        "annotations": []
+      },
+      "relationships": {
+        "relationships": [],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": [
+          {
+            "id": "mock_job_9",
+            "kind": "enrich",
+            "status": "running",
+            "attempts": 1,
+            "errorCode": null,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "itemId": "395D1F1A-16EA-5BB8-90C6-520CC651D0AD",
+            "availableAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      }
+    },
+    "A1F9744F-AD8F-5771-A0A1-7FE7E32233EE": {
+      "annotations": {
+        "annotations": []
+      },
+      "relationships": {
+        "relationships": [],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": [
+          {
+            "id": "mock_job_10",
+            "kind": "enrich",
+            "status": "failed",
+            "attempts": 1,
+            "errorCode": "provider_timeout",
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "itemId": "A1F9744F-AD8F-5771-A0A1-7FE7E32233EE",
+            "availableAt": "2026-11-09T12:00:00.000Z"
+          }
+        ]
+      }
+    },
+    "3848D18D-0153-5E11-ADA0-CC203D45EB52": {
+      "annotations": {
+        "annotations": []
+      },
+      "relationships": {
+        "relationships": [],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": []
+      }
+    },
+    "4268063B-600D-5C28-B81A-B7C7A9BA1D75": {
+      "annotations": {
+        "annotations": []
+      },
+      "relationships": {
+        "relationships": [],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": []
+      }
+    },
+    "65988F4D-F797-574C-95DB-B7FF2974E235": {
+      "annotations": {
+        "annotations": []
+      },
+      "relationships": {
+        "relationships": [],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": []
+      }
+    },
+    "DE1D021C-791B-5CBC-AB1C-F8C6A71F3AA1": {
+      "annotations": {
+        "annotations": []
+      },
+      "relationships": {
+        "relationships": [],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": []
+      }
+    },
+    "6CE6D1B6-4CC3-5892-9BE6-4782F2ABFEEE": {
+      "annotations": {
+        "annotations": []
+      },
+      "relationships": {
+        "relationships": [],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": []
+      }
+    },
+    "12B8B9CF-BCC5-5707-83DE-5BFB529A1AD1": {
+      "annotations": {
+        "annotations": []
+      },
+      "relationships": {
+        "relationships": [],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": []
+      }
+    },
+    "40FB3139-E95B-597B-A8C0-089D2CA6857C": {
+      "annotations": {
+        "annotations": []
+      },
+      "relationships": {
+        "relationships": [],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": []
+      }
+    },
+    "CC3475AD-E773-55BC-9FBF-25F4B4553F44": {
+      "annotations": {
+        "annotations": []
+      },
+      "relationships": {
+        "relationships": [],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": []
+      }
+    },
+    "F1272971-65BF-554A-9FFE-ED0BFDF4C3AB": {
+      "annotations": {
+        "annotations": []
+      },
+      "relationships": {
+        "relationships": [],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": []
+      }
+    },
+    "CDF1AF17-020E-5F6E-9C26-3BCCA3F2519A": {
+      "annotations": {
+        "annotations": []
+      },
+      "relationships": {
+        "relationships": [],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": []
+      }
+    },
+    "9A05F49B-CC6B-5DFD-B74D-C1D83CEFBA06": {
+      "annotations": {
+        "annotations": []
+      },
+      "relationships": {
+        "relationships": [],
+        "nextCursor": null
+      },
+      "jobs": {
+        "jobs": []
+      }
+    }
+  },
+  "searches": [
+    {
+      "query": "designing with AI",
+      "response": {
+        "items": [
+          {
+            "id": "6B450C0B-3040-548C-883F-C072C637EC6B",
+            "status": "saved",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_3",
+              "url": "https://x.com/addyosmani/status/2119332146485891501",
+              "platform": "x",
+              "type": "post",
+              "title": "Your coding agents made you a manager",
+              "description": "The skills for managing agents are pretty much the skills for managing a team, and you don't need to be a manager to learn them. If you're spending all day with a coding agent, you are managing.",
+              "summary": "The skills for managing agents are pretty much the skills for managing a team, and you don't need to be a manager to learn them. If you're spending all day with a coding agent, you are managing.",
+              "topics": ["AI", "design"]
+            },
+            "context": [
+              {
+                "id": "mock_context_3",
+                "text": "Useful context for the agent workflow I am exploring.",
+                "origin": "explicit",
+                "contributor": "mock-experience",
+                "createdAt": "2026-11-09T12:00:00.000Z",
+                "updatedAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "tags": ["AI", "design"],
+            "collectionIds": ["ai-design"],
+            "progress": {
+              "position": null,
+              "unit": null,
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_3",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_3",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_3",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "matches": [
+              {
+                "field": "context",
+                "excerpt": "Useful context for the agent workflow I am exploring.",
+                "matchedBy": ["semantic"]
+              }
+            ]
+          },
+          {
+            "id": "CDAEB875-6DEF-58AA-BA39-A1CF193A933A",
+            "status": "saved",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_4",
+              "url": "https://x.com/teddy_riker/status/2047312986696454584",
+              "platform": "x",
+              "type": "post",
+              "title": "Designing for Agents",
+              "description": "If you spend time in the same corner of X as I do, scrolling past the \"How I built a second brain with Obsidian\" and \"Anthropic just KILLED [insert industry] FOREVER\" posts, you've probably also seen",
+              "summary": "If you spend time in the same corner of X as I do, scrolling past the \"How I built a second brain with Obsidian\" and \"Anthropic just KILLED [insert industry] FOREVER\" posts, you've probably also seen",
+              "topics": ["AI", "design"]
+            },
+            "context": [
+              {
+                "id": "mock_context_4",
+                "text": "For a quieter way to think about practice and attention.",
+                "origin": "explicit",
+                "contributor": "mock-experience",
+                "createdAt": "2026-11-09T12:00:00.000Z",
+                "updatedAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "tags": ["AI", "design"],
+            "collectionIds": ["ai-design"],
+            "progress": {
+              "position": null,
+              "unit": null,
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_4",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_4",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_4",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "matches": [
+              {
+                "field": "context",
+                "excerpt": "For a quieter way to think about practice and attention.",
+                "matchedBy": ["semantic"]
+              }
+            ]
+          },
+          {
+            "id": "070A506D-CE56-5CCD-B930-1D1455A1D6AE",
+            "status": "saved",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_5",
+              "url": "https://www.youtube.com/watch?v=pFscaR3gkfU",
+              "platform": "youtube",
+              "type": "video",
+              "title": "Good Taste vs. Slop: What Makes The Difference?",
+              "description": "How do you develop good taste in the age of AI Slop? Get 160+ lab tests for just $365 and save an extra $25 at https://functionhealth.com/modernwisdom - Get access to every episode 10 hours before YouTube by subscribing for free on Spotify - https://spotify.modernwisdom.com or Apple Podcasts - https://apple.modernwisdom.com Get my free Reading List of 100 life-changing books here - https://chriswillx.com/books/ Try my productivity energy drink Neutonic here - https://neutonic.com/modernwisdom - Get in touch in the comments below or head to... Instagram: https://www.instagram.com/chriswillx Twitter: https://www.twitter.com/chriswillx Email: https://chriswillx.com/contact/",
+              "summary": "How do you develop good taste in the age of AI Slop? Get 160+ lab tests for just $365 and save an extra $25 at https://functionhealth.com/modernwisdom - Get access to every episode 10 hours before YouTube by subscribing for free on Spotify - https://spotify.modernwisdom.com or Apple Podcasts - https://apple.modernwisdom.com Get my free Reading List of 100 life-changing books here - https://chriswillx.com/books/ Try my productivity energy drink Neutonic here - https://neutonic.com/modernwisdom - Get in touch in the comments below or head to... Instagram: https://www.instagram.com/chriswillx Twitter: https://www.twitter.com/chriswillx Email: https://chriswillx.com/contact/",
+              "topics": ["AI", "design"],
+              "durationSeconds": 780
+            },
+            "context": [
+              {
+                "id": "mock_context_5",
+                "text": "Come back to the hardware discussion on the next walk.",
+                "origin": "explicit",
+                "contributor": "mock-experience",
+                "createdAt": "2026-11-09T12:00:00.000Z",
+                "updatedAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "tags": ["AI", "design"],
+            "collectionIds": ["ai-design"],
+            "progress": {
+              "position": null,
+              "unit": null,
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_5",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_5",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "transcript",
+                  "status": "unavailable",
+                  "reasonCode": "transcript_not_available"
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_5",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "matches": [
+              {
+                "field": "context",
+                "excerpt": "Come back to the hardware discussion on the next walk.",
+                "matchedBy": ["semantic"]
+              }
+            ]
+          },
+          {
+            "id": "AD7A97E4-9162-5D52-9A68-0AFF8B75F903",
+            "status": "saved",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_8",
+              "url": "https://x.com/addyosmani/status/2117512471930167377",
+              "platform": "x",
+              "type": "post",
+              "title": "Critical thinking when agents do the work",
+              "description": "Back in the day, critical thinking was taught as approaching new info with humble curiosity and a healthy dose of skepticism - take in different views, form your own opinion. Still true, but",
+              "summary": "Back in the day, critical thinking was taught as approaching new info with humble curiosity and a healthy dose of skepticism - take in different views, form your own opinion. Still true, but",
+              "topics": ["AI", "design"]
+            },
+            "context": [
+              {
+                "id": "mock_context_8",
+                "text": "For a quieter way to think about practice and attention.",
+                "origin": "explicit",
+                "contributor": "mock-experience",
+                "createdAt": "2026-11-09T12:00:00.000Z",
+                "updatedAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "tags": ["AI", "design"],
+            "collectionIds": ["ai-design"],
+            "progress": {
+              "position": null,
+              "unit": null,
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_8",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_8",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_8",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "matches": [
+              {
+                "field": "context",
+                "excerpt": "For a quieter way to think about practice and attention.",
+                "matchedBy": ["semantic"]
+              }
+            ]
+          },
+          {
+            "id": "65988F4D-F797-574C-95DB-B7FF2974E235",
+            "status": "saved",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_13",
+              "url": "https://seangoedecke.com/working-with-designers",
+              "platform": "web",
+              "type": "article",
+              "title": "Working with designers",
+              "description": "I love working with designers, in part because (unlike managers and product managers) they’re culturally different from engineers. However, having more than one…",
+              "summary": "I love working with designers, in part because (unlike managers and product managers) they’re culturally different from engineers. However, having more than one…",
+              "topics": ["AI", "design"]
+            },
+            "context": [],
+            "tags": ["AI", "design"],
+            "collectionIds": ["ai-design"],
+            "progress": {
+              "position": null,
+              "unit": null,
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_13",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_13",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "article",
+                  "status": "unavailable",
+                  "reasonCode": "source_access_limited"
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_13",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "matches": [
+              {
+                "field": "topics",
+                "excerpt": "AI, design",
+                "matchedBy": ["semantic"]
+              }
+            ]
+          }
+        ],
+        "nextCursor": null,
+        "index": {
+          "pendingItems": 2,
+          "eventuallyConsistent": true
+        }
+      }
+    },
+    {
+      "query": "attention and craft",
+      "response": {
+        "items": [
+          {
+            "id": "FEBA96B0-D3A1-5FF4-939C-4199241F9398",
+            "status": "saved",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_0",
+              "url": "https://www.newyorker.com/magazine/2008/06/09/haruki-murakami-the-running-novelist",
+              "platform": "web",
+              "type": "article",
+              "title": "The Running Novelist",
+              "description": "Haruki Murakami on learning how to go the distance as a writer and a runner.",
+              "summary": "Haruki Murakami on learning how to go the distance as a writer and a runner.",
+              "topics": ["attention", "craft"]
+            },
+            "context": [
+              {
+                "id": "mock_context_0",
+                "text": "For a quieter way to think about practice and attention.",
+                "origin": "explicit",
+                "contributor": "mock-experience",
+                "createdAt": "2026-11-09T12:00:00.000Z",
+                "updatedAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "tags": ["attention", "craft"],
+            "collectionIds": ["craft"],
+            "progress": {
+              "position": 0.28,
+              "unit": "fraction",
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_0",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_0",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "article",
+                  "status": "available",
+                  "reasonCode": null
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_0",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "matches": [
+              {
+                "field": "context",
+                "excerpt": "For a quieter way to think about practice and attention.",
+                "matchedBy": ["semantic"]
+              }
+            ]
+          },
+          {
+            "id": "BD92B205-9659-5B63-B613-D8567357F281",
+            "status": "saved",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_6",
+              "url": "https://andymatuschak.org/books/",
+              "platform": "web",
+              "type": "article",
+              "title": "Why books don't work",
+              "description": "Designing media to reflect how people think and learn",
+              "summary": "Designing media to reflect how people think and learn",
+              "topics": ["attention", "craft"]
+            },
+            "context": [
+              {
+                "id": "mock_context_6",
+                "text": "An idea for how to build products with more care.",
+                "origin": "explicit",
+                "contributor": "mock-experience",
+                "createdAt": "2026-11-09T12:00:00.000Z",
+                "updatedAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "tags": ["attention", "craft"],
+            "collectionIds": ["craft", "ai-design"],
+            "progress": {
+              "position": null,
+              "unit": null,
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_6",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_6",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "article",
+                  "status": "pending",
+                  "reasonCode": null
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_6",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "matches": [
+              {
+                "field": "context",
+                "excerpt": "An idea for how to build products with more care.",
+                "matchedBy": ["semantic"]
+              }
+            ]
+          }
+        ],
+        "nextCursor": null,
+        "index": {
+          "pendingItems": 2,
+          "eventuallyConsistent": true
+        }
+      }
+    }
+  ],
+  "orderedCollections": {
+    "craft": {
+      "items": [
+        {
+          "position": 0,
+          "item": {
+            "id": "CC3475AD-E773-55BC-9FBF-25F4B4553F44",
+            "status": "received",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": null,
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_18",
+              "url": "https://www.youtube.com/watch?v=ZV58g_JzIso",
+              "platform": "youtube",
+              "type": "video",
+              "title": "Liam Pace | The Nine Club #414",
+              "description": "Liam Pace discusses growing up skating bowls at Santa Rita skate park in Tucson AZ, his backyard mini ramp, running from the cops in full pads at 13 years old, knocking his front tooth out at Washington Street & skating the same day with it wired back in, blacking out on big tricks, 23 broken bones, turning his first leg plate into a ring, getting on Foundation through Mike Sinclair at 18 then moving to Madness with Bill Weiss, the Madness promo video he’s working on, Hell Ride, Swampfest, X Games, and much more! Subscribe for more legendary interviews, deep dives, and unfiltered conversations with the people who shaped skateboarding. Drop your favorite story or moment from this episode in the comments below. Liam Pace: https://www.instagram.com/liampace_ ------------------------------------------------ Become a Channel Member & Receive Perks: https://www.youtube.com/TheNineClub/join Nin",
+              "summary": "Liam Pace discusses growing up skating bowls at Santa Rita skate park in Tucson AZ, his backyard mini ramp, running from the cops in full pads at 13 years old, knocking his front tooth out at Washington Street & skating the same day with it wired back in, blacking out on big tricks, 23 broken bones, turning his first leg plate into a ring, getting on Foundation through Mike Sinclair at 18 then moving to Madness with Bill Weiss, the Madness promo video he’s working on, Hell Ride, Swampfest, X Games, and much more! Subscribe for more legendary interviews, deep dives, and unfiltered conversations with the people who shaped skateboarding. Drop your favorite story or moment from this episode in the comments below. Liam Pace: https://www.instagram.com/liampace_ ------------------------------------------------ Become a Channel Member & Receive Perks: https://www.youtube.com/TheNineClub/join Nin",
+              "topics": ["attention", "craft"],
+              "durationSeconds": 5700
+            },
+            "context": [],
+            "tags": ["attention", "craft"],
+            "collectionIds": ["craft"],
+            "progress": {
+              "position": null,
+              "unit": null,
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_18",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_18",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "transcript",
+                  "status": "unavailable",
+                  "reasonCode": "transcript_not_available"
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_18",
+                "route": "subscription",
+                "contributor": "mock-experience",
+                "subscriptionId": "following-craft",
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ]
+          }
+        },
+        {
+          "position": 1,
+          "item": {
+            "id": "BD92B205-9659-5B63-B613-D8567357F281",
+            "status": "saved",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_6",
+              "url": "https://andymatuschak.org/books/",
+              "platform": "web",
+              "type": "article",
+              "title": "Why books don't work",
+              "description": "Designing media to reflect how people think and learn",
+              "summary": "Designing media to reflect how people think and learn",
+              "topics": ["attention", "craft"]
+            },
+            "context": [
+              {
+                "id": "mock_context_6",
+                "text": "An idea for how to build products with more care.",
+                "origin": "explicit",
+                "contributor": "mock-experience",
+                "createdAt": "2026-11-09T12:00:00.000Z",
+                "updatedAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "tags": ["attention", "craft"],
+            "collectionIds": ["craft", "ai-design"],
+            "progress": {
+              "position": null,
+              "unit": null,
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_6",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_6",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "article",
+                  "status": "pending",
+                  "reasonCode": null
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_6",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ]
+          }
+        },
+        {
+          "position": 2,
+          "item": {
+            "id": "9D6A1586-3AB5-5522-B73A-5DDE64BFBC0C",
+            "status": "saved",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_2",
+              "url": "https://open.spotify.com/episode/4naJmXtr0gpvPMifePblbr",
+              "platform": "spotify",
+              "type": "podcast_episode",
+              "title": "It's Been A While",
+              "description": "Changes are afoot, so the boys must catch up.",
+              "summary": "Changes are afoot, so the boys must catch up.",
+              "topics": ["technology", "product"],
+              "durationSeconds": 3960
+            },
+            "context": [
+              {
+                "id": "mock_context_2",
+                "text": "An idea for how to build products with more care.",
+                "origin": "explicit",
+                "contributor": "mock-experience",
+                "createdAt": "2026-11-09T12:00:00.000Z",
+                "updatedAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "tags": ["technology", "product"],
+            "collectionIds": ["craft"],
+            "progress": {
+              "position": null,
+              "unit": null,
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_2",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_2",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "transcript",
+                  "status": "unavailable",
+                  "reasonCode": "transcript_not_available"
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_2",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ]
+          }
+        },
+        {
+          "position": 3,
+          "item": {
+            "id": "FEBA96B0-D3A1-5FF4-939C-4199241F9398",
+            "status": "saved",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_0",
+              "url": "https://www.newyorker.com/magazine/2008/06/09/haruki-murakami-the-running-novelist",
+              "platform": "web",
+              "type": "article",
+              "title": "The Running Novelist",
+              "description": "Haruki Murakami on learning how to go the distance as a writer and a runner.",
+              "summary": "Haruki Murakami on learning how to go the distance as a writer and a runner.",
+              "topics": ["attention", "craft"]
+            },
+            "context": [
+              {
+                "id": "mock_context_0",
+                "text": "For a quieter way to think about practice and attention.",
+                "origin": "explicit",
+                "contributor": "mock-experience",
+                "createdAt": "2026-11-09T12:00:00.000Z",
+                "updatedAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "tags": ["attention", "craft"],
+            "collectionIds": ["craft"],
+            "progress": {
+              "position": 0.28,
+              "unit": "fraction",
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_0",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_0",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "article",
+                  "status": "available",
+                  "reasonCode": null
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_0",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ]
+          }
+        }
+      ],
+      "nextCursor": null
+    },
+    "ai-design": {
+      "items": [
+        {
+          "position": 0,
+          "item": {
+            "id": "9A05F49B-CC6B-5DFD-B74D-C1D83CEFBA06",
+            "status": "saved",
+            "archived": true,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_21",
+              "url": "https://www.youtube.com/watch?v=kBqRubi7dSk",
+              "platform": "youtube",
+              "type": "video",
+              "title": "Making Agents Ship in Complex Brownfield Codebases | Dex Horothy, CEO of HumanLayer",
+              "description": "In this episode of The Build System, I sit down with Dex, CEO of HumanLayer, father of the term “context engineering”, and one of the most prominent thought leaders in the AI coding ecosystem. We break down how teams are actually building with AI today, beyond demos and hype. The conversation digs into why most agent workflows don’t hold up in production, and what changes when you’re working inside large, messy, brownfield systems. We cover: - why most “agent” examples online fail in real environments - the gap between teams seeing ~15–30% gains and those reaching 2–3x productivity - why coding itself is not the main bottleneck in software engineering - the risks of pushing too far toward fully autonomous systems - how AI is starting to reshape team structure and ownership A big theme throughout is that the real leverage comes from improving the entire workflow around coding, not just ge",
+              "summary": "In this episode of The Build System, I sit down with Dex, CEO of HumanLayer, father of the term “context engineering”, and one of the most prominent thought leaders in the AI coding ecosystem. We break down how teams are actually building with AI today, beyond demos and hype. The conversation digs into why most agent workflows don’t hold up in production, and what changes when you’re working inside large, messy, brownfield systems. We cover: - why most “agent” examples online fail in real environments - the gap between teams seeing ~15–30% gains and those reaching 2–3x productivity - why coding itself is not the main bottleneck in software engineering - the risks of pushing too far toward fully autonomous systems - how AI is starting to reshape team structure and ownership A big theme throughout is that the real leverage comes from improving the entire workflow around coding, not just ge",
+              "topics": ["AI", "design"],
+              "durationSeconds": 5220
+            },
+            "context": [],
+            "tags": ["AI", "design"],
+            "collectionIds": ["ai-design"],
+            "progress": {
+              "position": null,
+              "unit": null,
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_21",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_21",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "transcript",
+                  "status": "unavailable",
+                  "reasonCode": "transcript_not_available"
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_21",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ]
+          }
+        },
+        {
+          "position": 1,
+          "item": {
+            "id": "12B8B9CF-BCC5-5707-83DE-5BFB529A1AD1",
+            "status": "saved",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_16",
+              "url": "https://www.anthropic.com/research/components-of-agent-memory",
+              "platform": "web",
+              "type": "article",
+              "title": "The components of agent memory",
+              "description": "For Claude to learn from experience, it has to decide what’s worth remembering before it knows what’s next. Here’s how “dreaming” helps it organize memory and correct mistakes.",
+              "summary": "For Claude to learn from experience, it has to decide what’s worth remembering before it knows what’s next. Here’s how “dreaming” helps it organize memory and correct mistakes.",
+              "topics": ["AI", "design"]
+            },
+            "context": [],
+            "tags": ["AI", "design"],
+            "collectionIds": ["ai-design"],
+            "progress": {
+              "position": null,
+              "unit": null,
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_16",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_16",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "article",
+                  "status": "unavailable",
+                  "reasonCode": "source_access_limited"
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_16",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ]
+          }
+        },
+        {
+          "position": 2,
+          "item": {
+            "id": "6CE6D1B6-4CC3-5892-9BE6-4782F2ABFEEE",
+            "status": "saved",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_15",
+              "url": "https://www.youtube.com/watch?v=afoJu8f9GMA",
+              "platform": "youtube",
+              "type": "video",
+              "title": "Torrenters are building epic media collections | The Vergecast",
+              "description": "All around the internet, groups of media fans are hunting for and curating some of the best movie, music, and TV collections anywhere. And they're doing it all via BitTorrent. Verge contributor and Lowpass writer Janko Roettgers takes us into the world of private torrent trackers, where some people are saving culture and some people are just in it for the flicks. 0:00 Torrents Return 01:20 Private Trackers Explained 04:04 Rules Ratios And Leechers 05:56 The Prestige Ladder 10:00 Bounties And Salinger 12:55 Piracy Ethics Today 17:16 Streaming Backlash 19:45 What Private Really Means 22:12 Anti Piracy Crackdowns 25:44 Why People Do It 27:14 Is BitTorrent Growing 28:45 Curation Beats Algorithms 31:51 Enough Phone Kickstarter 33:50 Phone Prices Subscribe: http://goo.gl/G5RXGs Like The Verge on Facebook: https://goo.gl/2P1aGc Follow on X: https://goo.gl/XTWX61 Follow on Instagram: https://goo",
+              "summary": "All around the internet, groups of media fans are hunting for and curating some of the best movie, music, and TV collections anywhere. And they're doing it all via BitTorrent. Verge contributor and Lowpass writer Janko Roettgers takes us into the world of private torrent trackers, where some people are saving culture and some people are just in it for the flicks. 0:00 Torrents Return 01:20 Private Trackers Explained 04:04 Rules Ratios And Leechers 05:56 The Prestige Ladder 10:00 Bounties And Salinger 12:55 Piracy Ethics Today 17:16 Streaming Backlash 19:45 What Private Really Means 22:12 Anti Piracy Crackdowns 25:44 Why People Do It 27:14 Is BitTorrent Growing 28:45 Curation Beats Algorithms 31:51 Enough Phone Kickstarter 33:50 Phone Prices Subscribe: http://goo.gl/G5RXGs Like The Verge on Facebook: https://goo.gl/2P1aGc Follow on X: https://goo.gl/XTWX61 Follow on Instagram: https://goo",
+              "topics": ["AI", "design"],
+              "durationSeconds": 2220
+            },
+            "context": [],
+            "tags": ["AI", "design"],
+            "collectionIds": ["ai-design"],
+            "progress": {
+              "position": null,
+              "unit": null,
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_15",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_15",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "transcript",
+                  "status": "unavailable",
+                  "reasonCode": "transcript_not_available"
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_15",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ]
+          }
+        },
+        {
+          "position": 3,
+          "item": {
+            "id": "DE1D021C-791B-5CBC-AB1C-F8C6A71F3AA1",
+            "status": "saved",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_14",
+              "url": "https://open.spotify.com/episode/7uL5OXOWudZz28P4Xn3twN",
+              "platform": "spotify",
+              "type": "podcast_episode",
+              "title": "The Future Called. It's Using CSS2.",
+              "description": "This week, Robbie and Adam sip on Chicken Cock Small Batch Kentucky Bourbon and dive into building mobile apps with Claude, CSS infinity, MySpace's comeback, and whether 2026 is just 2006 but way more expensive. They dig into the Doorway app for ADHD task tracking, voice dictation workflows, AI keyboards, Steve Yegge's hot takes on CICD and code review, mental health in the age of agents, design system chaos, LLM failures, why Opus 5 still wins, and skull.style as the future of passive income. Along the way, they debate MySpace's return and nostalgia culture, retro gaming and digital ownership, CSS layers and Tailwind quirks, prop for that and responsive border radiuses, infinity pixels breaking browsers, treating agents nice versus yelling at them, caveman prompting versus verbose explanations, dark factories and internal bleeding, human code review being dead, agent overload and mental",
+              "summary": "This week, Robbie and Adam sip on Chicken Cock Small Batch Kentucky Bourbon and dive into building mobile apps with Claude, CSS infinity, MySpace's comeback, and whether 2026 is just 2006 but way more expensive. They dig into the Doorway app for ADHD task tracking, voice dictation workflows, AI keyboards, Steve Yegge's hot takes on CICD and code review, mental health in the age of agents, design system chaos, LLM failures, why Opus 5 still wins, and skull.style as the future of passive income. Along the way, they debate MySpace's return and nostalgia culture, retro gaming and digital ownership, CSS layers and Tailwind quirks, prop for that and responsive border radiuses, infinity pixels breaking browsers, treating agents nice versus yelling at them, caveman prompting versus verbose explanations, dark factories and internal bleeding, human code review being dead, agent overload and mental",
+              "topics": ["technology", "product"],
+              "durationSeconds": 4020
+            },
+            "context": [],
+            "tags": ["technology", "product"],
+            "collectionIds": ["ai-design"],
+            "progress": {
+              "position": null,
+              "unit": null,
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_14",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_14",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "transcript",
+                  "status": "unavailable",
+                  "reasonCode": "transcript_not_available"
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_14",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ]
+          }
+        },
+        {
+          "position": 4,
+          "item": {
+            "id": "65988F4D-F797-574C-95DB-B7FF2974E235",
+            "status": "saved",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_13",
+              "url": "https://seangoedecke.com/working-with-designers",
+              "platform": "web",
+              "type": "article",
+              "title": "Working with designers",
+              "description": "I love working with designers, in part because (unlike managers and product managers) they’re culturally different from engineers. However, having more than one…",
+              "summary": "I love working with designers, in part because (unlike managers and product managers) they’re culturally different from engineers. However, having more than one…",
+              "topics": ["AI", "design"]
+            },
+            "context": [],
+            "tags": ["AI", "design"],
+            "collectionIds": ["ai-design"],
+            "progress": {
+              "position": null,
+              "unit": null,
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_13",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_13",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "article",
+                  "status": "unavailable",
+                  "reasonCode": "source_access_limited"
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_13",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ]
+          }
+        },
+        {
+          "position": 5,
+          "item": {
+            "id": "395D1F1A-16EA-5BB8-90C6-520CC651D0AD",
+            "status": "saved",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_9",
+              "url": "https://lucumr.pocoo.org/2026/11/9/irontown",
+              "platform": "web",
+              "type": "article",
+              "title": "AI and Irontown",
+              "description": "Thoughts on reconciling incompatible needs.",
+              "topics": ["AI", "design"]
+            },
+            "context": [
+              {
+                "id": "mock_context_9",
+                "text": "Come back to the hardware discussion on the next walk.",
+                "origin": "explicit",
+                "contributor": "mock-experience",
+                "createdAt": "2026-11-09T12:00:00.000Z",
+                "updatedAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "tags": ["AI", "design"],
+            "collectionIds": ["ai-design"],
+            "progress": {
+              "position": null,
+              "unit": null,
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "topics": {
+                  "contributionId": "mock_topics_9",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "processing",
+                  "reasonCode": null
+                },
+                {
+                  "component": "article",
+                  "status": "unavailable",
+                  "reasonCode": "source_access_limited"
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_9",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ]
+          }
+        },
+        {
+          "position": 6,
+          "item": {
+            "id": "AD7A97E4-9162-5D52-9A68-0AFF8B75F903",
+            "status": "saved",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_8",
+              "url": "https://x.com/addyosmani/status/2117512471930167377",
+              "platform": "x",
+              "type": "post",
+              "title": "Critical thinking when agents do the work",
+              "description": "Back in the day, critical thinking was taught as approaching new info with humble curiosity and a healthy dose of skepticism - take in different views, form your own opinion. Still true, but",
+              "summary": "Back in the day, critical thinking was taught as approaching new info with humble curiosity and a healthy dose of skepticism - take in different views, form your own opinion. Still true, but",
+              "topics": ["AI", "design"]
+            },
+            "context": [
+              {
+                "id": "mock_context_8",
+                "text": "For a quieter way to think about practice and attention.",
+                "origin": "explicit",
+                "contributor": "mock-experience",
+                "createdAt": "2026-11-09T12:00:00.000Z",
+                "updatedAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "tags": ["AI", "design"],
+            "collectionIds": ["ai-design"],
+            "progress": {
+              "position": null,
+              "unit": null,
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_8",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_8",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_8",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ]
+          }
+        },
+        {
+          "position": 7,
+          "item": {
+            "id": "8F0124AB-9225-528A-89B5-E2CE0E782B00",
+            "status": "saved",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_7",
+              "url": "https://www.youtube.com/watch?v=GtJKFhztgdM",
+              "platform": "youtube",
+              "type": "video",
+              "title": "Coding Isn't About Code Anymore",
+              "description": "AI has given engineers a new job, which is much more akin to gardening rather than coding, so let's talk about it Thank you Coderabbit for sponsoring! Check them out at: https://soydev.link/coderabbit Want to sponsor a video? Learn more here: https://soydev.link/sponsor-me Check out my Twitch, Twitter, Discord more at https://t3.gg S/O @Ph4seon3 for the awesome edit 🙏",
+              "summary": "AI has given engineers a new job, which is much more akin to gardening rather than coding, so let's talk about it Thank you Coderabbit for sponsoring! Check them out at: https://soydev.link/coderabbit Want to sponsor a video? Learn more here: https://soydev.link/sponsor-me Check out my Twitch, Twitter, Discord more at https://t3.gg S/O @Ph4seon3 for the awesome edit 🙏",
+              "topics": ["AI", "design"],
+              "durationSeconds": 2700
+            },
+            "context": [
+              {
+                "id": "mock_context_7",
+                "text": "Useful context for the agent workflow I am exploring.",
+                "origin": "explicit",
+                "contributor": "mock-experience",
+                "createdAt": "2026-11-09T12:00:00.000Z",
+                "updatedAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "tags": ["AI", "design"],
+            "collectionIds": ["ai-design"],
+            "progress": {
+              "position": null,
+              "unit": null,
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_7",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_7",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "transcript",
+                  "status": "unavailable",
+                  "reasonCode": "transcript_not_available"
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_7",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ]
+          }
+        },
+        {
+          "position": 8,
+          "item": {
+            "id": "BD92B205-9659-5B63-B613-D8567357F281",
+            "status": "saved",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_6",
+              "url": "https://andymatuschak.org/books/",
+              "platform": "web",
+              "type": "article",
+              "title": "Why books don't work",
+              "description": "Designing media to reflect how people think and learn",
+              "summary": "Designing media to reflect how people think and learn",
+              "topics": ["attention", "craft"]
+            },
+            "context": [
+              {
+                "id": "mock_context_6",
+                "text": "An idea for how to build products with more care.",
+                "origin": "explicit",
+                "contributor": "mock-experience",
+                "createdAt": "2026-11-09T12:00:00.000Z",
+                "updatedAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "tags": ["attention", "craft"],
+            "collectionIds": ["craft", "ai-design"],
+            "progress": {
+              "position": null,
+              "unit": null,
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_6",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_6",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "article",
+                  "status": "pending",
+                  "reasonCode": null
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_6",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ]
+          }
+        },
+        {
+          "position": 9,
+          "item": {
+            "id": "070A506D-CE56-5CCD-B930-1D1455A1D6AE",
+            "status": "saved",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_5",
+              "url": "https://www.youtube.com/watch?v=pFscaR3gkfU",
+              "platform": "youtube",
+              "type": "video",
+              "title": "Good Taste vs. Slop: What Makes The Difference?",
+              "description": "How do you develop good taste in the age of AI Slop? Get 160+ lab tests for just $365 and save an extra $25 at https://functionhealth.com/modernwisdom - Get access to every episode 10 hours before YouTube by subscribing for free on Spotify - https://spotify.modernwisdom.com or Apple Podcasts - https://apple.modernwisdom.com Get my free Reading List of 100 life-changing books here - https://chriswillx.com/books/ Try my productivity energy drink Neutonic here - https://neutonic.com/modernwisdom - Get in touch in the comments below or head to... Instagram: https://www.instagram.com/chriswillx Twitter: https://www.twitter.com/chriswillx Email: https://chriswillx.com/contact/",
+              "summary": "How do you develop good taste in the age of AI Slop? Get 160+ lab tests for just $365 and save an extra $25 at https://functionhealth.com/modernwisdom - Get access to every episode 10 hours before YouTube by subscribing for free on Spotify - https://spotify.modernwisdom.com or Apple Podcasts - https://apple.modernwisdom.com Get my free Reading List of 100 life-changing books here - https://chriswillx.com/books/ Try my productivity energy drink Neutonic here - https://neutonic.com/modernwisdom - Get in touch in the comments below or head to... Instagram: https://www.instagram.com/chriswillx Twitter: https://www.twitter.com/chriswillx Email: https://chriswillx.com/contact/",
+              "topics": ["AI", "design"],
+              "durationSeconds": 780
+            },
+            "context": [
+              {
+                "id": "mock_context_5",
+                "text": "Come back to the hardware discussion on the next walk.",
+                "origin": "explicit",
+                "contributor": "mock-experience",
+                "createdAt": "2026-11-09T12:00:00.000Z",
+                "updatedAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "tags": ["AI", "design"],
+            "collectionIds": ["ai-design"],
+            "progress": {
+              "position": null,
+              "unit": null,
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_5",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_5",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "transcript",
+                  "status": "unavailable",
+                  "reasonCode": "transcript_not_available"
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_5",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ]
+          }
+        },
+        {
+          "position": 10,
+          "item": {
+            "id": "CDAEB875-6DEF-58AA-BA39-A1CF193A933A",
+            "status": "saved",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_4",
+              "url": "https://x.com/teddy_riker/status/2047312986696454584",
+              "platform": "x",
+              "type": "post",
+              "title": "Designing for Agents",
+              "description": "If you spend time in the same corner of X as I do, scrolling past the \"How I built a second brain with Obsidian\" and \"Anthropic just KILLED [insert industry] FOREVER\" posts, you've probably also seen",
+              "summary": "If you spend time in the same corner of X as I do, scrolling past the \"How I built a second brain with Obsidian\" and \"Anthropic just KILLED [insert industry] FOREVER\" posts, you've probably also seen",
+              "topics": ["AI", "design"]
+            },
+            "context": [
+              {
+                "id": "mock_context_4",
+                "text": "For a quieter way to think about practice and attention.",
+                "origin": "explicit",
+                "contributor": "mock-experience",
+                "createdAt": "2026-11-09T12:00:00.000Z",
+                "updatedAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "tags": ["AI", "design"],
+            "collectionIds": ["ai-design"],
+            "progress": {
+              "position": null,
+              "unit": null,
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_4",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_4",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_4",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ]
+          }
+        },
+        {
+          "position": 11,
+          "item": {
+            "id": "6B450C0B-3040-548C-883F-C072C637EC6B",
+            "status": "saved",
+            "archived": false,
+            "createdAt": "2026-11-09T12:00:00.000Z",
+            "savedAt": "2026-11-09T12:00:00.000Z",
+            "updatedAt": "2026-11-09T12:00:00.000Z",
+            "revision": 1,
+            "content": {
+              "id": "mock_content_3",
+              "url": "https://x.com/addyosmani/status/2119332146485891501",
+              "platform": "x",
+              "type": "post",
+              "title": "Your coding agents made you a manager",
+              "description": "The skills for managing agents are pretty much the skills for managing a team, and you don't need to be a manager to learn them. If you're spending all day with a coding agent, you are managing.",
+              "summary": "The skills for managing agents are pretty much the skills for managing a team, and you don't need to be a manager to learn them. If you're spending all day with a coding agent, you are managing.",
+              "topics": ["AI", "design"]
+            },
+            "context": [
+              {
+                "id": "mock_context_3",
+                "text": "Useful context for the agent workflow I am exploring.",
+                "origin": "explicit",
+                "contributor": "mock-experience",
+                "createdAt": "2026-11-09T12:00:00.000Z",
+                "updatedAt": "2026-11-09T12:00:00.000Z"
+              }
+            ],
+            "tags": ["AI", "design"],
+            "collectionIds": ["ai-design"],
+            "progress": {
+              "position": null,
+              "unit": null,
+              "completedAt": null,
+              "updatedAt": "2026-11-09T12:00:00.000Z"
+            },
+            "enrichment": {
+              "fields": {
+                "summary": {
+                  "contributionId": "mock_summary_3",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                },
+                "topics": {
+                  "contributionId": "mock_topics_3",
+                  "category": "derived",
+                  "provenance": {
+                    "method": "mock_fixture",
+                    "description": "Illustrative understanding from source metadata only. No full-source analysis was performed.",
+                    "coverage": "metadata_only",
+                    "sourceCoverage": "unknown",
+                    "inputContributionIds": []
+                  }
+                }
+              },
+              "components": [
+                {
+                  "component": "metadata",
+                  "status": "available",
+                  "reasonCode": null
+                },
+                {
+                  "component": "understanding",
+                  "status": "available",
+                  "reasonCode": null
+                }
+              ]
+            },
+            "occurrences": [
+              {
+                "id": "mock_occurrence_3",
+                "route": "save",
+                "contributor": "mock-experience",
+                "subscriptionId": null,
+                "createdAt": "2026-11-09T12:00:00.000Z"
+              }
+            ]
+          }
+        }
+      ],
+      "nextCursor": null
+    }
+  }
+}

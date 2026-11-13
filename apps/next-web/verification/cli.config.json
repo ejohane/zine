@@ -1,0 +1,11 @@
+{
+  "browser": {
+    "browserName": "chromium",
+    "launchOptions": { "channel": "chrome" },
+    "contextOptions": {
+      "viewport": { "width": 951, "height": 669 },
+      "colorScheme": "light",
+      "recordVideo": { "dir": "output/playwright/video", "size": { "width": 1280, "height": 900 } }
+    }
+  }
+}

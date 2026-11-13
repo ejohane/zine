@@ -5,6 +5,7 @@ import { alertSchema } from './operations';
 import { eventSchema, webhookSchema, webhookInputSchema, webhookPatchSchema } from './events';
 import { googleCredentialSchema } from './connections';
 import { saveSchema, patchItemSchema, progressSchema } from './items';
+import { homeDraftSchema, homePublishSchema } from './home';
 import { searchSchema } from './query';
 import {
   contextSchema,
@@ -171,6 +172,25 @@ const schemaSources: Record<string, z.ZodType> = {
   ItemPatchResult: z.object({ id: z.string(), status: z.string(), archived: z.boolean() }),
   ItemList: z.object({ items: z.array(item), nextCursor: nullableString }),
   SearchInput: searchSchema,
+  HomeDraft: homeDraftSchema,
+  HomePublishInput: homePublishSchema,
+  HomePublished: z.object({ editionId: z.string(), generatedAt: z.string() }),
+  Home: z.object({
+    editionId: nullableString,
+    generatedAt: nullableString,
+    sections: z.array(
+      z.object({
+        id: z.string(),
+        kind: z.enum(['resume', 'recent', 'collection']),
+        title: z.string(),
+        cards: z.array(
+          item.pick({ id: true, savedAt: true, progress: true }).extend({
+            content: item.shape.content.omit({ id: true }),
+          })
+        ),
+      })
+    ),
+  }),
   SearchResult: z.object({
     items: z.array(item.extend({ matches: z.array(match), score: z.number().optional() })),
     nextCursor: nullableString,
@@ -527,6 +547,21 @@ op(
   'Health'
 );
 op('get', `${p}/me`, 'Authenticated identity', undefined, 'Me');
+op('get', `${p}/home`, 'Read the current personal Home edition', undefined, 'Home');
+op(
+  'post',
+  `${p}/home/preview`,
+  'Preview a draft against live personal item state',
+  'HomeDraft',
+  'Home'
+);
+op(
+  'put',
+  `${p}/home/edition`,
+  'Atomically replace the current personal Home edition',
+  'HomePublishInput',
+  'HomePublished'
+);
 op(
   'post',
   `${p}/ops/index/rebuild`,
