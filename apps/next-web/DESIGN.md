@@ -37,5 +37,6 @@ system typography **for Home** (format filters keep the native bento in `BentoFe
   never put text over pictures.
 - Type: DM Sans and Source Serif 4, self-hosted via Fontsource (offline in the PWA), as
   stand-ins for the Claude app's Anthropic Sans and Anthropic Serif.
-- Dev-only visual harness: `output/home-preview/` (ignored), served by `bun run dev` at
-  `/next/output/home-preview/index.html`.
+- Visual check without the API: an ignored, machine-local harness can live in `output/` and is
+  served by `bun run dev` (one existed on Erik's Mac at `output/home-preview/`; it is not in git).
+  Prefer `local:pull` data or a branch preview for real checks.

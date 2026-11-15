@@ -65,7 +65,8 @@ The Vite dev server forwards `/v1` to the local API and signs each request in wi
 the local API token, so the browser needs no Clerk sign-in. That code exists only in
 the dev server and `import.meta.env.DEV` branches; production builds keep Clerk and
 the production origin. Production Clerk sign-in stays limited to the production origin.
-Never bypass auth to make verification pass. Transport tests inject responses only in
+Never bypass auth to make verification pass. Details, phone access over Tailscale and branch
+previews: [../api/docs/environments.md](../api/docs/environments.md). Transport tests inject responses only in
 isolated tests.
 
 Reference-only native fixtures/artwork remain in source for design comparison;

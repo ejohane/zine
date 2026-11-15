@@ -15,8 +15,9 @@ for current checks. Read `../AGENTS.md`, inspect git status, then run `bun run d
 - Live-verified from a checkout: deploy (rows load once; object uploads resume after rate limits),
   `/health`, agent token reads the library and keyword search, production rejects the preview
   token, Clerk sign-in renders on the preview origin, and destroy removes every resource while
-  production D1/Worker remain. Not yet verified: a completed human sign-in on a preview, and the
-  workflow running in GitHub Actions.
+  production D1/Worker remain. The workflow also deployed from GitHub Actions on PR #477 (label `preview`).
+  Not yet verified: a completed human sign-in on a preview. Pending: GitHub secret
+  `ZINE_PREVIEW_SECRET`. Guide: `docs/environments.md`.
 
 ## Direction and scope
 

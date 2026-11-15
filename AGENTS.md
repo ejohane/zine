@@ -16,6 +16,7 @@
 
 - New service work in `apps/api` follows [apps/api/AGENTS.md](apps/api/AGENTS.md).
 - Fresh API sessions should read [the API handoff](apps/api/docs/STATUS.md) and run `bun run doctor` from `apps/api`.
+- Zine Next (`apps/api` + `apps/next-web`) local development and branch previews use a cleaned copy of production: read [apps/api/docs/environments.md](apps/api/docs/environments.md). The "Production-Shaped Local Data" section below is for the legacy `apps/worker` stack only.
 - This rewrite deliberately uses its own `/v1` contract and fresh Cloudflare resources. Existing native `/api/v1` work remains governed by the client guidance below.
 - Erik is the owner and Codex is the ongoing implementation agent across fresh sessions. Keep operational context and reproducible commands in the repository; prioritize reliable experiences and agent continuity over broad external-developer onboarding.
 
@@ -100,6 +101,8 @@
 - If the host cannot provide the Simulator app or native computer-use surface, run every remaining safe check but report native UI verification as skipped or blocked; never substitute a static screenshot or logs.
 
 ### Production-Shaped Local Data
+
+- This section covers the legacy `apps/worker` stack. For `apps/api` + `apps/next-web`, see [apps/api/docs/environments.md](apps/api/docs/environments.md).
 
 - To refresh local D1 and reader bodies from the primary production account, run `bun run data:prod:local -- --yes --include-article-bodies` from the repo root.
 - The script exports production D1, keeps only `user_31ejjz59G6mTX1SIyErOi0fwu4A`, retains that Clerk user ID by default (or remaps to the explicit `ZINE_LOCAL_USER_ID` Clerk subject), sanitizes sensitive fields, and restores the result into `apps/worker/.wrangler/state`.

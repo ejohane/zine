@@ -95,6 +95,8 @@ unavailable locally. Data lives in ignored `.local-data/dev/`. Stop `local:dev` 
 
 ### Branch previews
 
+See [docs/environments.md](docs/environments.md) for the full guide and known pitfalls.
+
 A preview is a full copy of the stack for one branch at `https://next-<branch>.myzine.app/next/`:
 an API Worker with its own D1 database, R2 bucket and queue, plus the branch's web app. Its data
 is a slim, cleaned copy of the newest nightly production backup (`scripts/preview-sql.py`: library
