@@ -22,6 +22,8 @@ export default defineConfig(({ command }) => {
     plugins: [react()],
     build: { sourcemap: false, cssMinify: false },
     server: {
+      // Reachable from your own devices over Tailscale (MagicDNS names end in .ts.net).
+      allowedHosts: ['.ts.net'],
       proxy: {
         '/v1': {
           target: 'http://localhost:8890',
