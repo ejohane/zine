@@ -13,6 +13,7 @@
     "local:pull": "bun run scripts/local-data.ts pull",
     "local:reset": "bun run scripts/local-data.ts reset",
     "local:token": "bun run scripts/local-data.ts token",
+    "preview": "bun run scripts/preview.ts",
     "local:dev": "bunx wrangler@4.158.0 dev --config wrangler.local.jsonc --persist-to .local-data/dev/state --port 8890",
     "deploy": "bunx wrangler@4.158.0 deploy",
     "cli": "bun run scripts/zine.ts",

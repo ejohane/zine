@@ -10,10 +10,11 @@
  * webhooks or queued work, and subscriptions paused. Everything lives under ignored .local-data/dev.
  */
 import assert from 'node:assert/strict';
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { chmod, cp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { Miniflare } from 'miniflare';
-import { cloudflare, cloudflareR2Object, environments } from './cloudflare-control';
+import { downloadBackup, extractBackup, latestBackup, sha256 } from './backup-source';
+import { environments } from './cloudflare-control';
 import { quietCommand } from './quiet-command';
 
 const CONFIG = 'wrangler.local.jsonc';
@@ -22,7 +23,6 @@ const STATE = `${ROOT}/state`;
 const PRISTINE = `${ROOT}/pristine`;
 const SNAPSHOT = `${ROOT}/snapshot`;
 const TOKEN = `${ROOT}/token`;
-const BACKUPS = 'zine-api-next-backups';
 const WRANGLER = 'wrangler@4.158.0';
 // Everything the local API may do with its own copy; nothing operational.
 const SCOPES = [
@@ -39,7 +39,6 @@ async function exists(path: string) {
     () => false
   );
 }
-const sha256 = (bytes: string | Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 
 /** The local config must never point at a real environment. */
 async function assertLocalConfig() {
@@ -54,42 +53,9 @@ async function assertLocalConfig() {
 const wrangler = (...args: string[]) =>
   quietCommand('bunx', [WRANGLER, ...args, '--config', CONFIG, '--persist-to', STATE]);
 
-async function latestBackup() {
-  const objects = await cloudflare<{ key: string; size: number }[]>(
-    `r2/buckets/${BACKUPS}/objects?prefix=backups/production/&per_page=1000`
-  );
-  const latest = objects
-    .filter((object) => /^backups\/production\/[^/]+\/[a-f0-9]{64}\.tar\.gz$/.test(object.key))
-    .sort((a, b) => a.key.localeCompare(b.key))
-    .at(-1);
-  assert.ok(latest, 'No production backup found; run the API private backup workflow first');
-  return latest.key;
-}
-
-async function download(key: string) {
-  const archive = `${ROOT}/${key.split('/').at(-1)}`;
-  if (await exists(archive)) return archive;
-  const response = await cloudflareR2Object(BACKUPS, key);
-  assert.equal(response.status, 200, `Backup download failed (HTTP ${response.status})`);
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  // Archives are content-addressed: the file name is the archive's SHA-256.
-  assert.equal(`${sha256(bytes)}.tar.gz`, key.split('/').at(-1), 'Backup archive is corrupt');
-  await writeFile(archive, bytes, { mode: 0o600 });
-  return archive;
-}
-
 async function load(archive: string) {
   await assertLocalConfig();
-  await rm(SNAPSHOT, { recursive: true, force: true });
-  await mkdir(SNAPSHOT, { recursive: true, mode: 0o700 });
-  await quietCommand('tar', ['-xzf', archive, '-C', SNAPSHOT]);
-  const manifest = JSON.parse(await readFile(`${SNAPSHOT}/manifest.json`, 'utf8')) as {
-    environment: string;
-    startedAt: string;
-    counts: Record<string, number>;
-    artifacts: { key: string; file: string; sha256: string }[];
-  };
-  assert.equal(manifest.environment, 'production');
+  const manifest = await extractBackup(archive, SNAPSHOT);
 
   // Fresh local database at the current branch's schema, then the cleaned rows on top.
   await rm(STATE, { recursive: true, force: true });
@@ -185,12 +151,7 @@ async function reset() {
 const command = process.argv[2];
 await mkdir(ROOT, { recursive: true, mode: 0o700 });
 if (command === 'pull') {
-  const key = await latestBackup();
-  await load(await download(key));
-  // Keep only the archive just loaded.
-  const current = key.split('/').at(-1)!;
-  for (const name of await readdir(ROOT))
-    if (name.endsWith('.tar.gz') && name !== current) await rm(`${ROOT}/${name}`);
+  await load(await downloadBackup(await latestBackup(), ROOT));
 } else if (command === 'reset') await reset();
 else if (command === 'token') process.stdout.write(await readFile(TOKEN, 'utf8'));
 else throw new Error('Use: bun run scripts/local-data.ts pull|reset|token');

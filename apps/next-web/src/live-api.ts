@@ -1,7 +1,15 @@
 // Browser-only /v1 boundary; mirrors apps/api/client retry and idempotency semantics.
 export const libraryPageSize = 30;
-// In local development the dev server forwards /v1 to the local API (see vite.config.ts).
-export const apiOrigin = import.meta.env?.DEV ? location.origin : 'https://api-next.myzine.app';
+export const productionOrigin = 'https://api-next.myzine.app';
+/** Origins that serve this app next to their own /v1 API: production and branch previews. */
+export const isAppOrigin = (origin: string) =>
+  origin === productionOrigin || /^https:\/\/next-[a-z0-9-]{1,20}\.myzine\.app$/.test(origin);
+// Previews use their own API on the same origin. In local development the dev server forwards
+// /v1 to the local API (see vite.config.ts). Anywhere else, the app points at production.
+export const apiOrigin =
+  typeof location !== 'undefined' && (import.meta.env?.DEV || isAppOrigin(location.origin))
+    ? location.origin
+    : productionOrigin;
 export const appURL = apiOrigin + '/next/';
 export type RemoteItem = {
   id: string;

@@ -36,7 +36,8 @@ portal or elaborate SDK is not the immediate production milestone.
   never raw credentials or private library content.
 - Local development and agent experiments run against `bun run local:pull` data with
   `bun run local:dev`, and `bun run local:reset` between attempts. Never point local
-  work, scripts or tests at production resources to get realistic data.
+  work, scripts or tests at production resources to get realistic data. To try a branch
+  deployed, use a branch preview (README) and its derived agent token, never production.
 - Use the shared `agent-secrets` skill for credentials. Profile metadata and key
   names are safe to inspect; secret values do not belong in chat, logs, arguments
   or repo files. Do not assume an inherited legacy token authenticates this API.

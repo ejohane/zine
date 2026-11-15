@@ -3,6 +3,21 @@
 Last reviewed: 2026-11-09 UTC. This file records observed state, not a substitute
 for current checks. Read `../AGENTS.md`, inspect git status, then run `bun run doctor`.
 
+## Local data and branch previews (2026-11-15, branch `next-home-redesign`)
+
+- `bun run local:pull|local:dev|local:reset|local:token`: local API on a cleaned copy of the
+  newest nightly production backup (`scripts/local-data.ts`, `scripts/local-restore.py`).
+- `bun run preview deploy|destroy|list|sweep|token`: per-branch API + web Workers at
+  `https://next-<slug>.myzine.app/next/` with their own D1/R2/queue and a slim cleaned copy
+  (`scripts/preview.ts`, `scripts/preview-sql.py`). Workflow `.github/workflows/next-preview.yml`
+  (PR label `preview`, manual, daily 7-day sweep; max 3). Needs GitHub secret
+  `ZINE_PREVIEW_SECRET` for agent tokens.
+- Live-verified from a checkout: deploy (rows load once; object uploads resume after rate limits),
+  `/health`, agent token reads the library and keyword search, production rejects the preview
+  token, Clerk sign-in renders on the preview origin, and destroy removes every resource while
+  production D1/Worker remain. Not yet verified: a completed human sign-in on a preview, and the
+  workflow running in GitHub Actions.
+
 ## Direction and scope
 
 Zine is an API-first saving service. Platforms host original media; Zine owns

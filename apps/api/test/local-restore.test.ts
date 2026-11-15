@@ -61,6 +61,31 @@ print(json.dumps({
     expect(counts).toEqual({ tokens: 0, connections: 0, pending: 0, leases: 0, jobs: 1 });
   });
 
+  it('builds a preview import with no credentials, jobs or oversized statements', () => {
+    const snapshot = join(dir, 'snapshot.sqlite');
+    const sql = join(dir, 'preview.sql');
+    const preview = join(dir, 'preview.sqlite');
+    const report = JSON.parse(
+      execFileSync('python3', ['scripts/preview-sql.py', snapshot, sql], { encoding: 'utf8' })
+    );
+    expect(report.largestStatementBytes).toBeLessThan(100_000);
+    python(migrate, preview);
+    const counts = JSON.parse(
+      python(
+        `
+import json, sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+db.executescript(open(sys.argv[2]).read())
+one = lambda sql: db.execute(sql).fetchone()[0]
+print(json.dumps({t: one(f'SELECT COUNT(*) FROM {t}') for t in ['api_tokens', 'connections', 'jobs']}))
+`,
+        preview,
+        sql
+      )
+    );
+    expect(counts).toEqual({ api_tokens: 0, connections: 0, jobs: 0 });
+  });
+
   it('refuses to load into a database that already has rows', () => {
     const snapshot = join(dir, 'snapshot.sqlite');
     const local = join(dir, 'local.sqlite');

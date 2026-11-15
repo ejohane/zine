@@ -93,6 +93,24 @@ schedules or provider secrets, so semantic search and ingestion that needs provi
 unavailable locally. Data lives in ignored `.local-data/dev/`. Stop `local:dev` before
 `local:reset`. `test/local-restore.test.ts` proves the cleaning.
 
+### Branch previews
+
+A preview is a full copy of the stack for one branch at `https://next-<branch>.myzine.app/next/`:
+an API Worker with its own D1 database, R2 bucket and queue, plus the branch's web app. Its data
+is a slim, cleaned copy of the newest nightly production backup (`scripts/preview-sql.py`: library
+only, no credentials, webhooks, event/job history or semantic index state; subscriptions paused).
+Previews have no AI, vector index, cron or provider secrets; search is keyword-only. Sign in with
+your normal Zine account; production rejects preview sessions.
+
+- Request one: add the `preview` label to a pull request (redeploys on each push; data is loaded
+  once and kept), or run the "Zine Next branch preview" workflow by hand.
+- Removed when the label is removed, the pull request closes, or after 7 days. At most 3 exist;
+  a new one replaces the oldest.
+- From a checkout (needs `CLOUDFLARE_API_TOKEN`; build `apps/next-web` first):
+  `bun run preview deploy|destroy <branch>`, `bun run preview list`, `bun run preview sweep`.
+- Agents: `ZINE_PREVIEW_SECRET=… bun run preview token <branch>` derives that preview's API
+  token (the workflow seeds it from the same GitHub secret).
+
 ## CLI
 
 ```sh
