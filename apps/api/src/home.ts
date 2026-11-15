@@ -46,6 +46,55 @@ export type HomeCard = ReturnType<typeof homeCard>;
 type Item = Awaited<ReturnType<typeof getItem>>;
 type Edition = { id: string; generatedAt: string; draft: HomeDraft };
 
+type Post = { id?: string; text?: string; author_id?: string };
+type Thread = { selectedId?: string; posts?: Post[] };
+const words = (text: string) => text.split(/\s+/).filter(Boolean).length;
+
+// Opening text for a card: whole paragraphs while they fit, then whole sentences, never mid-word.
+export function openingText(text: string, limit = 700) {
+  const paragraphs = text
+    .split(/\n\s*\n|\r?\n(?=\s*\S)/)
+    .map((paragraph) => paragraph.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  const kept: string[] = [];
+  let length = 0;
+  for (const paragraph of paragraphs) {
+    const room = limit - length - (kept.length ? 2 : 0);
+    if (paragraph.length <= room) {
+      kept.push(paragraph);
+      length += paragraph.length + (kept.length > 1 ? 2 : 0);
+      continue;
+    }
+    if (room < 80 && kept.length) break;
+    const sentences = paragraph.match(/[^.!?]+[.!?]+["'”’)\]]*\s*|[^.!?]+$/g) ?? [paragraph];
+    let cut = '';
+    for (const sentence of sentences) {
+      if ((cut + sentence).trim().length > room) break;
+      cut += sentence;
+    }
+    if (!cut.trim()) {
+      const slice = paragraph.slice(0, room - 1);
+      cut = slice.slice(0, Math.max(slice.lastIndexOf(' '), 1)) + '…';
+    }
+    kept.push(cut.trim());
+    break;
+  }
+  return kept.join('\n\n') || undefined;
+}
+
+function threadParts(thread: Thread | undefined) {
+  const posts = thread?.posts ?? [];
+  const selected = posts.find((post) => post.id === thread?.selectedId) ?? posts[0];
+  if (!selected?.text) return {};
+  const authored = posts.filter(
+    (post) => post.author_id && post.author_id === selected.author_id && post.text
+  );
+  // The author's own posts in the conversation, starting at the saved post.
+  const from = Math.max(0, authored.indexOf(selected));
+  const run = authored.length ? authored.slice(from) : [selected];
+  return { text: run.map((post) => post.text).join('\n\n'), count: run.length };
+}
+
 export function homeCard(item: Item) {
   const { id, savedAt, progress, content } = item;
   const {
@@ -59,6 +108,15 @@ export function homeCard(item: Item) {
     durationSeconds,
     summary,
   } = content;
+  const article = content.article as { text?: string; coverage?: string } | undefined;
+  const thread = threadParts(content.thread as Thread | undefined);
+  const description = typeof content.description === 'string' ? content.description : undefined;
+  const source = article?.text || thread.text || summary || description;
+  const preview = typeof source === 'string' ? openingText(source) : undefined;
+  const readMinutes =
+    type === 'article' && article?.text && article.coverage !== 'partial'
+      ? Math.max(1, Math.ceil(words(article.text) / 230))
+      : undefined;
   return {
     id,
     savedAt,
@@ -73,6 +131,9 @@ export function homeCard(item: Item) {
       creatorImageUrl,
       durationSeconds,
       summary,
+      ...(preview ? { preview } : {}),
+      ...(readMinutes ? { readMinutes } : {}),
+      ...(thread.count && thread.count > 1 ? { threadPosts: thread.count } : {}),
     },
   };
 }
@@ -138,7 +199,7 @@ async function hydrate(env: Env, owner: string, ids: string[]) {
   const entries = await Promise.all(
     ids.map(async (itemId) => {
       try {
-        const item = await getItem(env, owner, itemId);
+        const item = await getItem(env, owner, itemId, ['article', 'thread']);
         return eligibleForHome(item) ? ([itemId, homeCard(item)] as const) : null;
       } catch (error) {
         if (error instanceof ApiError && error.status === 404) return null;

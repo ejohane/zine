@@ -104,6 +104,19 @@ export async function youtubePlaylistPage(
     total: page.pageInfo?.totalResults,
   };
 }
+// A video's creator image is its channel avatar, which needs one extra lookup (1 quota unit).
+// The avatar is optional, so a failed lookup never fails the extraction.
+async function channelAvatar(env: Env, owner: string | undefined, channelId: string) {
+  try {
+    const result = await youtubeRequest(env, owner, 'channels', { part: 'snippet', id: channelId });
+    const thumbnails = object(object(result.items[0]?.snippet).thumbnails);
+    return creatorImageReference(
+      object(thumbnails.high ?? thumbnails.medium ?? thumbnails.default).url
+    );
+  } catch {
+    return undefined;
+  }
+}
 export async function youtubeApiExtraction(
   env: Env,
   owner: string | undefined,
@@ -154,10 +167,12 @@ export async function youtubeApiExtraction(
     thumbnails.maxres ?? thumbnails.high ?? thumbnails.medium ?? thumbnails.default
   ).url;
   add('thumbnail', thumbnail);
+  const channelId = identity.kind === 'channel' ? text(item.id) : text(snippet.channelId);
   if (identity.kind === 'channel') add('creatorImageUrl', creatorImageReference(thumbnail));
+  else if (identity.kind === 'video' && channelId)
+    add('creatorImageUrl', await channelAvatar(env, owner, channelId));
   add('durationSeconds', isoDuration(text(details.duration)));
   add('structuredData', item);
-  const channelId = identity.kind === 'channel' ? text(item.id) : text(snippet.channelId);
   if (channelId)
     add('source', {
       id: channelId,
