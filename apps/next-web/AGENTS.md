@@ -13,6 +13,8 @@ legacy web app as part of these experiments.
   app uses real Clerk sessions and the independent production `/v1` service.
 - Serve at `https://api-next.myzine.app/next/` with a separate asset Worker and
   path-scoped service worker. Preserve the backend deployment and auth policies.
+- Local development uses `apps/api` `local:pull`/`local:dev` data through the Vite
+  proxy (README). Never point local work at production.
 - Never substitute mock content on network/auth failure or import old mock edits.
 - Private caches are account-scoped and cleared at sign-out/account changes.
   Never cache authenticated API responses in the public shell service worker.

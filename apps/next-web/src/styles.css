@@ -1182,7 +1182,6 @@ blockquote {
   height: var(--av, 28px);
   border-radius: 50%;
   overflow: hidden;
-  background: var(--inset);
 }
 .hcard .creator {
   display: flex;
@@ -1864,6 +1863,8 @@ blockquote {
 }
 .m3 .rail > [role='listitem'] {
   flex: 0 0 148px;
+  width: 148px;
+  min-width: 0;
   scroll-snap-align: start;
   height: 196px;
   display: flex;

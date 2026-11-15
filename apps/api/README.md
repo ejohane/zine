@@ -73,6 +73,26 @@ Zod 3 resolution. Tests use the monorepo's Vitest 2. Wrangler 4 is invoked with 
 exact Bunx version, preserving the existing root Wrangler 3 installation.
 The independent `API rewrite checks` workflow runs this package's checks on changes.
 
+### Local development with a copy of production data
+
+```sh
+cd apps/api
+bun run local:pull    # newest nightly production backup → cleaned local copy (~10 s once cached)
+bun run local:dev     # local API on :8890 against that copy
+bun run local:reset   # discard local changes; back to the pristine copy (about a second)
+bun run local:token   # the local API token, for curl or agents
+```
+
+`local:pull` only reads production through the private backup bucket
+(`zine-api-next-backups`, needs `CLOUDFLARE_API_TOKEN`). Rows are copied by
+`scripts/local-restore.py` with the isolated-restore cleaning rules from `restore-sql.py`:
+no API tokens, provider connections, webhooks or queued work, and subscriptions paused.
+It then seeds one local-only API token for the account with the most saves.
+`wrangler.local.jsonc` has no production database, bucket, AI, vector index, routes,
+schedules or provider secrets, so semantic search and ingestion that needs providers are
+unavailable locally. Data lives in ignored `.local-data/dev/`. Stop `local:dev` before
+`local:reset`. `test/local-restore.test.ts` proves the cleaning.
+
 ## CLI
 
 ```sh

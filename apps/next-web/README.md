@@ -52,10 +52,21 @@ bun run --cwd apps/next-web build
 bunx wrangler@4.158.0 deploy --config apps/next-web/wrangler.jsonc
 ```
 
-`bun run --cwd apps/next-web dev` runs Vite at `/next/` on localhost:5194.
-Production Clerk sign-in is intentionally limited to the production origin; a
-local runtime shows a link to the connected app. Never bypass auth to make local
-manual verification pass. Transport tests inject responses only in isolated tests.
+Local development runs the real connected app against a cleaned local copy of
+production data, never against production:
+
+```sh
+bun run --cwd apps/api local:pull   # once, and whenever you want fresher data
+bun run --cwd apps/api local:dev    # local API on :8890
+bun run --cwd apps/next-web dev     # app at http://localhost:5194/next/
+```
+
+The Vite dev server forwards `/v1` to the local API and signs each request in with
+the local API token, so the browser needs no Clerk sign-in. That code exists only in
+the dev server and `import.meta.env.DEV` branches; production builds keep Clerk and
+the production origin. Production Clerk sign-in stays limited to the production origin.
+Never bypass auth to make verification pass. Transport tests inject responses only in
+isolated tests.
 
 Reference-only native fixtures/artwork remain in source for design comparison;
 `sync:native` refreshes those explicitly. They do not supply connected runtime data

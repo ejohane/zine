@@ -1,0 +1,34 @@
+// Local development only: `bun run local:dev`. Runs against a cleaned copy of production data
+// loaded by `bun run local:pull` into ignored .local-data/dev/state. It has no production database,
+// bucket, AI, vector index, routes or schedules, and no provider secrets, so nothing here can reach
+// production or act on the outside world. Never deploy this config.
+{
+  "$schema": "https://unpkg.com/wrangler@4.158.0/config-schema.json",
+  "name": "zine-api-next-local",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-30",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "version_metadata": { "binding": "DEPLOYMENT" },
+  "vars": {
+    "ENVIRONMENT": "local",
+    // Local sign-in uses the API token seeded by local:pull; no JWT issuer is trusted.
+    "ALLOWED_ORIGINS": "http://localhost:5194,http://localhost:8890",
+    "EMBEDDING_MODEL": "unconfigured",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "zine-api-next-local",
+      // Not a real database: local mode only.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "r2_buckets": [{ "binding": "ARTIFACTS", "bucket_name": "zine-api-next-local-artifacts" }],
+  "queues": {
+    "producers": [{ "binding": "JOBS", "queue": "zine-api-next-local-jobs" }],
+    "consumers": [{ "queue": "zine-api-next-local-jobs", "max_batch_size": 5, "max_batch_timeout": 1 }],
+  },
+}

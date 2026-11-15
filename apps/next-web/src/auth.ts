@@ -26,7 +26,29 @@ function script(src: string, key?: string) {
   });
 }
 let loading: Promise<Clerk> | undefined;
+/**
+ * Local development: the dev server signs every /v1 request in with the local API token, so the
+ * browser needs no sign-in. The account is whatever that token belongs to. Never in a build.
+ */
+async function localAuth(): Promise<Clerk> {
+  const response = await fetch('/v1/me', { headers: { accept: 'application/json' } });
+  if (!response.ok)
+    throw Error(
+      'Local API unavailable. Run `bun run local:pull` and `bun run local:dev` in apps/api.'
+    );
+  const { id } = (await response.json()) as { id: string };
+  return {
+    isSignedIn: true,
+    user: { id },
+    session: { getToken: async () => 'local-development' },
+    load: async () => {},
+    mountSignIn: () => {},
+    signOut: async () => {},
+    addListener: () => () => {},
+  };
+}
 export function loadAuth() {
+  if (import.meta.env?.DEV) return (loading ??= localAuth());
   return (loading ??= (async () => {
     await script('https://clerk.myzine.app/npm/@clerk/ui@1/dist/ui.browser.js');
     await script(
