@@ -1,4 +1,4 @@
-import type { RemoteItem, Material } from './live-api';
+import type { RemoteItem, Material, Home } from './live-api';
 export type Snapshot = {
   owner: string;
   section: string;
@@ -36,6 +36,10 @@ export const readSnapshot = (owner: string, section: string) =>
   transaction<Snapshot | undefined>('readonly', (s) => s.get(owner + ':feed:' + section));
 export const writeSnapshot = (snapshot: Snapshot) =>
   transaction('readwrite', (s) => s.put(snapshot, snapshot.owner + ':feed:' + snapshot.section));
+export const readHome = (owner: string) =>
+  transaction<Home | undefined>('readonly', (s) => s.get(owner + ':home'));
+export const writeHome = (owner: string, home: Home) =>
+  transaction('readwrite', (s) => s.put(home, owner + ':home'));
 export const readItem = (owner: string, id: string) =>
   transaction<RemoteItem | undefined>('readonly', (s) => s.get(owner + ':item:' + id));
 export const writeItem = (owner: string, item: RemoteItem) =>
@@ -68,7 +72,15 @@ export async function forgetItem(owner: string, id: string) {
     cursor.onsuccess = () => {
       const row = cursor.result;
       if (!row) return;
-      if (String(row.key).startsWith(owner + ':feed:') && Array.isArray(row.value.items))
+      if (row.key === owner + ':home' && Array.isArray(row.value.sections))
+        row.update({
+          ...row.value,
+          sections: row.value.sections.map((section: Home['sections'][number]) => ({
+            ...section,
+            cards: section.cards.filter((card) => card.id !== id),
+          })),
+        });
+      else if (String(row.key).startsWith(owner + ':feed:') && Array.isArray(row.value.items))
         row.update({
           ...row.value,
           items: row.value.items.filter((item: RemoteItem) => item.id !== id),

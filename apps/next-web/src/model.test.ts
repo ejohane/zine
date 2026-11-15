@@ -6,7 +6,6 @@ import {
   isComplete,
   loadLibrary,
   persist,
-  composeHome,
   plan,
   progress,
   search,
@@ -146,43 +145,5 @@ describe('Native-parity model invariants', () => {
         initialItems()
       )
     ).toThrow('quota');
-  });
-});
-
-describe('Composed Home feed', () => {
-  const items = initialItems();
-  const cards = Array.from({ length: 63 }, (_, i) => ({
-    ...items[i % items.length],
-    id: `save-${i}`,
-  }));
-
-  test('renders every save in order and keeps previous rows stable during pagination', () => {
-    const first = composeHome(cards.slice(0, 30), 30);
-    const expanded = composeHome(cards, 30);
-    expect(expanded.slice(0, first.length)).toEqual(first);
-    expect(expanded.flatMap((row) => row.groups.flatMap((group) => group.items))).toEqual(cards);
-  });
-
-  test('assigns shapes by position even in single-format libraries', () => {
-    const videos = cards.slice(0, 12).map((item) => ({ ...item, section: 'Videos' as const }));
-    const rows = composeHome(videos, 30);
-    expect(rows.map((row) => row.groups.map((group) => group.presentation))).toEqual([
-      ['feature', 'compact'],
-      ['tile', 'tall'],
-      ['banner'],
-      ['compact', 'feature'],
-    ]);
-    expect(rows[0].groups[1].items).toHaveLength(3);
-    expect(rows[1].groups[0].items).toHaveLength(2);
-  });
-
-  test('renders partial rows without leaving empty slots', () => {
-    expect(composeHome([], 30)).toEqual([]);
-    for (let length = 1; length < 30; length++) {
-      const rows = composeHome(cards.slice(0, length), 30);
-      expect(rows.flatMap((row) => row.groups.flatMap((group) => group.items))).toEqual(
-        cards.slice(0, length)
-      );
-    }
   });
 });

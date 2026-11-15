@@ -8,7 +8,7 @@ import { BentoFeed, HomeFeed } from './HomeFeed';
 import { headlines, progress, resumeLabel, safeURL, timestamp } from './model';
 import type { Item, Section } from './model';
 import { API, ServiceError, apiOrigin, appURL, message } from './live-api';
-import type { RemoteItem, Collection, Material } from './live-api';
+import type { RemoteItem, Collection, Material, Home } from './live-api';
 import { loadAuth, token } from './auth';
 import type { Identity } from './auth';
 import {
@@ -17,6 +17,8 @@ import {
   forgetMaterial,
   readSnapshot,
   writeSnapshot,
+  readHome,
+  writeHome,
   readItem,
   writeItem,
   readMaterial,
@@ -218,6 +220,7 @@ function Library({ identity, signOut }: { identity: Identity; signOut: () => Pro
   const [cacheError, setCacheError] = useState('');
   const [cachedAt, setCachedAt] = useState<number>();
   const [collections, setCollections] = useState<Collection[]>([]);
+  const [home, setHome] = useState<Home>();
   const [panel, setPanel] = useState<string | null>(readPanel);
   const [current, setCurrent] = useState<RemoteItem>();
   const [busy, setBusy] = useState(false);
@@ -246,6 +249,16 @@ function Library({ identity, signOut }: { identity: Identity; signOut: () => Pro
   async function forgetDenied(id: string) {
     setCurrent(undefined);
     setItems((previous) => previous.filter((item) => item.id !== id));
+    setHome(
+      (previous) =>
+        previous && {
+          ...previous,
+          sections: previous.sections.map((section) => ({
+            ...section,
+            cards: section.cards.filter((card) => card.id !== id),
+          })),
+        }
+    );
     try {
       await forgetItem(owner, id);
     } catch {
@@ -358,6 +371,36 @@ function Library({ identity, signOut }: { identity: Identity; signOut: () => Pro
       stopped = true;
     };
   }, [section, owner, revision, destination, isSearch, isInbox, snapshotKey, query]);
+  const onHome = destination === 'Home' && section === 'Home';
+  // Home's composed edition loads beside the library page; the library fills whatever it leaves.
+  useEffect(() => {
+    if (!onHome) return;
+    let stopped = false;
+    void (async () => {
+      try {
+        const cached = await readHome(owner);
+        if (!stopped && cached) setHome(cached);
+      } catch {
+        cacheFailure();
+      }
+      if (!navigator.onLine) return;
+      try {
+        const value = await api.home();
+        if (stopped) return;
+        setHome(value);
+        try {
+          await writeHome(owner, value);
+        } catch {
+          cacheFailure();
+        }
+      } catch {
+        // The library page still fills Home; its own errors are reported by the feed load.
+      }
+    })();
+    return () => {
+      stopped = true;
+    };
+  }, [onHome, owner, revision]);
   useEffect(() => {
     if (!offline)
       void api
@@ -490,6 +533,20 @@ function Library({ identity, signOut }: { identity: Identity; signOut: () => Pro
     if (!alive.current) return value;
     setCurrent(value);
     setItems((previous) => previous.map((i) => (i.id === value.id ? value : i)));
+    // Home only shows open saves; keep its cards in step with the change just made.
+    const open = value.status === 'saved' && !value.archived && !value.progress.completedAt;
+    setHome(
+      (previous) =>
+        previous && {
+          ...previous,
+          sections: previous.sections.map((section) => ({
+            ...section,
+            cards: section.cards.flatMap((card) =>
+              card.id !== value.id ? [card] : open ? [{ ...card, progress: value.progress }] : []
+            ),
+          })),
+        }
+    );
     await cacheItem(value);
     try {
       const snap = isSearch ? undefined : await readSnapshot(owner, snapshotKey);
@@ -626,9 +683,9 @@ function Library({ identity, signOut }: { identity: Identity; signOut: () => Pro
               )}
             </div>
           )}
-          {cards.length > 0 ? (
-            destination === 'Home' && section === 'Home' ? (
-              <HomeFeed cards={cards} open={navigate} />
+          {cards.length > 0 || (onHome && home?.sections.length) ? (
+            onHome ? (
+              <HomeFeed home={home} items={items} open={navigate} />
             ) : (
               <BentoFeed
                 cards={cards}

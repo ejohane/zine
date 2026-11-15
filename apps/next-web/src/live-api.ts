@@ -48,6 +48,27 @@ export type RemoteItem = {
   };
 };
 export type Page = { items: RemoteItem[]; nextCursor: string | null };
+export type HomeCard = {
+  id: string;
+  savedAt: string | null;
+  progress: RemoteItem['progress'];
+  content: Omit<RemoteItem['content'], 'id'> & {
+    preview?: string;
+    readMinutes?: number;
+    threadPosts?: number;
+  };
+};
+export type HomeSection = {
+  id: string;
+  kind: 'resume' | 'recent' | 'collection';
+  title: string;
+  cards: HomeCard[];
+};
+export type Home = {
+  editionId: string | null;
+  generatedAt: string | null;
+  sections: HomeSection[];
+};
 export type Collection = {
   id: string;
   name: string;
@@ -155,6 +176,9 @@ export class API {
       ...(cursor ? { cursor } : {}),
     });
     return this.request<Page>('GET', '/v1/items?' + params);
+  }
+  home() {
+    return this.request<Home>('GET', '/v1/home');
   }
   search(query: string, cursor?: string) {
     return this.request<Page>('POST', '/v1/items/search', {
