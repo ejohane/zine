@@ -3,7 +3,7 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 import { House, Headphones, FileText, Play, MessageSquare, Plus, CheckCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { sections, progress, isComplete, resumeLabel } from './model';
-import type { Section, Item, HomePresentation, Placement } from './model';
+import type { Section, Item, Placement } from './model';
 const icons: Record<Section, LucideIcon> = {
   Home: House,
   Podcasts: Headphones,
@@ -172,17 +172,14 @@ export function StoryCard({
   item,
   placement,
   onOpen,
-  presentation,
 }: {
   item: Item;
   placement?: Omit<Placement, 'index'>;
-  presentation?: HomePresentation;
   onOpen: () => void;
 }) {
   const start = useRef({ x: 0, y: 0, moved: false });
-  const artwork = presentation || item.section !== 'Posts' ? item.image : undefined;
-  const compact = presentation === 'compact';
-  const media = !!artwork && !compact;
+  const artwork = item.section !== 'Posts' ? item.image : undefined;
+  const media = !!artwork;
   const Icon = icons[item.section];
   const fraction = progress(item);
   return (
@@ -190,7 +187,7 @@ export function StoryCard({
       type="button"
       data-item-id={item.id}
       data-kind={item.section}
-      className={`story-card ${media ? 'media-card' : 'text-card'} ${presentation ? `home-card-${presentation}` : `format-${item.section.toLowerCase()}`}`}
+      className={`story-card ${media ? 'media-card' : 'text-card'} format-${item.section.toLowerCase()}`}
       style={
         placement && {
           gridColumn: `${placement.column + 1} / span ${placement.columns}`,
@@ -233,20 +230,20 @@ export function StoryCard({
           {media && <span className="media-scrim" />}
         </>
       )}
-      {item.section === 'Videos' && !compact && (
+      {item.section === 'Videos' && (
         <span className="play-indicator" aria-hidden="true">
           <Play size={16} fill="currentColor" />
         </span>
       )}
       <span className="card-copy">
-        {!compact && item.section !== 'Posts' && (
+        {item.section !== 'Posts' && (
           <CreatorByline author={item.author} image={item.creatorImage} icon={Icon} />
         )}
         <strong className="card-title">{item.title}</strong>
-        {!artwork && !compact && item.section === 'Articles' && item.note && (
+        {!artwork && item.section === 'Articles' && item.note && (
           <span className="card-note">{item.note}</span>
         )}
-        {compact || item.section === 'Posts' ? (
+        {item.section === 'Posts' ? (
           <CreatorByline author={item.author} image={item.creatorImage} icon={Icon} />
         ) : (
           <span className="card-duration">

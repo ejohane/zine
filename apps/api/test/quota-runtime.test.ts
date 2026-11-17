@@ -88,7 +88,8 @@ describe('separate YouTube resource quotas with durable feed metadata', () => {
       item.enrichment.components.find((c: { component: string }) => c.component === 'transcript')
         .reasonCode
     ).toBe('youtube_public_access_deferred');
-    expect(apiRequests).toBe(1);
+    // One video lookup plus one channel lookup for the creator's avatar.
+    expect(apiRequests).toBe(2);
     expect(publicRequests).toBe(0);
     const held = await runtime.db
       .prepare("SELECT not_before FROM provider_budgets WHERE scope='provider:youtube:watch'")

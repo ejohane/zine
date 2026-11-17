@@ -185,7 +185,11 @@ const schemaSources: Record<string, z.ZodType> = {
         title: z.string(),
         cards: z.array(
           item.pick({ id: true, savedAt: true, progress: true }).extend({
-            content: item.shape.content.omit({ id: true }),
+            content: item.shape.content.omit({ id: true }).extend({
+              preview: z.string().optional(),
+              readMinutes: z.number().int().positive().optional(),
+              threadPosts: z.number().int().min(2).optional(),
+            }),
           })
         ),
       })

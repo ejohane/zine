@@ -73,6 +73,46 @@ Zod 3 resolution. Tests use the monorepo's Vitest 2. Wrangler 4 is invoked with 
 exact Bunx version, preserving the existing root Wrangler 3 installation.
 The independent `API rewrite checks` workflow runs this package's checks on changes.
 
+### Local development with a copy of production data
+
+```sh
+cd apps/api
+bun run local:pull    # newest nightly production backup → cleaned local copy (~10 s once cached)
+bun run local:dev     # local API on :8890 against that copy
+bun run local:reset   # discard local changes; back to the pristine copy (about a second)
+bun run local:token   # the local API token, for curl or agents
+```
+
+`local:pull` only reads production through the private backup bucket
+(`zine-api-next-backups`, needs `CLOUDFLARE_API_TOKEN`). Rows are copied by
+`scripts/local-restore.py` with the isolated-restore cleaning rules from `restore-sql.py`:
+no API tokens, provider connections, webhooks or queued work, and subscriptions paused.
+It then seeds one local-only API token for the account with the most saves.
+`wrangler.local.jsonc` has no production database, bucket, AI, vector index, routes,
+schedules or provider secrets, so semantic search and ingestion that needs providers are
+unavailable locally. Data lives in ignored `.local-data/dev/`. Stop `local:dev` before
+`local:reset`. `test/local-restore.test.ts` proves the cleaning.
+
+### Branch previews
+
+See [docs/environments.md](docs/environments.md) for the full guide and known pitfalls.
+
+A preview is a full copy of the stack for one branch at `https://next-<branch>.myzine.app/next/`:
+an API Worker with its own D1 database, R2 bucket and queue, plus the branch's web app. Its data
+is a slim, cleaned copy of the newest nightly production backup (`scripts/preview-sql.py`: library
+only, no credentials, webhooks, event/job history or semantic index state; subscriptions paused).
+Previews have no AI, vector index, cron or provider secrets; search is keyword-only. Sign in with
+your normal Zine account; production rejects preview sessions.
+
+- Request one: add the `preview` label to a pull request (redeploys on each push; data is loaded
+  once and kept), or run the "Zine Next branch preview" workflow by hand.
+- Removed when the label is removed, the pull request closes, or after 7 days. At most 3 exist;
+  a new one replaces the oldest.
+- From a checkout (needs `CLOUDFLARE_API_TOKEN`; build `apps/next-web` first):
+  `bun run preview deploy|destroy <branch>`, `bun run preview list`, `bun run preview sweep`.
+- Agents: `bun run preview token <branch>` mints a fresh 7-day API token straight into that
+  preview's database (same `CLOUDFLARE_API_TOKEN`, no other secret).
+
 ## CLI
 
 ```sh

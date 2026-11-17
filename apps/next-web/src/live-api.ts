@@ -1,6 +1,15 @@
 // Browser-only /v1 boundary; mirrors apps/api/client retry and idempotency semantics.
 export const libraryPageSize = 30;
-export const apiOrigin = 'https://api-next.myzine.app';
+export const productionOrigin = 'https://api-next.myzine.app';
+/** Origins that serve this app next to their own /v1 API: production and branch previews. */
+export const isAppOrigin = (origin: string) =>
+  origin === productionOrigin || /^https:\/\/next-[a-z0-9-]{1,20}\.myzine\.app$/.test(origin);
+// Previews use their own API on the same origin. In local development the dev server forwards
+// /v1 to the local API (see vite.config.ts). Anywhere else, the app points at production.
+export const apiOrigin =
+  typeof location !== 'undefined' && (import.meta.env?.DEV || isAppOrigin(location.origin))
+    ? location.origin
+    : productionOrigin;
 export const appURL = apiOrigin + '/next/';
 export type RemoteItem = {
   id: string;
@@ -48,6 +57,27 @@ export type RemoteItem = {
   };
 };
 export type Page = { items: RemoteItem[]; nextCursor: string | null };
+export type HomeCard = {
+  id: string;
+  savedAt: string | null;
+  progress: RemoteItem['progress'];
+  content: Omit<RemoteItem['content'], 'id'> & {
+    preview?: string;
+    readMinutes?: number;
+    threadPosts?: number;
+  };
+};
+export type HomeSection = {
+  id: string;
+  kind: 'resume' | 'recent' | 'collection';
+  title: string;
+  cards: HomeCard[];
+};
+export type Home = {
+  editionId: string | null;
+  generatedAt: string | null;
+  sections: HomeSection[];
+};
 export type Collection = {
   id: string;
   name: string;
@@ -155,6 +185,9 @@ export class API {
       ...(cursor ? { cursor } : {}),
     });
     return this.request<Page>('GET', '/v1/items?' + params);
+  }
+  home() {
+    return this.request<Home>('GET', '/v1/home');
   }
   search(query: string, cursor?: string) {
     return this.request<Page>('POST', '/v1/items/search', {

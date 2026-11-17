@@ -1,0 +1,107 @@
+name: Zine Next branch preview
+
+# A preview is an API Worker + web Worker on https://next-<branch>.myzine.app with a slim, cleaned
+# copy of production data (see apps/api/scripts/preview.ts). Previews are on demand: add the
+# `preview` label to a pull request, or run this workflow by hand. At most 3 exist; each is
+# deleted after 7 days, when the label is removed, or when the pull request closes.
+
+on:
+  pull_request:
+    types: [labeled, unlabeled, synchronize, reopened, closed]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Deploy or destroy a branch preview
+        required: true
+        default: deploy
+        type: choice
+        options: [deploy, destroy]
+      ref:
+        description: Branch name
+        required: true
+        type: string
+  schedule:
+    - cron: '17 6 * * *'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: next-preview-${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.head_ref || 'sweep' }}
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    # Fork pull requests get no secrets; previews are only for this repository's branches.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      BRANCH: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.head_ref }}
+    steps:
+      - name: Decide
+        id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          INPUT_ACTION: ${{ inputs.action }}
+          LABELED: ${{ contains(github.event.pull_request.labels.*.name, 'preview') }}
+          LABEL: ${{ github.event.label.name }}
+        run: |
+          action=none
+          if [ "$EVENT" = schedule ]; then action=sweep
+          elif [ "$EVENT" = workflow_dispatch ]; then action="$INPUT_ACTION"
+          elif [ "$ACTION" = closed ] || { [ "$ACTION" = unlabeled ] && [ "$LABEL" = preview ]; }; then action=destroy
+          elif [ "$LABELED" = true ] && [ "$ACTION" != unlabeled ]; then action=deploy
+          fi
+          echo "action=$action" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: steps.decide.outputs.action != 'none'
+        with:
+          ref: ${{ steps.decide.outputs.action == 'deploy' && (github.event_name == 'workflow_dispatch' && inputs.ref || github.event.pull_request.head.sha) || '' }}
+      - uses: actions/setup-node@v4
+        if: steps.decide.outputs.action != 'none'
+        with:
+          node-version: '22'
+      - uses: oven-sh/setup-bun@v2
+        if: steps.decide.outputs.action != 'none'
+        with:
+          bun-version: '1.3.4'
+      - run: bun install --frozen-lockfile
+        if: steps.decide.outputs.action != 'none'
+      - name: Build the web app
+        if: steps.decide.outputs.action == 'deploy'
+        run: bun run --cwd apps/next-web build
+      - name: Deploy preview
+        id: deploy
+        if: steps.decide.outputs.action == 'deploy'
+        working-directory: apps/api
+        run: |
+          bun run preview deploy "$BRANCH" | tee preview-result.json
+          echo "url=$(tail -n1 preview-result.json | jq -r .url)" >> "$GITHUB_OUTPUT"
+      - name: Destroy preview
+        if: steps.decide.outputs.action == 'destroy'
+        working-directory: apps/api
+        run: bun run preview destroy "$BRANCH"
+      - name: Sweep expired previews
+        if: steps.decide.outputs.action == 'sweep'
+        working-directory: apps/api
+        run: bun run preview sweep
+      - name: Comment the preview address
+        if: steps.decide.outputs.action == 'deploy' && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          URL: ${{ steps.deploy.outputs.url }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          body="Preview: $URL (copy of production data; sign in with your Zine account)"
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --body "$body" 2>/dev/null ||
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "$body"
+      - name: Remove private copies
+        if: always()
+        run: rm -rf apps/api/.local-data

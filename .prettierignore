@@ -1,2 +1,4 @@
 .opencode/
 apps/web/storybook-static/
+# Untracked local Expo app; not part of the repository.
+apps/mobile/

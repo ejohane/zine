@@ -19,3 +19,24 @@ modal focus management, keyboard support and explicit local-preview labeling.
 Erik removed the heading utility icons (Search/Collections/Following), the
 All saves/Inbox scope row, and the resume banner. The heading now leads directly
 into the bento feed with a 24px gap. Preserve the top content filters and Save.
+
+## Home redesign — 2026-11-15
+
+Erik redesigned Home from scratch; this supersedes the native three-column recipe and
+system typography **for Home** (format filters keep the native bento in `BentoFeed`).
+
+- Data: `GET /v1/home` (resume, recent, editorial collections) plus the loaded library page,
+  which fills a final "Also in your queue" shelf. Cards: article **Plate**, video and podcast
+  **Fade** (identical by design), post **Plate** (avatar, name, @handle, the post's own words).
+  Missing or broken avatars render nothing.
+- Layout (`src/homeLayout.ts`): each entry offers only the shapes its data supports; every shelf
+  is packed row by row with no gaps. Three columns for tablets and laptops, five on large
+  screens, never a column narrower than 252px (video titles need ~250px).
+- Phone (<600px): full-width lead, "Pick up where you left off" as one list card, "Just saved"
+  as the only sideways rail, then shelves of two picture tiles plus a list card. Small cards
+  never put text over pictures.
+- Type: DM Sans and Source Serif 4, self-hosted via Fontsource (offline in the PWA), as
+  stand-ins for the Claude app's Anthropic Sans and Anthropic Serif.
+- Visual check without the API: an ignored, machine-local harness can live in `output/` and is
+  served by `bun run dev` (one existed on Erik's Mac at `output/home-preview/`; it is not in git).
+  Prefer `local:pull` data or a branch preview for real checks.

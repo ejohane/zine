@@ -80,6 +80,17 @@ describe('provider requests inside workerd', () => {
         const url = new URL(request.url);
         requests.push(url.hostname + url.pathname);
         expect(url.hostname).toBe('www.googleapis.com');
+        if (url.pathname.endsWith('/channels')) {
+          expect(url.searchParams.get('id')).toBe('UCexample');
+          return Response.json({
+            items: [
+              {
+                id: 'UCexample',
+                snippet: { thumbnails: { high: { url: 'https://yt3.ggpht.com/avatar=s800' } } },
+              },
+            ],
+          });
+        }
         expect(url.searchParams.get('id')).toBe('abcdefghijk');
         return Response.json({
           items: [
@@ -117,7 +128,59 @@ describe('provider requests inside workerd', () => {
       status: 'unavailable',
       reasonCode: 'youtube_caption_download_requires_video_permissions',
     });
-    expect(requests).toEqual(['www.googleapis.com/youtube/v3/videos']);
+    expect(extraction.contributions.find((value) => value.field === 'creatorImageUrl')?.value).toBe(
+      'https://yt3.ggpht.com/avatar=s800'
+    );
+    expect(requests).toEqual([
+      'www.googleapis.com/youtube/v3/videos',
+      'www.googleapis.com/youtube/v3/channels',
+    ]);
+  });
+  it('keeps YouTube video metadata when the channel avatar lookup fails', async () => {
+    const built = await build({
+      stdin: {
+        contents: `import {youtubeApiExtraction} from './src/providers/youtube-api';export default {async fetch(request,env){return Response.json(await youtubeApiExtraction(env,undefined,'https://www.youtube.com/watch?v=abcdefghijk'));}};`,
+        resolveDir: process.cwd(),
+      },
+      bundle: true,
+      write: false,
+      format: 'esm',
+      platform: 'browser',
+      target: 'es2022',
+      external: ['node:*'],
+    });
+    runtime = new Miniflare({
+      modules: true,
+      script: built.outputFiles[0].text,
+      compatibilityDate: '2026-07-30',
+      compatibilityFlags: ['nodejs_compat'],
+      bindings: { YOUTUBE_API_KEY: 'synthetic-key' },
+      outboundService: (request: Request) =>
+        new URL(request.url).pathname.endsWith('/channels')
+          ? new Response('unavailable', { status: 500 })
+          : Response.json({
+              items: [
+                {
+                  id: 'abcdefghijk',
+                  snippet: {
+                    title: 'Video title',
+                    channelTitle: 'Creator',
+                    channelId: 'UCexample',
+                  },
+                  contentDetails: { duration: 'PT1M' },
+                },
+              ],
+            }),
+    });
+    const response = await runtime.dispatchFetch('http://localhost');
+    const extraction = (await response.json()) as {
+      contributions: { field: string; value: unknown }[];
+    };
+    expect(response.status).toBe(200);
+    expect(extraction.contributions.find((value) => value.field === 'title')?.value).toBe(
+      'Video title'
+    );
+    expect(extraction.contributions.some((value) => value.field === 'creatorImageUrl')).toBe(false);
   });
   it('polls an X creator by stored provider identity after its display handle changes', async () => {
     const built = await build({

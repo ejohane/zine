@@ -34,6 +34,11 @@ portal or elaborate SDK is not the immediate production milestone.
 - Private snapshots/logs/exports live in ignored `.local-data/` and may not exist in
   another checkout. Public evidence belongs in `evidence/`, with scope and hashes,
   never raw credentials or private library content.
+- Local development and agent experiments run against `bun run local:pull` data with
+  `bun run local:dev`, and `bun run local:reset` between attempts. Never point local
+  work, scripts or tests at production resources to get realistic data. To try a branch
+  deployed, use a branch preview and a token from `bun run preview token <branch>`, never production. Full guide,
+  including known pitfalls: `docs/environments.md`.
 - Use the shared `agent-secrets` skill for credentials. Profile metadata and key
   names are safe to inspect; secret values do not belong in chat, logs, arguments
   or repo files. Do not assume an inherited legacy token authenticates this API.

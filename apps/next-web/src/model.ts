@@ -115,69 +115,6 @@ export function plan(items: Item[]): Placement[] {
   });
   return placements.sort((a, b) => a.row - b.row || a.column - b.column);
 }
-export type HomePresentation = 'feature' | 'compact' | 'tile' | 'tall' | 'banner';
-
-type HomeGroup = { title?: string; presentation: HomePresentation; count: number };
-type HomeRecipe = { layout: string; groups: HomeGroup[] };
-const homeRecipes: HomeRecipe[] = [
-  {
-    layout: 'lead',
-    groups: [
-      { title: 'Settle in', presentation: 'feature', count: 1 },
-      { title: 'A quick look', presentation: 'compact', count: 3 },
-    ],
-  },
-  {
-    layout: 'gallery',
-    groups: [
-      { title: 'Worth exploring', presentation: 'tile', count: 2 },
-      { title: 'Next up', presentation: 'tall', count: 1 },
-    ],
-  },
-  { layout: 'banner', groups: [{ title: 'Worth your time', presentation: 'banner', count: 1 }] },
-  {
-    layout: 'digest',
-    groups: [
-      { title: 'The shortlist', presentation: 'compact', count: 3 },
-      { title: 'Take a closer look', presentation: 'feature', count: 1 },
-    ],
-  },
-];
-
-export function composeHome(cards: Item[], pageSize: number) {
-  const rows = [];
-  // Compose each page independently so loading more never changes a rendered row.
-  for (let start = 0; start < cards.length; start += pageSize) {
-    const end = Math.min(start + pageSize, cards.length);
-    let offset = start;
-    for (let row = 0; offset < end; row++) {
-      const recipe = homeRecipes[row % homeRecipes.length];
-      const remaining = end - offset;
-      const fits = recipe.groups.reduce((count, group) => count + group.count, 0) <= remaining;
-      const groups: HomeGroup[] = fits
-        ? recipe.groups
-        : [
-            {
-              presentation: remaining === 1 ? 'banner' : 'tile',
-              count: remaining,
-            },
-          ];
-      rows.push({
-        layout: fits ? recipe.layout : 'remainder',
-        groups: groups.map(({ title, presentation, count }) => {
-          const items = cards.slice(offset, offset + count);
-          offset += count;
-          return {
-            title: start === 0 && row < homeRecipes.length ? title : undefined,
-            presentation,
-            items,
-          };
-        }),
-      });
-    }
-  }
-  return rows;
-}
 export function progress(item: Item): number | null {
   const { position, unit } = item.api.progress;
   if (position === null) return null;
