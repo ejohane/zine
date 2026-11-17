@@ -42,7 +42,6 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      ZINE_PREVIEW_SECRET: ${{ secrets.ZINE_PREVIEW_SECRET }}
       BRANCH: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.head_ref }}
     steps:
       - name: Decide

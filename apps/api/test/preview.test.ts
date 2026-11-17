@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agentToken, slugFor } from '../scripts/preview';
+import { newToken, slugFor } from '../scripts/preview';
 
 describe('branch previews', () => {
   it('turns branch names into short DNS-safe slugs', () => {
@@ -10,11 +10,9 @@ describe('branch previews', () => {
     expect(() => slugFor('---')).toThrow();
   });
 
-  it('derives a stable agent token per preview only when the secret is set', () => {
-    const one = agentToken('alpha', 'secret');
+  it('mints random API-shaped agent tokens', () => {
+    const one = newToken();
     expect(one).toMatch(/^zine2_[a-f0-9]{64}$/);
-    expect(agentToken('alpha', 'secret')).toBe(one);
-    expect(agentToken('beta', 'secret')).not.toBe(one);
-    expect(agentToken('alpha', '')).toBeUndefined();
+    expect(newToken()).not.toBe(one);
   });
 });

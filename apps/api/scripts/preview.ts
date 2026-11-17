@@ -6,14 +6,14 @@
  *   bun run preview destroy <branch>   delete every resource of that preview
  *   bun run preview list               current previews
  *   bun run preview sweep              destroy previews older than 7 days
- *   bun run preview token <branch>     agent API token (needs ZINE_PREVIEW_SECRET)
+ *   bun run preview token <branch>     mint a fresh 7-day agent API token for that preview
  *
  * Production is only read, through the nightly backup. Previews have no AI, vector index, cron or
  * provider secrets. At most MAX_PREVIEWS exist at once; deploying another replaces the oldest.
  * Build apps/next-web first (`bun run --cwd apps/next-web build`).
  */
 import assert from 'node:assert/strict';
-import { createHmac } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { downloadBackup, extractBackup, latestBackup, sha256 } from './backup-source';
 import { accountId, cloudflare, cloudflareR2Object, environments } from './cloudflare-control';
@@ -68,9 +68,9 @@ function names(slug: string) {
 }
 type Names = ReturnType<typeof names>;
 
-export function agentToken(slug: string, secret = process.env.ZINE_PREVIEW_SECRET) {
-  if (!secret) return undefined;
-  return 'zine2_' + createHmac('sha256', secret).update(`preview:${slug}`).digest('hex');
+/** A random `zine2_` API token; only its hash is stored in the preview. */
+export function newToken() {
+  return 'zine2_' + randomBytes(32).toString('hex');
 }
 
 type Database = { uuid: string; name: string; created_at: string };
@@ -273,37 +273,42 @@ async function loadData(n: Names, config: string) {
   };
 }
 
-async function seedToken(n: Names, config: string) {
-  const token = agentToken(n.slug);
-  if (!token) return false;
-  const owner = JSON.parse(
-    await wrangler(
-      'd1',
-      'execute',
-      'DB',
-      '--remote',
-      '--json',
-      '--config',
-      config,
-      '--command',
-      'SELECT owner_id FROM personal_items GROUP BY owner_id ORDER BY COUNT(*) DESC LIMIT 1'
-    )
-  )[0].results[0]?.owner_id as string | undefined;
-  if (!owner) return false;
-  assert.match(owner, /^[A-Za-z0-9_]+$/);
-  const now = new Date().toISOString();
-  const expires = new Date(Date.now() + 30 * 86400000).toISOString();
-  await wrangler(
-    'd1',
-    'execute',
-    'DB',
-    '--remote',
-    '--config',
-    config,
-    '--command',
-    `DELETE FROM api_tokens WHERE id='tok_preview_agent'; INSERT INTO api_tokens(id,owner_id,name,token_hash,expires_at,created_at,scopes_json) VALUES('tok_preview_agent','${owner}','Preview agent','${sha256(token)}','${expires}','${now}','${JSON.stringify(SCOPES)}')`
+/**
+ * Mints a new agent token straight into the preview's own D1. Anyone who can run this already holds
+ * the Cloudflare credential that created the preview, so no extra shared secret is needed. Each call
+ * adds a token (earlier ones keep working until they expire with the preview).
+ */
+async function mintToken(slug: string) {
+  const n = names(slug);
+  const database = (await previews()).find((d) => d.name === n.database);
+  assert.ok(database, `No preview for ${slug}; deploy it first`);
+  const query = async <T>(sql: string, params: unknown[] = []) =>
+    (
+      await cloudflare<{ results: T[] }[]>(`d1/database/${database.uuid}/query`, 'POST', {
+        sql,
+        params,
+      })
+    )[0].results;
+  const [top] = await query<{ owner_id: string }>(
+    'SELECT owner_id FROM personal_items GROUP BY owner_id ORDER BY COUNT(*) DESC LIMIT 1'
   );
-  return true;
+  assert.ok(top, 'Preview has no library data yet');
+  const token = newToken();
+  const now = new Date().toISOString();
+  const expires = new Date(Date.now() + MAX_AGE_DAYS * 86400000).toISOString();
+  await query(
+    'INSERT INTO api_tokens(id,owner_id,name,token_hash,expires_at,created_at,scopes_json) VALUES(?,?,?,?,?,?,?)',
+    [
+      'tok_preview_' + randomBytes(6).toString('hex'),
+      top.owner_id,
+      'Preview agent',
+      sha256(token),
+      expires,
+      now,
+      JSON.stringify(SCOPES),
+    ]
+  );
+  return token;
 }
 
 async function waitForHealth(n: Names) {
@@ -339,7 +344,6 @@ async function deploy(branch: string) {
   const configs = await writeConfigs(n, database.id);
   await wrangler('d1', 'migrations', 'apply', 'DB', '--remote', '--config', configs.api);
   const data = await loadData(n, configs.api);
-  const agent = await seedToken(n, configs.api);
   await wrangler('deploy', '--config', configs.api);
   await wrangler('deploy', '--config', configs.web);
   const healthy = await waitForHealth(n);
@@ -348,7 +352,6 @@ async function deploy(branch: string) {
     api: n.origin,
     freshData: !!data,
     ...data,
-    agentToken: agent,
     healthy,
   };
   console.log(JSON.stringify(result));
@@ -420,9 +423,7 @@ if (import.meta.main) {
   if (command === 'deploy' && branch) await deploy(branch);
   else if (command === 'destroy' && branch) await destroy(slugFor(branch));
   else if (command === 'token' && branch) {
-    const token = agentToken(slugFor(branch));
-    assert.ok(token, 'Set ZINE_PREVIEW_SECRET to derive preview agent tokens');
-    process.stdout.write(token + '\n');
+    process.stdout.write((await mintToken(slugFor(branch))) + '\n');
   } else if (command === 'list')
     for (const database of await previews())
       console.log(

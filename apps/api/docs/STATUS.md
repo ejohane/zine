@@ -10,14 +10,13 @@ for current checks. Read `../AGENTS.md`, inspect git status, then run `bun run d
 - `bun run preview deploy|destroy|list|sweep|token`: per-branch API + web Workers at
   `https://next-<slug>.myzine.app/next/` with their own D1/R2/queue and a slim cleaned copy
   (`scripts/preview.ts`, `scripts/preview-sql.py`). Workflow `.github/workflows/next-preview.yml`
-  (PR label `preview`, manual, daily 7-day sweep; max 3). Needs GitHub secret
-  `ZINE_PREVIEW_SECRET` for agent tokens.
+  (PR label `preview`, manual, daily 7-day sweep; max 3). Agent tokens are minted on demand
+  with the Cloudflare credential; no extra secret.
 - Live-verified from a checkout: deploy (rows load once; object uploads resume after rate limits),
   `/health`, agent token reads the library and keyword search, production rejects the preview
   token, Clerk sign-in renders on the preview origin, and destroy removes every resource while
   production D1/Worker remain. The workflow also deployed from GitHub Actions on PR #477 (label `preview`).
-  Not yet verified: a completed human sign-in on a preview. Pending: GitHub secret
-  `ZINE_PREVIEW_SECRET`. Guide: `docs/environments.md`.
+  Not yet verified: a completed human sign-in on a preview. Guide: `docs/environments.md`.
 
 ## Direction and scope
 

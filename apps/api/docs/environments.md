@@ -71,9 +71,11 @@ sessions and preview tokens.
   `bun run preview deploy|destroy <branch>`, `bun run preview list`, `bun run preview sweep`.
 - **Data loads once** (first deploy) and survives redeploys, so preview edits persist. For fresh
   data: `destroy`, then `deploy`.
-- **Agents:** `ZINE_PREVIEW_SECRET=… bun run preview token <branch>` derives that preview's API
-  token (HMAC of the slug). The workflow seeds it from the GitHub secret of the same name; without
-  the secret a preview deploys with no agent token.
+- **Agents:** `bun run preview token <branch>` mints a fresh API token for that preview (the
+  account with the most saves, 7-day expiry) by writing its hash straight into the preview's D1,
+  and prints it. It needs only `CLOUDFLARE_API_TOKEN`, which anyone able to reach the preview's
+  data already holds, so there is no shared preview secret. Each call adds a token; tokens die
+  with the preview.
 
 **Lessons from building it** (all handled in `scripts/preview.ts`; keep them if you change it)
 

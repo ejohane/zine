@@ -110,8 +110,8 @@ your normal Zine account; production rejects preview sessions.
   a new one replaces the oldest.
 - From a checkout (needs `CLOUDFLARE_API_TOKEN`; build `apps/next-web` first):
   `bun run preview deploy|destroy <branch>`, `bun run preview list`, `bun run preview sweep`.
-- Agents: `ZINE_PREVIEW_SECRET=… bun run preview token <branch>` derives that preview's API
-  token (the workflow seeds it from the same GitHub secret).
+- Agents: `bun run preview token <branch>` mints a fresh 7-day API token straight into that
+  preview's database (same `CLOUDFLARE_API_TOKEN`, no other secret).
 
 ## CLI
 
