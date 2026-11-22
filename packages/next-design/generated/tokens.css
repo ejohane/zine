@@ -15,7 +15,7 @@
   --zn-color-on-raised: light-dark(#FAFAF8, #F5F5F3);
   --zn-color-on-raised-muted: light-dark(#B5B5BA, #A3A3A8);
   --zn-color-bubble: light-dark(#ECECE8, #1A1A1D);
-  --zn-font: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --zn-font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --zn-type-display: 700 32px/1 var(--zn-font);
   --zn-tracking-display: -0.04em;
   --zn-type-title: 700 21px/1.05 var(--zn-font);

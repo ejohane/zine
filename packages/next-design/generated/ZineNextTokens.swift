@@ -29,7 +29,7 @@ enum ZineNextTokens {
         }
     }
 
-    static let fontFamily = "Space Grotesk"
+    static let fontFamily = "Inter"
 
     struct TypeStyle {
         let size: CGFloat
