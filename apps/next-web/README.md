@@ -49,6 +49,14 @@ bun install
 bun run --cwd apps/next-web test
 bun run --cwd apps/next-web lint
 bun run --cwd apps/next-web build
+```
+
+Merging to `main` publishes the app: `.github/workflows/next-web-release.yml` runs when the app,
+`packages/next-ui`, `packages/next-design` or `bun.lock` change. It checks and builds, deploys the
+`zine-next-web` Worker, then confirms production serves that build's `sw.js`. Run the workflow by
+hand to republish. To deploy from a checkout instead (needs `CLOUDFLARE_API_TOKEN`):
+
+```sh
 bunx wrangler@4.158.0 deploy --config apps/next-web/wrangler.jsonc
 ```
 
