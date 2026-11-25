@@ -211,6 +211,40 @@ describe('automatic arrival and durable jobs', () => {
     ).toBe(2);
   });
 
+  it('leaves short-form video out unless the subscription asks for it', async () => {
+    const future = () => new Date(Date.now() + 10000).toISOString();
+    const arrivals = (): FeedEntry[] => [
+      { ...entry(), kind: 'short_video', publishedAt: future() },
+      { ...entry(), kind: 'video', publishedAt: future() },
+    ];
+    const first = arrivals();
+    const sub = await subscription(false);
+    const load = (entries: FeedEntry[]): Parameters<typeof syncSubscription>[3] => {
+      return async () => ({ title: 'source', url: 'https://example.com/feed', entries });
+    };
+    expect(await syncSubscription(env, sub.id, owner, load(first))).toMatchObject({ received: 1 });
+    const urls = async () =>
+      (
+        await env.DB.prepare(
+          'SELECT c.canonical_url AS url FROM personal_items p JOIN content_items c ON c.id=p.content_id WHERE p.owner_id=?'
+        )
+          .bind(owner)
+          .all<{ url: string }>()
+      ).results.map((row) => row.url);
+    expect(await urls()).toEqual([first[1].url]);
+    // A skipped Short is still marked seen, so opting in later never backfills it.
+    await stmt(
+      env.DB,
+      `UPDATE subscriptions SET filters_json='{"types":["short_video"]}' WHERE id=?`,
+      sub.id
+    ).run();
+    const second = arrivals();
+    expect(await syncSubscription(env, sub.id, owner, load([...first, ...second]))).toMatchObject({
+      received: 1,
+    });
+    expect((await urls()).sort()).toEqual([first[1].url, second[0].url].sort());
+  });
+
   it('retains arrivals since creation across a delayed first poll plus the latest preceding match', async () => {
     const sub = await subscription(false);
     const cutoff = new Date(Date.now() - 3600000).toISOString();

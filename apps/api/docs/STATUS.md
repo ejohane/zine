@@ -3,6 +3,28 @@
 Last reviewed: 2026-11-09 UTC. This file records observed state, not a substitute
 for current checks. Read `../AGENTS.md`, inspect git status, then run `bun run doctor`.
 
+## YouTube Shorts excluded from subscriptions (2026-11-25, not yet released)
+
+- Before this change every YouTube subscription entry was typed `video`, so Shorts were
+  delivered and `filters.types` could not exclude them. Now `youtube_feed` entries are typed
+  from the feed link (`/shorts/<id>`), and channel uploads playlists (`UU…`) are checked
+  against the channel's Shorts playlist (`UUSH` + the same suffix) in
+  `markYouTubeShorts` (`src/providers/youtube-api.ts`). `short_video` is skipped unless
+  `filters.types` names it; skipped entries are still marked seen.
+- Live-checked from a checkout against public YouTube on four channels: feed `/shorts/`
+  links matched `UUSH` feed membership exactly and every other entry was in the long-form
+  playlist; `/shorts/<id>` answered 200 for Shorts and 303 to `/watch` otherwise.
+  Not live-verified: the Data API `playlistItems` call on a `UUSH` playlist (fixture tests
+  only) and the behavior in a deployed Worker.
+- If the Shorts lookup fails with a retryable error the sync page fails and retries rather
+  than delivering Shorts. A 404 means the channel has none.
+  The lookup reads at most ten Shorts pages per uploads page;
+  an older upload it could not reach is withheld as `short_video`, not delivered as a video.
+- Cleanup of already-delivered Shorts: `scripts/remove-subscribed-shorts.ts` (dry run by
+  default, `--apply` deletes through `/v1`). It keeps anything saved from the inbox,
+  archived, tagged, collected, noted, annotated or started. It has not been run; it needs the `zine.test`
+  login. Next action: release, run the dry run, review the list, then `--apply`.
+
 ## Local data and branch previews (2026-11-15, branch `next-home-redesign`)
 
 - `bun run local:pull|local:dev|local:reset|local:token`: local API on a cleaned copy of the

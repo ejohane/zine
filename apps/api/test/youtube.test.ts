@@ -46,3 +46,133 @@ it('parses official API durations and explicit description chapter timestamps', 
     { startSeconds: 3723, title: 'Wrap-up' },
   ]);
 });
+
+import { afterEach, vi } from 'vitest';
+import { markYouTubeShorts, youtubeFeedEntryKind } from '../src/providers/youtube-api';
+import { parseFeed } from '../src/providers/feed';
+import type { Env } from '../src/types';
+import type { FeedEntry } from '../src/providers/feed';
+
+describe('YouTube Shorts classification', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const env = { YOUTUBE_API_KEY: 'synthetic-key' } as Env;
+  const uploads = 'https://www.youtube.com/playlist?list=UUabcdefghijklmnopqrstuv';
+  const video = (id: string, publishedAt: string): FeedEntry => ({
+    id: `youtube:video:${id}`,
+    url: `https://www.youtube.com/watch?v=${id}`,
+    title: id,
+    publishedAt,
+    kind: 'video',
+    enclosures: [],
+    transcripts: [],
+  });
+  const shortsPage = (ids: [string, string][], nextPageToken?: string) =>
+    Response.json({
+      items: ids.map(([videoId, videoPublishedAt]) => ({
+        contentDetails: { videoId, videoPublishedAt },
+      })),
+      nextPageToken,
+    });
+
+  it('reads the format from a channel feed entry link', () => {
+    const feed = parseFeed(
+      `<?xml version="1.0" encoding="UTF-8"?>
+      <feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns="http://www.w3.org/2005/Atom">
+        <title>Channel</title>
+        <entry><id>yt:video:aaaaaaaaaaa</id><yt:videoId>aaaaaaaaaaa</yt:videoId><title>Short</title>
+          <link rel="alternate" href="https://www.youtube.com/shorts/aaaaaaaaaaa"/></entry>
+        <entry><id>yt:video:bbbbbbbbbbb</id><yt:videoId>bbbbbbbbbbb</yt:videoId><title>Long</title>
+          <link rel="alternate" href="https://www.youtube.com/watch?v=bbbbbbbbbbb"/></entry>
+      </feed>`,
+      'https://www.youtube.com/feeds/videos.xml?channel_id=UCabcdefghijklmnopqrstuv'
+    );
+    expect(feed.entries.map((entry) => youtubeFeedEntryKind(entry.url))).toEqual([
+      'short_video',
+      'video',
+    ]);
+    expect(youtubeFeedEntryKind('not a url')).toBe('video');
+  });
+
+  it('marks uploads that are members of the channel Shorts playlist', async () => {
+    const requested: string[] = [];
+    vi.stubGlobal('fetch', async (input: URL) => {
+      requested.push(input.searchParams.get('playlistId')!);
+      return shortsPage([
+        ['short000001', '2026-11-20T00:00:00Z'],
+        ['short000000', '2026-11-01T00:00:00Z'],
+      ]);
+    });
+    const entries = [
+      video('short000001', '2026-11-20T00:00:00Z'),
+      video('long0000001', '2026-11-10T00:00:00Z'),
+    ];
+    await markYouTubeShorts(env, undefined, uploads, entries);
+    expect(entries.map((entry) => entry.kind)).toEqual(['short_video', 'video']);
+    expect(requested).toEqual(['UUSHabcdefghijklmnopqrstuv']);
+  });
+
+  it('pages the Shorts playlist until it reaches back past the uploads page', async () => {
+    const tokens: (string | null)[] = [];
+    vi.stubGlobal('fetch', async (input: URL) => {
+      const token = input.searchParams.get('pageToken');
+      tokens.push(token);
+      return token === 'third'
+        ? shortsPage([['short000003', '2026-09-01T00:00:00Z']], 'unused')
+        : token === 'second'
+          ? shortsPage([['short000002', '2026-10-01T00:00:00Z']], 'third')
+          : shortsPage([['short000001', '2026-11-20T00:00:00Z']], 'second');
+    });
+    const entries = [video('short000002', '2026-10-01T00:00:00Z')];
+    const older = [video('long0000002', '2026-10-15T00:00:00Z'), ...entries];
+    await markYouTubeShorts(env, undefined, uploads, older);
+    expect(older.map((entry) => entry.kind)).toEqual(['video', 'short_video']);
+    // The second page only ties the oldest upload; the third is the first strictly older one.
+    expect(tokens).toEqual([null, 'second', 'third']);
+  });
+
+  it('withholds uploads older than the Shorts it was able to examine', async () => {
+    let calls = 0;
+    vi.stubGlobal('fetch', async () => {
+      calls++;
+      return shortsPage(
+        [[`short${calls}`, `2026-11-${String(30 - calls).padStart(2, '0')}T00:00:00Z`]],
+        'more'
+      );
+    });
+    const entries = [
+      video('long0000001', '2026-11-25T00:00:00Z'),
+      video('unknown0001', '2020-01-01T00:00:00Z'),
+    ];
+    await markYouTubeShorts(env, undefined, uploads, entries);
+    expect(calls).toBe(10);
+    expect(entries.map((entry) => entry.kind)).toEqual(['video', 'short_video']);
+  });
+
+  it('treats a channel without a Shorts playlist as having none', async () => {
+    vi.stubGlobal('fetch', async () => new Response('{}', { status: 404 }));
+    const entries = [video('long0000001', '2026-11-10T00:00:00Z')];
+    await markYouTubeShorts(env, undefined, uploads, entries);
+    expect(entries[0].kind).toBe('video');
+  });
+
+  it('does not spend a lookup on explicit playlists or history that cannot arrive', async () => {
+    const fetched = vi.fn();
+    vi.stubGlobal('fetch', fetched);
+    const entries = [video('long0000001', '2020-01-01T00:00:00Z')];
+    await markYouTubeShorts(
+      env,
+      undefined,
+      'https://www.youtube.com/playlist?list=PLabcdefghijklmnopqrstuvwxyz012345',
+      entries
+    );
+    await markYouTubeShorts(env, undefined, uploads, entries, '2026-01-01T00:00:00.000Z');
+    expect(fetched).not.toHaveBeenCalled();
+  });
+
+  it('fails the page rather than letting Shorts through when the lookup is unavailable', async () => {
+    vi.stubGlobal('fetch', async () => new Response('{}', { status: 503 }));
+    await expect(
+      markYouTubeShorts(env, undefined, uploads, [video('long0000001', '2026-11-10T00:00:00Z')])
+    ).rejects.toMatchObject({ code: 'provider_http_503', retryable: true });
+  });
+});
