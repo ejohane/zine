@@ -12,6 +12,8 @@ export interface ItemCardProps {
   now?: Date;
   /** The three-dots button in the footer. */
   onAction?: (item: CardItem) => void;
+  /** Opens the original in a new tab, for apps that should stay open behind it. */
+  newTab?: boolean;
 }
 
 /** Posts this short are set larger so one line does not sit lost in a big card. */
@@ -276,6 +278,7 @@ export function ItemCard({
   tallWidth = 'wide',
   now,
   onAction,
+  newTab,
 }: ItemCardProps) {
   const isPost = item.kind === 'post';
   const picture = item.picture;
@@ -307,7 +310,14 @@ export function ItemCard({
     />
   );
   const label = item.title ?? `Post by ${item.creator.name}`;
-  const link = <a className="zn-card__link" href={item.url} aria-label={`Open ${label}`} />;
+  const link = (
+    <a
+      className="zn-card__link"
+      href={item.url}
+      aria-label={`Open ${label}`}
+      {...(newTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+    />
+  );
 
   if (size === 'compact') {
     // Things you play keep their picture on the left; things you read keep it on the right.

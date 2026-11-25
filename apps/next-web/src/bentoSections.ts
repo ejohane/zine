@@ -1,5 +1,5 @@
 import type { CardItem, ItemKind } from '@zine/next-ui';
-import type { Home, HomeCard } from './live-api';
+import type { Home, HomeCard, RemoteItem } from './live-api';
 
 /** One Home section, ready for the card components. */
 export interface BentoSection {
@@ -72,13 +72,39 @@ export function toCardItem({ id, savedAt, progress, content }: HomeCard): CardIt
   };
 }
 
-/** Home sections in the order the API sends them, without cards the components cannot show. */
-export function toBentoSections(home: Home): BentoSection[] {
-  return home.sections
-    .map((section) => ({
-      id: section.id,
-      title: section.title,
-      items: section.cards.map(toCardItem).filter((item): item is CardItem => item !== null),
-    }))
-    .filter((section) => section.items.length > 0);
+const shown = (cards: HomeCard[]) =>
+  cards.map(toCardItem).filter((item): item is CardItem => item !== null);
+
+/**
+ * Home as bento sections: the sections `/v1/home` composed, then whatever else of the loaded
+ * library they did not use. Before Home has loaded (or offline without a saved copy), the
+ * library stands in with the same two opening sections.
+ */
+export function toBentoSections(home: Home | undefined, library: RemoteItem[]): BentoSection[] {
+  const open = library.filter(
+    (item) => item.status === 'saved' && !item.archived && !item.progress.completedAt
+  );
+  const composed = home?.sections.length
+    ? home.sections.map((section) => ({
+        id: section.id,
+        title: section.title,
+        items: shown(section.cards),
+      }))
+    : [
+        {
+          id: 'resume',
+          title: 'Jump back in',
+          items: shown(open.filter((item) => (item.progress.position ?? 0) > 0).slice(0, 3)),
+        },
+      ];
+  const used = new Set(composed.flatMap((section) => section.items.map((item) => item.id)));
+  const rest = shown(open.filter((item) => !used.has(item.id)));
+  return [
+    ...composed,
+    {
+      id: 'library',
+      title: home?.sections.length ? 'More from your library' : 'Just saved',
+      items: rest,
+    },
+  ].filter((section) => section.items.length > 0);
 }

@@ -5,14 +5,9 @@ import '@fontsource-variable/inter';
 import '@zine/next-design/tokens.css';
 import '@zine/next-ui/cards.css';
 import '@zine/next-ui/bento.css';
-import './bento-home.css';
 import { toBentoSections } from './bentoSections';
 import type { BentoSection } from './bentoSections';
-import { message } from './live-api';
-import type { Home } from './live-api';
-
-/** The preview lives at /next/?view=bento so the current Home stays as it is. */
-export const isBentoView = () => new URLSearchParams(location.search).get('view') === 'bento';
+import type { Home, RemoteItem } from './live-api';
 
 type Shape = { width: number; height: number } | 'missing';
 
@@ -22,16 +17,24 @@ type Shape = { width: number; height: number } | 'missing';
  */
 function usePostPictureShapes(sections: BentoSection[]) {
   const [shapes, setShapes] = useState<Record<string, Shape>>({});
+  const urls = useMemo(
+    () =>
+      [
+        ...new Set(
+          sections.flatMap((section) =>
+            section.items.flatMap((item) =>
+              item.kind === 'post' && item.picture ? [item.picture.url] : []
+            )
+          )
+        ),
+      ]
+        .sort()
+        .join('\n'),
+    [sections]
+  );
   useEffect(() => {
     let active = true;
-    const urls = new Set(
-      sections.flatMap((section) =>
-        section.items.flatMap((item) =>
-          item.kind === 'post' && item.picture ? [item.picture.url] : []
-        )
-      )
-    );
-    for (const url of urls) {
+    for (const url of urls ? urls.split('\n') : []) {
       const image = new Image();
       const report = (shape: Shape) => {
         if (active) setShapes((previous) => ({ ...previous, [url]: shape }));
@@ -43,7 +46,7 @@ function usePostPictureShapes(sections: BentoSection[]) {
     return () => {
       active = false;
     };
-  }, [sections]);
+  }, [urls]);
   return shapes;
 }
 
@@ -55,65 +58,33 @@ function withShape(item: CardItem, shapes: Record<string, Shape>): CardItem {
   return { ...item, picture: { ...item.picture, ...shape } };
 }
 
-export function BentoHome({ load }: { load: () => Promise<Home> }) {
-  const [home, setHome] = useState<Home>();
-  const [error, setError] = useState('');
-  const [attempt, setAttempt] = useState(0);
-  useEffect(() => {
-    let active = true;
-    setError('');
-    load().then(
-      (result) => active && setHome(result),
-      (failure) => active && setError(message(failure))
-    );
-    return () => {
-      active = false;
-    };
-    // `load` is a fresh function on every render; only a retry should fetch again.
-  }, [attempt]);
-  useEffect(() => {
-    document.documentElement.classList.add('bento-view');
-    return () => document.documentElement.classList.remove('bento-view');
-  }, []);
-
-  const sections = useMemo(() => (home ? toBentoSections(home) : []), [home]);
+/**
+ * Home: the sections `/v1/home` composed, as bentos of Zine Next cards, followed by the rest of
+ * the loaded library. A card opens the original in a new tab; its three dots open the item here.
+ */
+export function BentoHome({
+  home,
+  items,
+  open,
+}: {
+  home: Home | undefined;
+  items: RemoteItem[];
+  open: (id: string) => void;
+}) {
+  const sections = useMemo(() => toBentoSections(home, items), [home, items]);
   const shapes = usePostPictureShapes(sections);
-
   return (
-    <main className="bento-page">
-      <div className="bento-page__inner">
-        <header className="bento-page__header">
-          <h1>Home</h1>
-          <a className="bento-page__back" href={location.pathname}>
-            Current Home
-          </a>
-        </header>
-        {error ? (
-          <div role="alert">
-            <p className="bento-page__status">{error}</p>
-            <button
-              type="button"
-              className="bento-page__retry"
-              onClick={() => setAttempt((count) => count + 1)}
-            >
-              Try again
-            </button>
-          </div>
-        ) : !home ? (
-          <p className="bento-page__status" role="status">
-            Opening your Home…
-          </p>
-        ) : sections.length === 0 ? (
-          <p className="bento-page__status">Nothing saved yet.</p>
-        ) : (
-          sections.map((section) => (
-            <section key={section.id} className="bento-section" aria-labelledby={section.id}>
-              <h2 id={section.id}>{section.title}</h2>
-              <Bento items={section.items.map((item) => withShape(item, shapes))} />
-            </section>
-          ))
-        )}
-      </div>
-    </main>
+    <div className="bento-home" aria-label="Home">
+      {sections.map((section) => (
+        <section key={section.id} className="bento-section" aria-labelledby={'home-' + section.id}>
+          <h2 id={'home-' + section.id}>{section.title}</h2>
+          <Bento
+            items={section.items.map((item) => withShape(item, shapes))}
+            onAction={(item) => open(item.id)}
+            newTab
+          />
+        </section>
+      ))}
+    </div>
   );
 }

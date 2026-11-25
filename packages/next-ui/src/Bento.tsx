@@ -11,12 +11,15 @@ export interface BentoProps {
   columns?: number;
   now?: Date;
   onAction?: (item: CardItem) => void;
+  /** Cards open their original in a new tab. */
+  newTab?: boolean;
 }
 
 function Cell(props: {
   cell: BentoCell;
   now?: Date;
   onAction?: (item: CardItem) => void;
+  newTab?: boolean;
 }): ReactNode {
   const { kind, items } = props.cell;
   const card = (item: CardItem, size: 'large' | 'compact' | 'tile' | 'tall', narrow = false) => (
@@ -27,6 +30,7 @@ function Cell(props: {
       tallWidth={narrow ? 'narrow' : 'wide'}
       now={props.now}
       onAction={props.onAction}
+      newTab={props.newTab}
     />
   );
   const list = (from: number) => (
@@ -57,7 +61,7 @@ function Cell(props: {
 }
 
 /** Lays items out as a bento: bands of mixed card sizes with no holes. See `packBento` for the rules. */
-export function Bento({ items, columns = 1, now, onAction }: BentoProps) {
+export function Bento({ items, columns = 1, now, onAction, newTab }: BentoProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [count, setCount] = useState(columns);
   useLayoutEffect(() => {
@@ -80,7 +84,13 @@ export function Bento({ items, columns = 1, now, onAction }: BentoProps) {
       {bands.map((band, index) => (
         <div key={index} className={`zn-bento__band zn-bento__band--${band.height}`}>
           {band.cells.map((cell) => (
-            <Cell key={cell.items[0]!.id} cell={cell} now={now} onAction={onAction} />
+            <Cell
+              key={cell.items[0]!.id}
+              cell={cell}
+              now={now}
+              onAction={onAction}
+              newTab={newTab}
+            />
           ))}
         </div>
       ))}

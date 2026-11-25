@@ -113,11 +113,11 @@ These wrap item cards and size to their content:
 Reply patterns explored in Round 14 (one large then a compact list; a pair of tiles then a list;
 a rail of tiles; a wide grid) are examples, not a spec. How an agent chooses sizes is undecided.
 
-## Bento layout and Home preview (25 Nov 2026)
+## Bento layout and Home (25 Nov 2026)
 
-Built in `packages/next-ui` (`Bento`, `packBento`) and shown at `/next/?view=bento` in
-`apps/next-web` from the real `/v1/home`. The current Home is unchanged. Erik asked for the page;
-the rules below were chosen by Claude and have not been reviewed yet.
+Built in `packages/next-ui` (`Bento`, `packBento`). It is the Home of `apps/next-web`, fed by the
+real `/v1/home`; the earlier Home (serif plates, phone edition) is removed. Erik asked for the
+screen and left the decisions to Claude; none of the rules below have been reviewed yet.
 
 - **Bands, not a free grid.** A section is a stack of bands. Each band is a full rectangle of one
   height: a row (368, one large card), a double (532, two tiles) or a tower (752, one tall card).
@@ -136,12 +136,18 @@ the rules below were chosen by Claude and have not been reviewed yet.
 - **In progress.** A started item replaces its length with what is left ("8 min left"), bold in the
   accent text colour, at the start of the footer. Nothing is drawn on the picture. Without a known
   length it says "In progress".
-- **Page.** "Home" in the display size, section titles in the title size, 48 between sections, 16
-  between cards. No navigation yet.
+- **Sections.** The sections `/v1/home` composed, in its order, each under a title in the title
+  size, 48 apart, 16 between cards. Loaded saves that Home did not use follow as "More from your
+  library". Until Home has loaded, the library stands in as "Jump back in" and "Just saved".
+- **Opening things.** A card opens the original in a new tab, as designed. The three dots open the
+  item inside the app, where notes, progress and archiving live.
+- **The rest of the app.** The app keeps its navigation, filters, sheets and other feeds, but its
+  colour and font variables now point at the Zine Next tokens (`apps/next-web/src/bento-home.css`),
+  so everything shares the palette and Inter. Those screens have not been redesigned.
 
 Known gaps: `/v1/home` has no picture sizes (post pictures are measured after loading), no quoted
 post or link fields, and at most 700 characters of text, so tall cards can end with empty space.
-The three-dots button does nothing, and cards open the original link rather than the in-app item.
+Home has only been seen with made-up data in a local browser, not with a real account.
 
 ## Open questions
 

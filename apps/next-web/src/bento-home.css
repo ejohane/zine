@@ -1,62 +1,42 @@
 /*
- * The bento Home preview, in the Zine Next design language (packages/next-design).
- * It shares nothing with styles.css: every colour, size and font here is a --zn-* token.
+ * Home in the Zine Next design language (packages/next-design). Loaded after styles.css.
+ *
+ * The first block re-points the app's own colour and font variables at the Zine Next tokens, so
+ * the navigation, filters, sheets and the other feeds sit in the same language as Home without
+ * being redesigned. Everything under .bento-home uses the --zn-* tokens directly.
  */
 
-html.bento-view,
-html.bento-view body {
-  background: var(--zn-color-canvas);
-}
-
-.bento-page {
+:root {
   --zn-font: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-
-  min-height: 100dvh;
-  padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
-    max(48px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
-  background: var(--zn-color-canvas);
-  color: var(--zn-color-ink);
-  font: var(--zn-type-body);
-  font-family: var(--zn-font);
+  --canvas: var(--zn-color-canvas);
+  --paper: var(--zn-color-canvas);
+  --inset: var(--zn-color-bubble);
+  --ink: var(--zn-color-ink);
+  --secondary: var(--zn-color-muted);
+  --line: var(--zn-color-outline);
+  --selection: var(--zn-color-accent-text);
+  --on-selection: var(--zn-color-canvas);
+  --glass: color-mix(in srgb, var(--zn-color-canvas) 78%, transparent);
+  --glass-selected: var(--zn-color-bubble);
+  --sans: var(--zn-font);
 }
 
-.bento-page__inner {
-  max-width: calc(3 * var(--zn-size-card-wide) + 32px);
-  margin-inline: auto;
+/* Three wide cards and their gaps, plus the page's own side padding. */
+.page.page--bento {
+  max-width: calc(3 * var(--zn-size-card-wide) + 32px + 60px);
 }
 
-/* Below this the bento is a single column, which stops at 400 wide; the page lines up with it. */
-@media (max-width: 591px) {
-  .bento-page__inner {
-    max-width: 400px;
-  }
-}
-
-.bento-page__header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 32px;
-}
-
-.bento-page h1 {
-  margin: 0;
+.page--bento .heading-row h1 {
   font: var(--zn-type-display);
   letter-spacing: -0.04em;
 }
 
-.bento-page__back {
-  color: var(--zn-color-muted);
-  font: var(--zn-type-label);
-  text-decoration: none;
-}
-
-.bento-page__back:hover {
+.bento-home {
   color: var(--zn-color-ink);
+  font: var(--zn-type-body);
 }
 
-.bento-page :focus-visible {
+.bento-home :focus-visible {
   outline: 2px solid var(--zn-color-accent);
   outline-offset: 2px;
 }
@@ -71,17 +51,15 @@ html.bento-view body {
   letter-spacing: -0.03em;
 }
 
-.bento-page__status {
-  margin: 0;
-  color: var(--zn-color-muted);
+/* Below this the bento is a single column, which stops at 400 wide; the headings line up with it. */
+@container (max-width: 559px) {
+  .bento-home {
+    max-width: 400px;
+    margin-inline: auto;
+  }
 }
 
-.bento-page__retry {
-  height: var(--zn-size-filter);
-  margin-top: 16px;
-  padding: 0 20px;
-  border-radius: var(--zn-radius-pill);
-  background: var(--zn-color-accent);
-  color: var(--zn-color-on-accent);
-  font: var(--zn-type-label);
+/* The other feeds' cards keep a surface of their own against the canvas. */
+.story-card {
+  --paper: var(--zn-color-bubble);
 }

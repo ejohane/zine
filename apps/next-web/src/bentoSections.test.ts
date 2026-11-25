@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { toBentoSections, toCardItem } from './bentoSections';
-import type { HomeCard } from './live-api';
+import type { HomeCard, RemoteItem } from './live-api';
 
 const card = (content: Partial<HomeCard['content']>, more: Partial<HomeCard> = {}): HomeCard => ({
   id: 'item-1',
@@ -84,19 +84,42 @@ describe('Home cards as card items', () => {
     expect(toCardItem(card({ url: 'not a link' }))).toBeNull();
   });
 
-  test('sections keep their order and drop out when nothing can be shown', () => {
-    const sections = toBentoSections({
-      editionId: null,
-      generatedAt: null,
-      sections: [
-        { id: 'resume', kind: 'resume', title: 'Jump back in', cards: [card({})] },
-        { id: 'empty', kind: 'collection', title: 'Nothing', cards: [card({ type: 'playlist' })] },
-        { id: 'recent', kind: 'recent', title: 'Just saved', cards: [card({}), card({})] },
-      ],
-    });
-    expect(sections.map((section) => [section.title, section.items.length])).toEqual([
-      ['Jump back in', 1],
-      ['Just saved', 2],
+  const saved = (id: string, position: number | null = null) =>
+    ({
+      ...card({}, { id, progress: { position, unit: 'fraction', completedAt: null } }),
+      status: 'saved',
+      archived: false,
+    }) as unknown as RemoteItem;
+
+  test('sections keep their order, empty ones drop out, and unused library items follow', () => {
+    const sections = toBentoSections(
+      {
+        editionId: null,
+        generatedAt: null,
+        sections: [
+          { id: 'resume', kind: 'resume', title: 'Jump back in', cards: [card({}, { id: 'a' })] },
+          { id: 'empty', kind: 'collection', title: 'None', cards: [card({ type: 'playlist' })] },
+          { id: 'recent', kind: 'recent', title: 'Just saved', cards: [card({}, { id: 'b' })] },
+        ],
+      },
+      [saved('a'), saved('c'), { ...saved('d'), archived: true }]
+    );
+    expect(
+      sections.map((section) => [section.title, section.items.map((item) => item.id)])
+    ).toEqual([
+      ['Jump back in', ['a']],
+      ['Just saved', ['b']],
+      ['More from your library', ['c']],
+    ]);
+  });
+
+  test('without Home, the library stands in', () => {
+    const sections = toBentoSections(undefined, [saved('a'), saved('b', 0.4), saved('c')]);
+    expect(
+      sections.map((section) => [section.title, section.items.map((item) => item.id)])
+    ).toEqual([
+      ['Jump back in', ['b']],
+      ['Just saved', ['a', 'c']],
     ]);
   });
 });
