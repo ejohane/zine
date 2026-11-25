@@ -40,6 +40,8 @@ export interface CardItem {
   durationMinutes?: number;
   /** ISO timestamp. */
   savedAt?: string;
+  /** How far through it you are, from 0 to 1. Between the two, the footer shows what is left. */
+  progress?: number;
   /** Domain of a link the post points at. */
   link?: string;
   quote?: QuotedPost;

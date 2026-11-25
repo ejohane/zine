@@ -5,6 +5,7 @@ import { Header } from './Feed';
 import { DestinationNav, readDestination } from './DestinationNav';
 import type { Destination } from './DestinationNav';
 import { BentoFeed, HomeFeed } from './HomeFeed';
+import { BentoHome, isBentoView } from './BentoHome';
 import { headlines, progress, resumeLabel, safeURL, timestamp } from './model';
 import type { Item, Section } from './model';
 import { API, ServiceError, apiOrigin, appURL, message } from './live-api';
@@ -145,7 +146,7 @@ export function ConnectedApp() {
         if (mount.current)
           auth.mountSignIn(mount.current, {
             routing: 'hash',
-            forceRedirectUrl: appURL,
+            forceRedirectUrl: appURL + (isBentoView() ? '?view=bento' : ''),
             signUpUrl: 'https://accounts.myzine.app/sign-up',
           });
       });
@@ -186,6 +187,8 @@ export function ConnectedApp() {
         )}
       </main>
     );
+  // The bento Home preview (?view=bento) is a separate page; the app itself is unchanged.
+  if (isBentoView()) return <BentoHome key={identity.owner} load={() => api.home()} />;
   return (
     <Library
       key={identity.owner}

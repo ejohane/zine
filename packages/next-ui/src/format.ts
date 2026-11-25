@@ -29,10 +29,21 @@ export function formatSaved(savedAt: string, now: Date = new Date()): string {
   return value === 0 ? 'Saved just now' : `Saved ${value}${unit} ago`;
 }
 
-/** The left side of the footer: what kind of length it has, then when it was saved. */
+/** "8 min left" for something started and not finished; "In progress" when its length is unknown. */
+export function progressLabel(item: CardItem): string | undefined {
+  const done = item.progress;
+  if (done === undefined || done <= 0 || done >= 1) return undefined;
+  if (!item.durationMinutes) return 'In progress';
+  return `${formatDuration(item.durationMinutes * (1 - done))} left`;
+}
+
+/** The left side of the footer: what is left or how long it is, then when it was saved. */
 export function footerLabel(item: CardItem, now?: Date): string {
   const parts: string[] = [];
-  if (item.kind === 'post') {
+  const left = progressLabel(item);
+  if (left) {
+    parts.push(left);
+  } else if (item.kind === 'post') {
     if (item.picture?.isVideo) parts.push('Video');
   } else if (item.durationMinutes) {
     const length = formatDuration(item.durationMinutes);

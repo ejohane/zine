@@ -10,7 +10,8 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts"
     },
-    "./cards.css": "./src/cards.css"
+    "./cards.css": "./src/cards.css",
+    "./bento.css": "./src/bento.css"
   },
   "scripts": {
     "gallery": "bun gallery/build.ts",

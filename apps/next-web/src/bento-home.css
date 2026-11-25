@@ -1,0 +1,87 @@
+/*
+ * The bento Home preview, in the Zine Next design language (packages/next-design).
+ * It shares nothing with styles.css: every colour, size and font here is a --zn-* token.
+ */
+
+html.bento-view,
+html.bento-view body {
+  background: var(--zn-color-canvas);
+}
+
+.bento-page {
+  --zn-font: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  min-height: 100dvh;
+  padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(48px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: var(--zn-color-canvas);
+  color: var(--zn-color-ink);
+  font: var(--zn-type-body);
+  font-family: var(--zn-font);
+}
+
+.bento-page__inner {
+  max-width: calc(3 * var(--zn-size-card-wide) + 32px);
+  margin-inline: auto;
+}
+
+/* Below this the bento is a single column, which stops at 400 wide; the page lines up with it. */
+@media (max-width: 591px) {
+  .bento-page__inner {
+    max-width: 400px;
+  }
+}
+
+.bento-page__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.bento-page h1 {
+  margin: 0;
+  font: var(--zn-type-display);
+  letter-spacing: -0.04em;
+}
+
+.bento-page__back {
+  color: var(--zn-color-muted);
+  font: var(--zn-type-label);
+  text-decoration: none;
+}
+
+.bento-page__back:hover {
+  color: var(--zn-color-ink);
+}
+
+.bento-page :focus-visible {
+  outline: 2px solid var(--zn-color-accent);
+  outline-offset: 2px;
+}
+
+.bento-section + .bento-section {
+  margin-top: 48px;
+}
+
+.bento-section h2 {
+  margin: 0 0 16px;
+  font: var(--zn-type-title);
+  letter-spacing: -0.03em;
+}
+
+.bento-page__status {
+  margin: 0;
+  color: var(--zn-color-muted);
+}
+
+.bento-page__retry {
+  height: var(--zn-size-filter);
+  margin-top: 16px;
+  padding: 0 20px;
+  border-radius: var(--zn-radius-pill);
+  background: var(--zn-color-accent);
+  color: var(--zn-color-on-accent);
+  font: var(--zn-type-label);
+}

@@ -424,6 +424,11 @@
   white-space: nowrap;
 }
 
+.zn-card__left {
+  color: var(--zn-color-accent-text);
+  font-weight: 700;
+}
+
 .zn-card__action {
   position: relative;
   z-index: 2;

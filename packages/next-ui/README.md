@@ -35,3 +35,9 @@ Before it has been measured (server render, tests) it shows a fixed first guess 
 - `bun run typecheck`, `bun run lint`.
 
 The tests do not cover layout. Check the gallery in a browser after changing `cards.css`.
+
+## Bento
+
+`<Bento items={items} />` lays cards out in bands of mixed sizes with no holes, and counts its own
+columns from its width (import `@zine/next-ui/bento.css` as well). `packBento` is the layout on its
+own. The rules are in `packages/next-design/DESIGN.md`.

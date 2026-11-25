@@ -9,6 +9,8 @@ legacy web app as part of these experiments.
   three-column bento packing for format filters. One vertical page; only the filters scrub.
 - Home follows the 2026-11-15 redesign in DESIGN.md (composed `/v1/home` edition,
   DM Sans + Source Serif 4). It supersedes the native recipe and system type for Home.
+- `/next/?view=bento` (`BentoHome.tsx`) is a separate preview of Home in the Zine Next design
+  language (`packages/next-design`, `packages/next-ui`). Keep it apart from the app's own styles.
 - Erik authorized production-account integration on 2026-11-10. The connected
   app uses real Clerk sessions and the independent production `/v1` service.
 - Serve at `https://api-next.myzine.app/next/` with a separate asset Worker and

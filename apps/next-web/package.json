@@ -10,11 +10,14 @@
     "preview": "vite preview --host 0.0.0.0 --port 4194 --strictPort",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src scripts --ext .ts,.tsx,.mjs",
-    "test": "bun test src/model.test.ts src/live-api.test.ts src/homeLayout.test.ts src/homeEntries.test.ts"
+    "test": "bun test src/model.test.ts src/live-api.test.ts src/homeLayout.test.ts src/homeEntries.test.ts src/bentoSections.test.ts"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.3.0",
+    "@fontsource-variable/inter": "^5.2.5",
     "@fontsource-variable/source-serif-4": "^5.3.1",
+    "@zine/next-design": "workspace:*",
+    "@zine/next-ui": "workspace:*",
     "lucide-react": "^1.8.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"

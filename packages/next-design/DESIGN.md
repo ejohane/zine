@@ -113,10 +113,39 @@ These wrap item cards and size to their content:
 Reply patterns explored in Round 14 (one large then a compact list; a pair of tiles then a list;
 a rail of tiles; a wide grid) are examples, not a spec. How an agent chooses sizes is undecided.
 
+## Bento layout and Home preview (25 Nov 2026)
+
+Built in `packages/next-ui` (`Bento`, `packBento`) and shown at `/next/?view=bento` in
+`apps/next-web` from the real `/v1/home`. The current Home is unchanged. Erik asked for the page;
+the rules below were chosen by Claude and have not been reviewed yet.
+
+- **Bands, not a free grid.** A section is a stack of bands. Each band is a full rectangle of one
+  height: a row (368, one large card), a double (532, two tiles) or a tower (752, one tall card).
+  So a section has no holes; only leftovers that cannot fill a band sit in a short last row.
+- **Eight column fillings.** Row: one large, or four compact. Double: four tiles, two narrow tall
+  cards, or one narrow tall card beside two tiles. Tower: one tall, two large, or one large over
+  four compact.
+- **Which band comes next.** Items keep the API's order. Each band is the best-scoring one the rest
+  can still follow evenly: bigger cards score higher, a section opens with a big card, mixed
+  fillings beat uniform ones, and repeating a filling or the previous band's height costs points.
+- **Tall cards are for reading.** Only articles and posts with at least 240 characters of text go
+  tall. A tall article shows its own text even when it has a picture.
+- **Widths.** One wide column under 560, two under 848, three above; the bento stops at 1208. Cards
+  keep their heights and stretch or shrink in width (about 270 to 415; designed at 392). A single
+  column stops at 400. A card wider than 392 keeps the designed picture height.
+- **In progress.** A started item replaces its length with what is left ("8 min left"), bold in the
+  accent text colour, at the start of the footer. Nothing is drawn on the picture. Without a known
+  length it says "In progress".
+- **Page.** "Home" in the display size, section titles in the title size, 48 between sections, 16
+  between cards. No navigation yet.
+
+Known gaps: `/v1/home` has no picture sizes (post pictures are measured after loading), no quoted
+post or link fields, and at most 700 characters of text, so tall cards can end with empty space.
+The three-dots button does nothing, and cards open the original link rather than the in-app item.
+
 ## Open questions
 
-- Cards are designed and built at one width per size. Narrow screens are not handled.
-- States are not designed: in progress, finished, loading and failed.
+- States are not designed: finished, loading and failed.
 - Posts with several photos, threads and replies are untested.
 - The article placeholder tile and the composed cards need another design pass before building.
 - The desktop web side panel from Round 7 did not feel right and needs another pass.

@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { footerLabel } from './format';
+import { footerLabel, progressLabel } from './format';
 import type { CardItem, CardSize, Creator, Picture, QuotedPost } from './types';
 
 export interface ItemCardProps {
@@ -180,10 +180,17 @@ function Footer(props: {
   hint?: string;
   onAction?: (item: CardItem) => void;
 }) {
-  const label = [props.hint, footerLabel(props.item, props.now)].filter(Boolean).join(' · ');
+  // What is left of something you started leads the footer, in the accent colour.
+  const left = progressLabel(props.item);
+  const rest = footerLabel(props.item, props.now).slice(left?.length ?? 0);
+  const hint = props.hint ? props.hint + (left || rest ? ' · ' : '') : '';
   return (
     <div className="zn-card__footer">
-      <span className="zn-card__meta">{label}</span>
+      <span className="zn-card__meta">
+        {hint}
+        {left ? <span className="zn-card__left">{left}</span> : null}
+        {rest}
+      </span>
       <button
         type="button"
         className="zn-card__action"
@@ -276,8 +283,9 @@ export function ItemCard({
   if (size === 'tall' && tallWidth === 'narrow') classes.push('zn-card--narrow');
   if (!picture) classes.push('zn-card--no-picture');
 
-  // Without a picture, an article shows its own text at full strength; otherwise the muted summary.
-  const ownWords = !isPost && !picture && item.body ? item.body : undefined;
+  // Without a picture, or with the room of a tall card, an article shows its own text at full
+  // strength; otherwise the muted summary.
+  const ownWords = !isPost && (!picture || size === 'tall') && item.body ? item.body : undefined;
   const summary = ownWords ?? item.description;
   const content = isPost ? (
     <PostBody item={item} size={size} />
