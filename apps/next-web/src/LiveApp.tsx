@@ -4,7 +4,8 @@ import { ArrowUpRight, Archive, Check, LogOut, RefreshCw, Sparkles, WifiOff } fr
 import { Header } from './Feed';
 import { DestinationNav, readDestination } from './DestinationNav';
 import type { Destination } from './DestinationNav';
-import { BentoFeed, HomeFeed } from './HomeFeed';
+import { BentoFeed } from './HomeFeed';
+import { BentoHome } from './BentoHome';
 import { headlines, progress, resumeLabel, safeURL, timestamp } from './model';
 import type { Item, Section } from './model';
 import { API, ServiceError, apiOrigin, appURL, message } from './live-api';
@@ -626,7 +627,7 @@ function Library({ identity, signOut }: { identity: Identity; signOut: () => Pro
           }}
           capture={() => navigate('capture')}
         />
-        <main className="page" id="main-content">
+        <main className={onHome ? 'page page--bento' : 'page'} id="main-content">
           <div className="heading-row">
             <h1>{destination === 'Home' ? headlines[section] : destination}</h1>
           </div>
@@ -685,7 +686,7 @@ function Library({ identity, signOut }: { identity: Identity; signOut: () => Pro
           )}
           {cards.length > 0 || (onHome && home?.sections.length) ? (
             onHome ? (
-              <HomeFeed home={home} items={items} open={navigate} />
+              <BentoHome home={home} items={items} open={navigate} />
             ) : (
               <BentoFeed
                 cards={cards}

@@ -20,7 +20,11 @@ Erik removed the heading utility icons (Search/Collections/Following), the
 All saves/Inbox scope row, and the resume banner. The heading now leads directly
 into the bento feed with a 24px gap. Preserve the top content filters and Save.
 
-## Home redesign — 2026-11-15
+## Home redesign — 2026-11-15 (superseded)
+
+> Replaced on 2026-11-25 by the bento Home in the Zine Next design language. The rules now live
+> in `packages/next-design/DESIGN.md`; the notes below are history, and the code they describe
+> (`HomeCards.tsx`, `homeLayout.ts`, `homeEntries.ts`) is gone.
 
 Erik redesigned Home from scratch; this supersedes the native three-column recipe and
 system typography **for Home** (format filters keep the native bento in `BentoFeed`).
