@@ -18,8 +18,11 @@ for current checks. Read `../AGENTS.md`, inspect git status, then run `bun run d
   only) and the behavior in a deployed Worker.
 - If the Shorts lookup fails with a retryable error the sync page fails and retries rather
   than delivering Shorts. A 404 means the channel has none.
+  The lookup reads at most ten Shorts pages per uploads page;
+  an older upload it could not reach is withheld as `short_video`, not delivered as a video.
 - Cleanup of already-delivered Shorts: `scripts/remove-subscribed-shorts.ts` (dry run by
-  default, `--apply` deletes through `/v1`). It has not been run; it needs the `zine.test`
+  default, `--apply` deletes through `/v1`). It keeps anything saved from the inbox,
+  archived, tagged, collected, noted, annotated or started. It has not been run; it needs the `zine.test`
   login. Next action: release, run the dry run, review the list, then `--apply`.
 
 ## Local data and branch previews (2026-11-15, branch `next-home-redesign`)

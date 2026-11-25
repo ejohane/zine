@@ -6,9 +6,10 @@
  *
  *   secretsctl run zine.test -- bun run scripts/remove-subscribed-shorts.ts [--apply]
  *
- * Only items whose every occurrence came from a subscription and that carry no tags,
- * collections, notes or progress are removed. Anything else that is a Short is listed
- * as kept. A Short is identified by YouTube itself: `/shorts/<id>` answers 200 for a
+ * Only items that a subscription delivered and you never acted on are removed: every
+ * occurrence came from a subscription, the item is still in the state it arrived in (not
+ * saved from the inbox or archived afterwards), and it has no tags, collections, notes,
+ * annotations or progress. Anything else that is a Short is listed as kept. A Short is identified by YouTube itself: `/shorts/<id>` answers 200 for a
  * Short and redirects to `/watch` for a regular video. */
 import { realSession } from './clerk-session';
 
@@ -24,6 +25,8 @@ if (
 interface Item {
   id: string;
   status: string;
+  archived: boolean;
+  createdAt: string;
   savedAt: string | null;
   content: { url: string; title?: unknown };
   context: unknown[];
@@ -81,13 +84,19 @@ try {
         if (!videoId) continue;
         checked++;
         if (!(await isShort(videoId))) continue;
+        // An automatic save happens at arrival; saving from the inbox later moves savedAt.
+        const asArrived =
+          !item.archived && (item.status === 'received' || item.savedAt === item.createdAt);
         const untouched =
+          asArrived &&
           item.occurrences.every((occurrence) => occurrence.subscriptionId) &&
           !item.tags.length &&
           !item.collectionIds.length &&
           !item.context.length &&
           item.progress.position === null &&
-          !item.progress.completedAt;
+          !item.progress.completedAt &&
+          !((await api('GET', `/v1/items/${item.id}/annotations`)) as { annotations: unknown[] })
+            .annotations.length;
         (untouched ? remove : kept).push(item);
       }
       cursor = page.nextCursor;
@@ -98,7 +107,9 @@ try {
   console.log(`Checked ${checked} subscribed YouTube videos on ${base.host}.`);
   console.log(`Shorts ${apply ? 'being removed' : 'that would be removed'}: ${remove.length}`);
   for (const item of remove) console.log(line(item));
-  console.log(`Shorts kept because you saved or organized them yourself: ${kept.length}`);
+  console.log(
+    `Shorts kept because you saved, organized or annotated them yourself: ${kept.length}`
+  );
   for (const item of kept) console.log(line(item));
   if (apply) {
     for (const item of remove) await api('DELETE', `/v1/items/${item.id}`);

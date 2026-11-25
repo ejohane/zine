@@ -94,7 +94,8 @@ export function youtubeFeedEntryKind(url: string) {
  * the API does not label them. YouTube keeps a Shorts-only playlist per channel (`UUSH` +
  * the same suffix), so membership there is the classification. Only entries published at or
  * after `since` need a verdict; `null` classifies the whole page. A channel without Shorts
- * has no such playlist. */
+ * has no such playlist. The lookup is bounded: an upload older than the Shorts it could
+ * examine has no verdict and is withheld as `short_video` rather than delivered as a video. */
 export async function markYouTubeShorts(
   env: Env,
   owner: string | undefined,
@@ -113,6 +114,7 @@ export async function markYouTubeShorts(
   const oldest = dates.includes('') ? '' : dates.sort()[0];
   const shorts = new Set<string>();
   let cursor: string | undefined;
+  let examinedSince = '';
   // Both playlists are newest first, so stop once the Shorts reach back past the page.
   for (let pages = 0; pages < 10; pages++) {
     let page: Page;
@@ -133,11 +135,17 @@ export async function markYouTubeShorts(
       if (text(details.videoId)) shorts.add(`youtube:video:${text(details.videoId)}`);
       const published = text(details.videoPublishedAt);
       if (oldest && published && published < oldest) covered = true;
+      if (published && (!examinedSince || published < examinedSince)) examinedSince = published;
     }
     cursor = page.nextPageToken;
-    if (!cursor || covered) break;
+    if (!cursor || covered) {
+      examinedSince = '';
+      break;
+    }
   }
-  for (const entry of entries) if (shorts.has(entry.id)) entry.kind = 'short_video';
+  for (const entry of entries)
+    if (shorts.has(entry.id) || (examinedSince && (entry.publishedAt ?? '') < examinedSince))
+      entry.kind = 'short_video';
 }
 export async function youtubePlaylistPage(
   env: Env,

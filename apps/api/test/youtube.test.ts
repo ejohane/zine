@@ -130,6 +130,24 @@ describe('YouTube Shorts classification', () => {
     expect(tokens).toEqual([null, 'second', 'third']);
   });
 
+  it('withholds uploads older than the Shorts it was able to examine', async () => {
+    let calls = 0;
+    vi.stubGlobal('fetch', async () => {
+      calls++;
+      return shortsPage(
+        [[`short${calls}`, `2026-11-${String(30 - calls).padStart(2, '0')}T00:00:00Z`]],
+        'more'
+      );
+    });
+    const entries = [
+      video('long0000001', '2026-11-25T00:00:00Z'),
+      video('unknown0001', '2020-01-01T00:00:00Z'),
+    ];
+    await markYouTubeShorts(env, undefined, uploads, entries);
+    expect(calls).toBe(10);
+    expect(entries.map((entry) => entry.kind)).toEqual(['video', 'short_video']);
+  });
+
   it('treats a channel without a Shorts playlist as having none', async () => {
     vi.stubGlobal('fetch', async () => new Response('{}', { status: 404 }));
     const entries = [video('long0000001', '2026-11-10T00:00:00Z')];
