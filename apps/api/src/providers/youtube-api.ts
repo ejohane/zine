@@ -82,6 +82,63 @@ function member(value: Obj): FeedEntry | null {
     transcripts: [],
   };
 }
+/** YouTube's channel feed links a Short as `/shorts/<id>` and a regular upload as `/watch`. */
+export function youtubeFeedEntryKind(url: string) {
+  try {
+    return new URL(url).pathname.startsWith('/shorts/') ? 'short_video' : 'video';
+  } catch {
+    return 'video';
+  }
+}
+/** A channel's uploads playlist (`UU` + channel suffix) mixes Shorts with regular videos and
+ * the API does not label them. YouTube keeps a Shorts-only playlist per channel (`UUSH` +
+ * the same suffix), so membership there is the classification. Only entries published at or
+ * after `since` need a verdict; `null` classifies the whole page. A channel without Shorts
+ * has no such playlist. */
+export async function markYouTubeShorts(
+  env: Env,
+  owner: string | undefined,
+  routeUrl: string,
+  entries: FeedEntry[],
+  since?: string | null
+) {
+  const identity = identify(routeUrl);
+  const uploads = identity.kind === 'playlist' ? (identity.externalId ?? '') : '';
+  if (!/^UU[A-Za-z0-9_-]{22}$/.test(uploads)) return;
+  const relevant = entries.filter(
+    (entry) => !since || !entry.publishedAt || entry.publishedAt >= since
+  );
+  if (!relevant.length) return;
+  const dates = relevant.map((entry) => entry.publishedAt ?? '');
+  const oldest = dates.includes('') ? '' : dates.sort()[0];
+  const shorts = new Set<string>();
+  let cursor: string | undefined;
+  // Both playlists are newest first, so stop once the Shorts reach back past the page.
+  for (let pages = 0; pages < 10; pages++) {
+    let page: Page;
+    try {
+      page = await youtubeRequest(env, owner, 'playlistItems', {
+        part: 'contentDetails',
+        playlistId: `UUSH${uploads.slice(2)}`,
+        maxResults: '50',
+        ...(cursor ? { pageToken: cursor } : {}),
+      });
+    } catch (error) {
+      if (error instanceof ProviderError && error.code === 'source_not_found') break;
+      throw error;
+    }
+    let covered = false;
+    for (const item of page.items) {
+      const details = object(item.contentDetails);
+      if (text(details.videoId)) shorts.add(`youtube:video:${text(details.videoId)}`);
+      const published = text(details.videoPublishedAt);
+      if (oldest && published && published < oldest) covered = true;
+    }
+    cursor = page.nextPageToken;
+    if (!cursor || covered) break;
+  }
+  for (const entry of entries) if (shorts.has(entry.id)) entry.kind = 'short_video';
+}
 export async function youtubePlaylistPage(
   env: Env,
   owner: string | undefined,

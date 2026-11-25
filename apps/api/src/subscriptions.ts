@@ -19,7 +19,11 @@ import { fetchPublic, ProviderError } from './remote';
 import { newestFirst, parseFeed } from './providers/feed';
 import { extractWeb } from './providers/web';
 import { spotifySource, spotifySourcePage } from './providers/spotify';
-import { youtubePlaylistPage } from './providers/youtube-api';
+import {
+  markYouTubeShorts,
+  youtubeFeedEntryKind,
+  youtubePlaylistPage,
+} from './providers/youtube-api';
 import { youtubeSource } from './providers/youtube';
 import { xSource, xSourcePage } from './providers/x';
 import type { Feed, FeedEntry } from './providers/feed';
@@ -597,10 +601,20 @@ async function subscriptionPage(
   route: { url: string; kind: string; external_id?: string | null },
   page: SyncCursor['page'],
   owner?: string,
-  headers: Record<string, string> = {}
+  headers: Record<string, string> = {},
+  // Entries published before this can no longer arrive; null means every entry may matter.
+  since: string | null = null
 ): Promise<SourcePage> {
-  if (route.kind === 'youtube_playlist')
-    return youtubePlaylistPage(env, owner, route.url, typeof page === 'string' ? page : undefined);
+  if (route.kind === 'youtube_playlist') {
+    const playlist = await youtubePlaylistPage(
+      env,
+      owner,
+      route.url,
+      typeof page === 'string' ? page : undefined
+    );
+    await markYouTubeShorts(env, owner, route.url, playlist.entries, since);
+    return playlist;
+  }
   if (route.kind.startsWith('spotify_'))
     return spotifySourcePage(env, route.url, typeof page === 'number' ? page : 0);
   if (route.kind.startsWith('x_'))
@@ -613,7 +627,8 @@ async function subscriptionPage(
   if (!['feed', 'youtube_feed'].includes(route.kind))
     throw new ProviderError('provider_route_not_implemented', false);
   const feed = await feedAt(typeof page === 'string' ? page : route.url, headers);
-  if (route.kind === 'youtube_feed') for (const entry of feed.entries) entry.kind = 'video';
+  if (route.kind === 'youtube_feed')
+    for (const entry of feed.entries) entry.kind = youtubeFeedEntryKind(entry.url);
   return feed;
 }
 
@@ -668,7 +683,14 @@ export async function syncSubscription(
         if (subscription.feed_last_modified)
           conditional['if-modified-since'] = subscription.feed_last_modified;
       }
-      const fetched = await loadPage(env, route, cursor.page, owner, conditional);
+      const fetched = await loadPage(
+        env,
+        route,
+        cursor.page,
+        owner,
+        conditional,
+        subscription.initialized || cursor.candidate ? intakeSince : null
+      );
       if (fetched.notModified) {
         await stmt(
           env.DB,
@@ -710,8 +732,11 @@ export async function syncSubscription(
     const batchLimit = subscription.initialized || hasNewArrivals ? 20 : 500;
     const feed = { entries: cursor.pending.slice(0, batchLimit) };
     const selection = JSON.parse(subscription.filters_json) as z.infer<typeof filters>;
-    const matches = newestFirst(feed.entries).filter(
-      (entry) => !selection.types?.length || selection.types.includes(entry.kind as never)
+    // Short-form video arrives only for a subscription that names it in `filters.types`.
+    const matches = newestFirst(feed.entries).filter((entry) =>
+      selection.types?.length
+        ? selection.types.includes(entry.kind as never)
+        : entry.kind !== 'short_video'
     );
     const stillActive = async () =>
       !!(await stmt(

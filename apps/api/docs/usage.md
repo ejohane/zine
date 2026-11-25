@@ -68,6 +68,11 @@ or podcast actually discusses.
 4. Read subscription status and the returned job. Initialization is asynchronous.
 5. Browse items by `subscriptionId` and lifecycle state.
 
+YouTube Shorts are left out of channel subscriptions. Channel feeds label them by link
+and channel uploads are checked against the channel's Shorts playlist, so a Short arrives
+as `short_video` only when `filters.types` names it (for example
+`["video", "short_video"]`). Explicit playlist routes are not classified.
+
 `autoSave: false` delivers undecided items as received; `true` saves new arrivals.
 Initial intake includes the latest matching item preceding subscription creation,
 plus all matching arrivals since creation, even when the first poll was delayed.
