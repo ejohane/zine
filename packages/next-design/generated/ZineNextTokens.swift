@@ -64,6 +64,13 @@ enum ZineNextTokens {
         static let thumb: CGFloat = 44
         static let rule: CGFloat = 1
         static let progress: CGFloat = 3
+        static let cardWide: CGFloat = 392
+        static let cardNarrow: CGFloat = 188
+        static let cardLarge: CGFloat = 368
+        static let cardCompact: CGFloat = 84
+        static let cardTile: CGFloat = 258
+        static let cardTallNarrow: CGFloat = 532
+        static let cardTallWide: CGFloat = 752
     }
 
     enum Space {

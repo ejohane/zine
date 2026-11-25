@@ -41,6 +41,13 @@
   --zn-size-thumb: 44px;
   --zn-size-rule: 1px;
   --zn-size-progress: 3px;
+  --zn-size-card-wide: 392px;
+  --zn-size-card-narrow: 188px;
+  --zn-size-card-large: 368px;
+  --zn-size-card-compact: 84px;
+  --zn-size-card-tile: 258px;
+  --zn-size-card-tall-narrow: 532px;
+  --zn-size-card-tall-wide: 752px;
   --zn-space-gutter: 18px;
   --zn-space-row: 10px;
   --zn-space-stack: 16px;
