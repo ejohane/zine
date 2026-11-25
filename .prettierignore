@@ -2,3 +2,5 @@
 apps/web/storybook-static/
 # Untracked local Expo app; not part of the repository.
 apps/mobile/
+# Local build of the Zine Next card gallery; ignored by git.
+packages/next-ui/.gallery/
