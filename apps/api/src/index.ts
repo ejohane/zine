@@ -35,6 +35,7 @@ import { diagnostic } from './diagnostics';
 import { mcpHandler } from './mcp';
 import { openApiDocument } from './openapi';
 import { apiReference } from './docs';
+import { clientImages, imageProxy, RAW_IMAGES_HEADER } from './image-proxy';
 import { architectureGuide } from './architecture';
 import type { AppEnv } from './types';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
@@ -85,6 +86,8 @@ app.get('/', (c) => c.html(inspector(c.env, crypto.randomUUID())));
 app.get('/openapi.json', (c) => c.json(openApiDocument()));
 app.get('/docs', (c) => c.html(apiReference()));
 app.get('/architecture', (c) => c.html(architectureGuide()));
+// Public by design: the HMAC signature is the authorization (see image-proxy.ts).
+app.get('/v1/img', imageProxy);
 app.use('/v1/*', authenticate);
 app.use('/v1/*', accountRequestUsage);
 app.use('/v1/*', authorizeScopes);
@@ -131,6 +134,8 @@ app.all('/mcp', async (c) => {
         method,
         headers: {
           authorization: c.req.header('authorization')!,
+          // Agents receive the original source URLs, not browser proxy references.
+          [RAW_IMAGES_HEADER]: '1',
           ...(body === undefined ? {} : { 'content-type': 'application/json' }),
           ...(key ? { 'idempotency-key': key } : {}),
         },
@@ -158,20 +163,29 @@ app.post('/v1/saves', async (c) => {
   );
   if (result.replayed) c.header('Idempotency-Replayed', 'true');
   if (!result.replayed) c.executionCtx.waitUntil(dispatchOutbox(c.env, c.get('principal').userId));
-  return c.json(result.body, result.status as ContentfulStatusCode);
+  // The stored idempotency response keeps original URLs; only this response is rewritten.
+  return c.json(await clientImages(c, result.body), result.status as ContentfulStatusCode);
 });
-app.get('/v1/home', async (c) => c.json(await getHome(c.env, c.get('principal').userId)));
+app.get('/v1/home', async (c) =>
+  c.json(await clientImages(c, await getHome(c.env, c.get('principal').userId)))
+);
 app.post('/v1/home/preview', async (c) =>
   c.json(
-    await getHome(c.env, c.get('principal').userId, await parseBody(c.req.raw, homeDraftSchema))
+    await clientImages(
+      c,
+      await getHome(c.env, c.get('principal').userId, await parseBody(c.req.raw, homeDraftSchema))
+    )
   )
 );
 app.put('/v1/home/edition', async (c) =>
   c.json(
-    await publishHome(
-      c.env,
-      c.get('principal').userId,
-      await parseBody(c.req.raw, homePublishSchema)
+    await clientImages(
+      c,
+      await publishHome(
+        c.env,
+        c.get('principal').userId,
+        await parseBody(c.req.raw, homePublishSchema)
+      )
     )
   )
 );
@@ -201,11 +215,19 @@ app.get('/v1/items', async (c) => {
     url: q.url,
   });
   const limit = z.coerce.number().int().min(1).max(100).default(50).parse(q.limit);
-  return c.json(await listItems(c.env, c.get('principal').userId, filters, limit, q.cursor));
+  return c.json(
+    await clientImages(
+      c,
+      await listItems(c.env, c.get('principal').userId, filters, limit, q.cursor)
+    )
+  );
 });
 app.post('/v1/items/search', async (c) =>
   c.json(
-    await searchItems(c.env, c.get('principal').userId, await parseBody(c.req.raw, searchSchema))
+    await clientImages(
+      c,
+      await searchItems(c.env, c.get('principal').userId, await parseBody(c.req.raw, searchSchema))
+    )
   )
 );
 app.get('/v1/items/:itemId', async (c) => {
@@ -217,15 +239,23 @@ app.get('/v1/items/:itemId', async (c) => {
     )
   )
     throw new ApiError(422, 'invalid_include', 'Unsupported include field');
-  return c.json(await getItem(c.env, c.get('principal').userId, c.req.param('itemId'), include));
+  return c.json(
+    await clientImages(
+      c,
+      await getItem(c.env, c.get('principal').userId, c.req.param('itemId'), include)
+    )
+  );
 });
 app.patch('/v1/items/:itemId', async (c) =>
   c.json(
-    await patchItem(
-      c.env,
-      c.get('principal').userId,
-      c.req.param('itemId'),
-      await parseBody(c.req.raw, patchItemSchema)
+    await clientImages(
+      c,
+      await patchItem(
+        c.env,
+        c.get('principal').userId,
+        c.req.param('itemId'),
+        await parseBody(c.req.raw, patchItemSchema)
+      )
     )
   )
 );
@@ -235,11 +265,14 @@ app.delete('/v1/items/:itemId', async (c) => {
 });
 app.patch('/v1/items/:itemId/progress', async (c) =>
   c.json(
-    await updateProgress(
-      c.env,
-      c.get('principal'),
-      c.req.param('itemId'),
-      await parseBody(c.req.raw, progressSchema)
+    await clientImages(
+      c,
+      await updateProgress(
+        c.env,
+        c.get('principal'),
+        c.req.param('itemId'),
+        await parseBody(c.req.raw, progressSchema)
+      )
     )
   )
 );

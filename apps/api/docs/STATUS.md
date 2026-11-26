@@ -3,6 +3,29 @@
 Last reviewed: 2026-11-09 UTC. This file records observed state, not a substitute
 for current checks. Read `../AGENTS.md`, inspect git status, then run `bun run doctor`.
 
+## Image proxy, card image fallbacks and web article images (2026-11-26, not yet released)
+
+- Branch `zine-next-image-fixes`. Nothing was deployed and no secret was set from this session.
+- New optional Worker secret `IMAGE_PROXY_SECRET` turns on `GET /v1/img?u=&s=`
+  (`src/image-proxy.ts`): HMAC-signed, public hosts only with DNS re-checked on each of at most
+  three redirects, `image/*` only, 5 MB cap, Cache API for a day. With the secret set,
+  `thumbnail`/`creatorImageUrl` are rewritten to signed references at the HTTP boundary only
+  (`clientImages`) on Home, Home preview, item list/search/detail, collection items and the item
+  mutations. Stored contributions, the saves idempotency record, exports and MCP output keep
+  original URLs. Unset: the route answers 503 and responses are unchanged.
+- **Next action (Erik):** set `IMAGE_PROXY_SECRET` on production, staging and any live preview;
+  commands are in `README.md` and `docs/environments.md`. Then check a claude.dev save on Home.
+- `src/providers/web.ts` now contributes `creatorImageUrl` for HTML pages (author image →
+  publisher logo → apple-touch-icon → icon → `/favicon.ico`) and falls back for `thumbnail` to
+  JSON-LD `image`, `<link rel="image_src">`, then the first reasonably large article image.
+  Already-saved items only change when re-enriched; there is no backfill. Some avatars will be
+  site icons.
+- `packages/next-ui` cards fall back to their no-picture layouts when an image fails to load.
+- Coverage is fixtures and mocked fetch only (`test/image-proxy.test.ts`,
+  `test/image-rewrite-routes.test.ts`, `test/web-images.test.ts`,
+  `packages/next-ui/test/image-fallback.test.tsx`). Not verified: the proxy against real
+  publishers or in a deployed Worker (including `caches.default` on the custom domain).
+
 ## YouTube Shorts excluded from subscriptions (2026-11-25, not yet released)
 
 - Before this change every YouTube subscription entry was typed `video`, so Shorts were

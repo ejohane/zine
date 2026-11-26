@@ -144,6 +144,36 @@ cold isolates do not depend on the provider's token-issuance endpoint. Google us
 grants are optional and separate from public-page extraction; provisioning a client
 ID alone does not establish an authorized Google account connection.
 
+### Image proxy secret (`IMAGE_PROXY_SECRET`)
+
+Some publishers serve covers and avatars with `Cross-Origin-Resource-Policy: same-origin` or
+hotlink protection, so a browser on our origin cannot show them. With `IMAGE_PROXY_SECRET` set,
+the `thumbnail` and `creatorImageUrl` fields of item, list, search, Home and collection-item
+responses become signed `GET /v1/img?u=<url>&s=<signature>` references, and that route fetches
+the image (public hosts only, `image/*` only, 5 MB cap, cached for a day). The signature
+(HMAC-SHA256 of the URL with this secret) is the authorization; the route needs no bearer token.
+Stored data, exports and MCP output keep the original URLs.
+
+It is an optional Worker secret: a long random string, different per environment. It is not set
+by any script or workflow here; a person sets it once per Worker:
+
+```sh
+openssl rand -base64 48                                               # generate a value
+bunx wrangler@4.158.0 secret put IMAGE_PROXY_SECRET                   # production
+bunx wrangler@4.158.0 secret put IMAGE_PROXY_SECRET --config wrangler.staging.jsonc
+bunx wrangler@4.158.0 secret put IMAGE_PROXY_SECRET --name zine-api-next-pv-<slug>  # a branch preview
+```
+
+Locally, add `IMAGE_PROXY_SECRET=...` to the ignored `apps/api/.dev.vars`; see
+[docs/environments.md](docs/environments.md) for when that is useful.
+
+When it is unset, `/v1/img` answers 503 and no response is rewritten: clients get the original
+image URLs, exactly as before the proxy existed. Changing the value invalidates references
+already handed out; clients get fresh ones on their next API read. SVG is served, but only with
+`Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` and
+`Content-Disposition: inline`, because many site icons exist only as SVG and the references are
+only used in `<img>`, where scripts never run.
+
 Durable D1 jobs survive queue delivery failures. Cron recovers unsent work and
 expired leases. Provider budgets coordinate backoff. Source ingestion takes
 priority over AI backfills, and only bounded AI work is queued at once. Long
