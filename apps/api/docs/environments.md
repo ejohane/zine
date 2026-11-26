@@ -93,6 +93,20 @@ sessions and preview tokens.
 **Cost** (Workers Paid, within included usage): per preview ~166k rows written once, ~95 MB of
 SQL, ~15 MB of files. Max 3 at once, 7-day expiry.
 
+## Image proxy
+
+The image proxy (`GET /v1/img/items/:itemId/:kind`, `src/image-proxy.ts`; behaviour in the
+[README](../README.md#image-proxy-get-v1imgitemsitemidkind)) needs no secret or configuration in
+any environment.
+
+- Production, staging and branch previews are served over `https`, so item and Home responses
+  carry proxy references and covers/avatars load through the Worker.
+- Locally, `local:dev` is `http://localhost`. Responses are only rewritten for `https` requests,
+  because `apps/next-web` deliberately renders only `https:` images; local responses keep the
+  original image URLs and pictures load straight from their sources, as before the proxy
+  existed. Images from hosts that block cross-origin embedding do not show locally. To exercise
+  the route itself, `curl http://localhost:<port>/v1/img/items/<itemId>/thumbnail`.
+
 ## Troubleshooting
 
 - Tests fail with `EADDRNOTAVAIL` connecting to 127.0.0.1: macOS ran out of ephemeral ports

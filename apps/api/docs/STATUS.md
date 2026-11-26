@@ -3,6 +3,34 @@
 Last reviewed: 2026-11-09 UTC. This file records observed state, not a substitute
 for current checks. Read `../AGENTS.md`, inspect git status, then run `bun run doctor`.
 
+## Image proxy, card image fallbacks and web article images (2026-11-26, not yet released)
+
+- Branch `zine-next-image-fixes` (PR #483). Nothing was deployed from this session.
+- Owner decision: the image proxy needs no secret. The first draft's `IMAGE_PROXY_SECRET` and
+  HMAC-signed `/v1/img?u=&s=` were removed before release; there is nothing to configure.
+- `GET /v1/img/items/:itemId/(thumbnail|creator)` (`src/image-proxy.ts`) proxies by record: it
+  fetches only the image URL currently stored and visible for that item, never a caller-supplied
+  URL. Unauthenticated because `<img>` cannot send a token; it returns image bytes only, and 404
+  for unknown/deleted/malformed ids or no image. Public hosts only with DNS re-checked on each
+  of at most three redirects, `image/*` only, 5 MB cap, Cache API for a day keyed on the
+  upstream URL.
+- `thumbnail`/`creatorImageUrl` of items and Home cards are always rewritten to those routes
+  (with `?v=<8 hex of SHA-256(url)>`) at the HTTP boundary (`clientImages`) on Home, Home
+  preview, item list/search/detail and collection items, for `https` requests only (local
+  `http://localhost` keeps originals; see `docs/environments.md`). Stored contributions, the
+  saves idempotency record, exports and MCP output keep original URLs.
+- **Next action:** after the PR is merged and deployed, check a claude.dev save on Home.
+- `src/providers/web.ts` now contributes `creatorImageUrl` for HTML pages (author image →
+  publisher logo → apple-touch-icon → icon → `/favicon.ico`) and falls back for `thumbnail` to
+  JSON-LD `image`, `<link rel="image_src">`, then the first reasonably large article image.
+  Already-saved items only change when re-enriched; there is no backfill. Some avatars will be
+  site icons.
+- `packages/next-ui` cards fall back to their no-picture layouts when an image fails to load.
+- Coverage is fixtures and mocked fetch only (`test/image-proxy.test.ts`,
+  `test/image-rewrite-routes.test.ts`, `test/web-images.test.ts`,
+  `packages/next-ui/test/image-fallback.test.tsx`). Not verified: the proxy against real
+  publishers or in a deployed Worker (including `caches.default` on the custom domain).
+
 ## YouTube Shorts excluded from subscriptions (2026-11-25, not yet released)
 
 - Before this change every YouTube subscription entry was typed `video`, so Shorts were

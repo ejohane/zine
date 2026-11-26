@@ -527,7 +527,11 @@ interface Operation {
   input?: string;
   output?: string;
   status?: number;
-  query?: { name: string; schema: Json; description?: string }[];
+  query?: { name: string; schema: Json; description?: string; required?: boolean }[];
+  /** Needs no bearer token (the record-scoped image proxy). */
+  public?: boolean;
+  /** Success body is binary with this media type instead of JSON. */
+  binary?: string;
 }
 const operations: Operation[] = [];
 const op = (
@@ -551,6 +555,25 @@ op(
   'Health'
 );
 op('get', `${p}/me`, 'Authenticated identity', undefined, 'Me');
+Object.assign(
+  op(
+    'get',
+    `${p}/img/items/{itemId}/{kind}`,
+    "Fetch an item's stored cover (kind `thumbnail`) or creator avatar (kind `creator`) through the image proxy. Public, because an <img> cannot send a bearer token: only the image already stored for the item is fetched, and nothing but its bytes is returned. 404 for an unknown item or one without that image"
+  ),
+  {
+    public: true,
+    binary: 'image/*',
+    query: [
+      {
+        name: 'v',
+        schema: { type: 'string' },
+        description:
+          'Cache-buster issued in API responses (a hash prefix of the stored image URL). Ignored by the route.',
+      },
+    ],
+  } satisfies Partial<Operation>
+);
 op('get', `${p}/home`, 'Read the current personal Home edition', undefined, 'Home');
 op(
   'post',
@@ -1167,7 +1190,7 @@ export function openApiDocument(): Json {
       schema: { type: 'string' },
     }));
     for (const parameter of operation.query ?? [])
-      parameters.push({ ...parameter, in: 'query', required: false });
+      parameters.push({ required: false, ...parameter, in: 'query' });
     if (operation.path === '/v1/saves')
       parameters.push({
         name: 'Idempotency-Key',
@@ -1183,21 +1206,31 @@ export function openApiDocument(): Json {
         description: `HTTP ${status}; machine-readable error code and request correlation`,
         content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
       };
-    const success = operation.output
+    if (operation.binary)
+      responses['502'] = {
+        description: 'HTTP 502; the source image was unreachable, not an image, or too large',
+        content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+      };
+    const success = operation.binary
       ? {
           description: operation.summary,
-          content: {
-            'application/json': { schema: { $ref: `#/components/schemas/${operation.output}` } },
-          },
+          content: { [operation.binary]: { schema: { type: 'string', format: 'binary' } } },
         }
-      : { description: 'Completed; no response body' };
+      : operation.output
+        ? {
+            description: operation.summary,
+            content: {
+              'application/json': { schema: { $ref: `#/components/schemas/${operation.output}` } },
+            },
+          }
+        : { description: 'Completed; no response body' };
     responses[String(operation.status ?? 200)] = success;
     if (operation.path === '/v1/saves') responses['200'] = success;
     paths[operation.path] ??= {};
     paths[operation.path][operation.method] = {
       operationId: `${operation.method}_${operation.path.replace(/[^a-zA-Z0-9]+/g, '_')}`,
       summary: operation.summary,
-      security: operation.path.startsWith('/v1/') ? [{ bearerAuth: [] }] : [],
+      security: operation.path.startsWith('/v1/') && !operation.public ? [{ bearerAuth: [] }] : [],
       parameters,
       ...(operation.input
         ? {

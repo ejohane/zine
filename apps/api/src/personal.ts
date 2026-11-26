@@ -16,6 +16,7 @@ import {
 } from './lib';
 import type { AppEnv } from './types';
 import { getItem } from './items';
+import { clientImages } from './image-proxy';
 
 export const contextSchema = z
   .object({
@@ -546,18 +547,20 @@ personalRoutes.get('/collections/:collectionId/items', async (c) => {
   );
   const page = rows.slice(0, limit);
   const last = page.at(-1);
-  return c.json({
-    items: await Promise.all(
-      page.map(async (row) => ({
-        position: row.position,
-        item: await getItem(c.env, owner, row.item_id),
-      }))
-    ),
-    nextCursor:
-      rows.length > limit && last
-        ? btoa(JSON.stringify({ collectionId, position: last.position, id: last.item_id }))
-        : null,
-  });
+  return c.json(
+    await clientImages(c, {
+      items: await Promise.all(
+        page.map(async (row) => ({
+          position: row.position,
+          item: await getItem(c.env, owner, row.item_id),
+        }))
+      ),
+      nextCursor:
+        rows.length > limit && last
+          ? btoa(JSON.stringify({ collectionId, position: last.position, id: last.item_id }))
+          : null,
+    })
+  );
 });
 
 export const collectionNoteSchema = z
