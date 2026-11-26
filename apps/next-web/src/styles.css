@@ -1076,6 +1076,22 @@ blockquote {
   font-weight: 750;
   letter-spacing: -0.03em;
 }
+.destination-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.destination-sidebar-header .destination-brand {
+  margin-bottom: 0;
+}
+.destination-toggle {
+  color: var(--secondary);
+}
+.destination-toggle svg {
+  width: 19px;
+  height: 19px;
+}
 .destination-links {
   display: grid;
   gap: 4px;
@@ -1184,6 +1200,29 @@ blockquote {
   }
   .destination-mobile {
     display: none;
+  }
+  .destination-shell:has(.destination-sidebar[data-collapsed='true']) {
+    --destination-width: 72px;
+  }
+  .destination-sidebar[data-collapsed='true'] .destination-sidebar-header {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .destination-sidebar[data-collapsed='true'] .destination-brand {
+    margin-inline: 0;
+  }
+  .destination-sidebar[data-collapsed='true'] .destination-links button {
+    justify-content: center;
+    padding: 0;
+  }
+  .destination-sidebar[data-collapsed='true'] .destination-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   .destination-shell .floating-header {
     top: 4px;
