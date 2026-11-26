@@ -4,3 +4,4 @@ apps/web/storybook-static/
 apps/mobile/
 # Local build of the Zine Next card gallery; ignored by git.
 packages/next-ui/.gallery/
+apps/next-web/output/
