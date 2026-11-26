@@ -93,27 +93,19 @@ sessions and preview tokens.
 **Cost** (Workers Paid, within included usage): per preview ~166k rows written once, ~95 MB of
 SQL, ~15 MB of files. Max 3 at once, 7-day expiry.
 
-## Image proxy secret (`IMAGE_PROXY_SECRET`)
+## Image proxy
 
-Optional Worker secret that turns on the signed image proxy (`GET /v1/img`, `src/image-proxy.ts`;
-purpose and behaviour in the [README](../README.md#image-proxy-secret-image_proxy_secret)). Unset
-means the route answers 503 and API responses keep the original image URLs, so every environment
-works without it; covers and avatars from hosts that block cross-origin embedding just don't show.
+The image proxy (`GET /v1/img/items/:itemId/:kind`, `src/image-proxy.ts`; behaviour in the
+[README](../README.md#image-proxy-get-v1imgitemsitemidkind)) needs no secret or configuration in
+any environment.
 
-| Environment    | How to set it (from `apps/api`, a long random value, different each time)              |
-| -------------- | -------------------------------------------------------------------------------------- |
-| Production     | `bunx wrangler@4.158.0 secret put IMAGE_PROXY_SECRET`                                  |
-| Staging        | `bunx wrangler@4.158.0 secret put IMAGE_PROXY_SECRET --config wrangler.staging.jsonc`  |
-| Branch preview | `bunx wrangler@4.158.0 secret put IMAGE_PROXY_SECRET --name zine-api-next-pv-<slug>`   |
-| Local          | `IMAGE_PROXY_SECRET=...` in the ignored `apps/api/.dev.vars`, then restart `local:dev` |
-
-- A preview has no secret when first deployed (the proxy is simply off). A secret set afterwards
-  survives redeploys of that preview and is gone when the preview is destroyed.
-- Locally, leave it unset for normal work: images then load straight from their sources as
-  before. With it set, references point at the local API's `http://` origin, which
-  `apps/next-web` deliberately ignores (it only renders `https:` images), so cards show no
-  pictures. Set it only to exercise the route itself, for example with `curl`.
-- Tests set their own synthetic value through the runtime harness; nothing reads a real secret.
+- Production, staging and branch previews are served over `https`, so item and Home responses
+  carry proxy references and covers/avatars load through the Worker.
+- Locally, `local:dev` is `http://localhost`. Responses are only rewritten for `https` requests,
+  because `apps/next-web` deliberately renders only `https:` images; local responses keep the
+  original image URLs and pictures load straight from their sources, as before the proxy
+  existed. Images from hosts that block cross-origin embedding do not show locally. To exercise
+  the route itself, `curl http://localhost:<port>/v1/img/items/<itemId>/thumbnail`.
 
 ## Troubleshooting
 

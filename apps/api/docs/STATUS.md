@@ -5,16 +5,21 @@ for current checks. Read `../AGENTS.md`, inspect git status, then run `bun run d
 
 ## Image proxy, card image fallbacks and web article images (2026-11-26, not yet released)
 
-- Branch `zine-next-image-fixes`. Nothing was deployed and no secret was set from this session.
-- New optional Worker secret `IMAGE_PROXY_SECRET` turns on `GET /v1/img?u=&s=`
-  (`src/image-proxy.ts`): HMAC-signed, public hosts only with DNS re-checked on each of at most
-  three redirects, `image/*` only, 5 MB cap, Cache API for a day. With the secret set,
-  `thumbnail`/`creatorImageUrl` are rewritten to signed references at the HTTP boundary only
-  (`clientImages`) on Home, Home preview, item list/search/detail, collection items and the item
-  mutations. Stored contributions, the saves idempotency record, exports and MCP output keep
-  original URLs. Unset: the route answers 503 and responses are unchanged.
-- **Next action (Erik):** set `IMAGE_PROXY_SECRET` on production, staging and any live preview;
-  commands are in `README.md` and `docs/environments.md`. Then check a claude.dev save on Home.
+- Branch `zine-next-image-fixes` (PR #483). Nothing was deployed from this session.
+- Owner decision: the image proxy needs no secret. The first draft's `IMAGE_PROXY_SECRET` and
+  HMAC-signed `/v1/img?u=&s=` were removed before release; there is nothing to configure.
+- `GET /v1/img/items/:itemId/(thumbnail|creator)` (`src/image-proxy.ts`) proxies by record: it
+  fetches only the image URL currently stored and visible for that item, never a caller-supplied
+  URL. Unauthenticated because `<img>` cannot send a token; it returns image bytes only, and 404
+  for unknown/deleted/malformed ids or no image. Public hosts only with DNS re-checked on each
+  of at most three redirects, `image/*` only, 5 MB cap, Cache API for a day keyed on the
+  upstream URL.
+- `thumbnail`/`creatorImageUrl` of items and Home cards are always rewritten to those routes
+  (with `?v=<8 hex of SHA-256(url)>`) at the HTTP boundary (`clientImages`) on Home, Home
+  preview, item list/search/detail and collection items, for `https` requests only (local
+  `http://localhost` keeps originals; see `docs/environments.md`). Stored contributions, the
+  saves idempotency record, exports and MCP output keep original URLs.
+- **Next action:** after the PR is merged and deployed, check a claude.dev save on Home.
 - `src/providers/web.ts` now contributes `creatorImageUrl` for HTML pages (author image →
   publisher logo → apple-touch-icon → icon → `/favicon.ico`) and falls back for `thumbnail` to
   JSON-LD `image`, `<link rel="image_src">`, then the first reasonably large article image.

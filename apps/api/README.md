@@ -144,35 +144,40 @@ cold isolates do not depend on the provider's token-issuance endpoint. Google us
 grants are optional and separate from public-page extraction; provisioning a client
 ID alone does not establish an authorized Google account connection.
 
-### Image proxy secret (`IMAGE_PROXY_SECRET`)
+### Image proxy (`GET /v1/img/items/:itemId/:kind`)
 
 Some publishers serve covers and avatars with `Cross-Origin-Resource-Policy: same-origin` or
-hotlink protection, so a browser on our origin cannot show them. With `IMAGE_PROXY_SECRET` set,
-the `thumbnail` and `creatorImageUrl` fields of item, list, search, Home and collection-item
-responses become signed `GET /v1/img?u=<url>&s=<signature>` references, and that route fetches
-the image (public hosts only, `image/*` only, 5 MB cap, cached for a day). The signature
-(HMAC-SHA256 of the URL with this secret) is the authorization; the route needs no bearer token.
-Stored data, exports and MCP output keep the original URLs.
+hotlink protection, so a browser on our origin cannot show them. In item, list, search, Home and
+collection-item responses, each item's `thumbnail` and `creatorImageUrl` are therefore returned
+as `https://<api>/v1/img/items/<itemId>/thumbnail?v=<hash>` and `.../creator?v=<hash>`.
+There is nothing to configure: no secret, binding or flag.
 
-It is an optional Worker secret: a long random string, different per environment. It is not set
-by any script or workflow here; a person sets it once per Worker:
-
-```sh
-openssl rand -base64 48                                               # generate a value
-bunx wrangler@4.158.0 secret put IMAGE_PROXY_SECRET                   # production
-bunx wrangler@4.158.0 secret put IMAGE_PROXY_SECRET --config wrangler.staging.jsonc
-bunx wrangler@4.158.0 secret put IMAGE_PROXY_SECRET --name zine-api-next-pv-<slug>  # a branch preview
-```
-
-Locally, add `IMAGE_PROXY_SECRET=...` to the ignored `apps/api/.dev.vars`; see
-[docs/environments.md](docs/environments.md) for when that is useful.
-
-When it is unset, `/v1/img` answers 503 and no response is rewritten: clients get the original
-image URLs, exactly as before the proxy existed. Changing the value invalidates references
-already handed out; clients get fresh ones on their next API read. SVG is served, but only with
-`Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` and
-`Content-Disposition: inline`, because many site icons exist only as SVG and the references are
-only used in `<img>`, where scripts never run.
+- **Proxy by record.** The route accepts no URL. It looks up the image URL currently stored and
+  visible for that item (the same selection the item JSON makes) and fetches only that, so it
+  cannot be used as an open proxy. Unknown, deleted or malformed id, or no stored image: 404.
+- **Unauthenticated, on purpose.** An `<img>` cannot send a bearer token. Anyone holding an item
+  id can load that item's cover and avatar bytes, and nothing else: no title, owner or metadata.
+  Item ids are only returned to their owner and are not guessable (a 160-bit hash over the
+  owner's account id and the content id). The route is outside per-account usage limits; caching
+  bounds what it costs.
+- **Fetch safeguards.** Public `http`/`https` hosts only, with DNS re-checked on each of at most
+  three redirects; 10 s timeout; `image/*` only; 5 MB cap. SVG is served, but only with
+  `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` and
+  `Content-Disposition: inline`, because many site icons exist only as SVG and the references
+  are only used in `<img>`, where scripts never run.
+- **Caching.** Successes are cacheable for a day (`max-age=86400`, plus
+  `stale-while-revalidate=604800`) and stored in the Cache API keyed on the upstream image URL,
+  so a changed stored image is fetched anew. `v` is the first 8 hex characters of
+  SHA-256(stored URL): the route ignores it, but the reference changes when the image does, so a
+  browser never reuses its cached copy of the old one. Failures (404/502) are `max-age=60` and
+  never stored.
+- **Where originals remain.** Stored data, the saves idempotency record, exports and MCP output
+  keep the original URLs. Images without an owning item id in the response (for example entries
+  of `content.members`) are returned as stored.
+- **Local development.** Responses are only rewritten for requests that arrive over `https`.
+  `local:dev` serves `http://localhost`, and clients only render `https:` images, so locally the
+  original URLs are returned and load straight from their sources. The route itself still works
+  locally (`curl http://localhost:<port>/v1/img/items/<itemId>/thumbnail`).
 
 Durable D1 jobs survive queue delivery failures. Cron recovers unsent work and
 expired leases. Provider budgets coordinate backoff. Source ingestion takes

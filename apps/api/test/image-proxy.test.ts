@@ -1,35 +1,34 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { runtimeHarness } from '../scripts/runtime-harness';
-import {
-  proxiedImageUrl,
-  rewriteImages,
-  signImageUrl,
-  verifyImageSignature,
-} from '../src/image-proxy';
+import { itemImageUrl, rewriteImages } from '../src/image-proxy';
+import { digest } from '../src/lib';
 
-const SECRET = 'synthetic-image-proxy-secret';
-const ORIGIN = 'http://localhost';
+const ORIGIN = 'https://api.test';
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
+const ITEM = `itm_${'a1'.repeat(20)}`;
 
-describe('image reference signing and rewriting', () => {
-  it('signs the exact URL and rejects any other URL, secret or malformed signature', async () => {
-    const url = 'https://images.example/cover.png?w=1200';
-    const signature = await signImageUrl(SECRET, url);
-    expect(signature).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    expect(await verifyImageSignature(SECRET, url, signature)).toBe(true);
-    expect(await verifyImageSignature(SECRET, `${url}0`, signature)).toBe(false);
-    expect(await verifyImageSignature('another-secret', url, signature)).toBe(false);
-    expect(await verifyImageSignature(SECRET, url, `${signature.slice(0, -1)}!`)).toBe(false);
-    expect(await verifyImageSignature(SECRET, url, '')).toBe(false);
+describe('image reference rewriting', () => {
+  it('points an item or card at its own proxy route, with a version derived from the URL', async () => {
+    const cover = 'https://images.example/cover.png';
+    const reference = await itemImageUrl(ORIGIN, ITEM, 'thumbnail', cover);
+    expect(reference).toBe(
+      `${ORIGIN}/v1/img/items/${ITEM}/thumbnail?v=${(await digest(cover)).slice(0, 8)}`
+    );
+    expect(reference).toMatch(/\?v=[a-f0-9]{8}$/);
+    expect(reference).not.toContain('images.example');
+    expect(await itemImageUrl(ORIGIN, ITEM, 'thumbnail', `${cover}?2`)).not.toBe(reference);
+    expect(await itemImageUrl(ORIGIN, ITEM, 'creator', cover)).toContain(`/${ITEM}/creator?v=`);
   });
 
-  it('rewrites only cover and avatar fields, skips publisher blobs and never double-wraps', async () => {
+  it('rewrites only fields owned by an identifiable item, skips blobs and never double-wraps', async () => {
     const cover = 'https://images.example/cover.png';
     const avatar = 'https://images.example/avatar.png';
     const body = {
       items: [
         {
+          id: ITEM,
           content: {
+            id: 'cnt_1',
             url: 'https://publisher.example/article',
             thumbnail: cover,
             creatorImageUrl: avatar,
@@ -41,30 +40,45 @@ describe('image reference signing and rewriting', () => {
             members: [{ thumbnail: cover, creatorImageUrl: null }],
           },
         },
+        {
+          id: ITEM,
+          content: { thumbnail: 'not a url', creatorImageUrl: 'data:image/png;base64,AA' },
+        },
+        { id: ITEM, content: { thumbnail: null } },
       ],
-      odd: { thumbnail: 'not a url', creatorImageUrl: 'data:image/png;base64,AAAA' },
+      // No item id, a foreign id shape, or no content object: nothing to key a route on.
+      loose: { thumbnail: cover, creatorImageUrl: avatar },
+      other: { id: 'col_123', content: { thumbnail: cover } },
+      malformed: { id: 'itm_../../x', content: { thumbnail: cover } },
     };
-    const once = await rewriteImages(body, SECRET, ORIGIN);
-    const expectedCover = await proxiedImageUrl(SECRET, ORIGIN, cover);
+    const once = await rewriteImages(body, ORIGIN);
     const content = once.items[0].content;
-    expect(content.thumbnail).toBe(expectedCover);
-    expect(expectedCover).toBe(
-      `${ORIGIN}/v1/img?u=${encodeURIComponent(cover)}&s=${await signImageUrl(SECRET, cover)}`
-    );
-    expect(content.creatorImageUrl).toBe(await proxiedImageUrl(SECRET, ORIGIN, avatar));
+    expect(content.thumbnail).toBe(await itemImageUrl(ORIGIN, ITEM, 'thumbnail', cover));
+    expect(content.creatorImageUrl).toBe(await itemImageUrl(ORIGIN, ITEM, 'creator', avatar));
     expect(content.url).toBe('https://publisher.example/article');
-    expect(content.members[0]).toEqual({ thumbnail: expectedCover, creatorImageUrl: null });
-    for (const field of ['structuredData', 'raw', 'article', 'thread', 'transcript'] as const)
+    for (const field of [
+      'structuredData',
+      'raw',
+      'article',
+      'thread',
+      'transcript',
+      'members',
+    ] as const)
       expect(content[field]).toEqual(body.items[0].content[field]);
-    expect(once.odd).toEqual(body.odd);
+    expect(once.items.slice(1)).toEqual(body.items.slice(1));
+    expect(once.loose).toEqual(body.loose);
+    expect(once.other).toEqual(body.other);
+    expect(once.malformed).toEqual(body.malformed);
     // The input is not mutated, and a second pass leaves proxy references alone.
     expect(body.items[0].content.thumbnail).toBe(cover);
-    expect(await rewriteImages(once, SECRET, ORIGIN)).toEqual(once);
+    expect(await rewriteImages(once, ORIGIN)).toEqual(once);
   });
 });
 
-describe('signed image proxy route', () => {
+describe('record-scoped image proxy route', () => {
   let runtime: Awaited<ReturnType<typeof runtimeHarness>>;
+  let token: string;
+  let saves = 0;
   const upstream: string[] = [];
   const outbound = (request: Request) => {
     const url = new URL(request.url);
@@ -78,6 +92,7 @@ describe('signed image proxy route', () => {
             : [{ type: 1, data: host.startsWith('private.') ? '10.0.0.7' : '93.184.216.34' }],
       });
     }
+    if (url.hostname === 'example.com') return new Response('unexpected', { status: 500 });
     upstream.push(request.url);
     expect(request.headers.get('authorization')).toBeNull();
     expect(request.headers.get('user-agent')).toBe('Zine/1.0 (+https://myzine.app)');
@@ -128,47 +143,63 @@ describe('signed image proxy route', () => {
     return new Response('unexpected', { status: 500 });
   };
   beforeAll(async () => {
-    runtime = await runtimeHarness({ outbound, bindings: { IMAGE_PROXY_SECRET: SECRET } });
+    runtime = await runtimeHarness({ outbound });
+    token = await runtime.token('proxy-owner');
   });
   afterAll(async () => runtime?.close());
 
-  const proxy = async (source: string, signature?: string) =>
-    runtime.mf.dispatchFetch(
-      signature === undefined
-        ? await proxiedImageUrl(SECRET, ORIGIN, source)
-        : `${ORIGIN}/v1/img?u=${encodeURIComponent(source)}&s=${signature}`
-    );
-  const failed = async (source: string) => {
-    const response = await proxy(source);
-    const body = (await response.json()) as { error: { code: string } };
-    return {
-      status: response.status,
-      code: body.error.code,
-      cacheControl: response.headers.get('cache-control'),
-    };
+  const api = (path: string, method = 'GET', body?: unknown) =>
+    runtime.mf.dispatchFetch(`${ORIGIN}/v1${path}`, {
+      method,
+      headers: {
+        authorization: `Bearer ${token}`,
+        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  const save = async () => {
+    const saved = await api('/saves', 'POST', { url: `https://example.com/proxy-${++saves}` });
+    expect(saved.status).toBe(201);
+    return ((await saved.json()) as { item: { id: string } }).item.id;
   };
-
-  it('refuses unsigned, tampered and wrongly signed requests without fetching anything', async () => {
-    const source = 'https://images.example/cover.png';
-    const valid = await signImageUrl(SECRET, source);
-    const unsigned = await runtime.mf.dispatchFetch(
-      `${ORIGIN}/v1/img?u=${encodeURIComponent(source)}`
-    );
-    expect(unsigned.status).toBe(403);
-    expect(((await unsigned.json()) as { error: { code: string } }).error.code).toBe(
-      'invalid_image_signature'
-    );
-    expect((await runtime.mf.dispatchFetch(`${ORIGIN}/v1/img`)).status).toBe(403);
-    expect((await proxy('https://images.example/other.png', valid)).status).toBe(403);
-    expect((await proxy(source, valid.replace(/.$/, valid.endsWith('A') ? 'B' : 'A'))).status).toBe(
-      403
-    );
-    expect((await proxy(source, await signImageUrl('wrong-secret', source))).status).toBe(403);
-    expect(upstream).toEqual([]);
+  /** Stores `source` as the item's image. Written directly so unsafe URLs can be stored too. */
+  const store = async (itemId: string, field: 'thumbnail' | 'creatorImageUrl', source: string) => {
+    const changed = await runtime.db
+      .prepare(
+        'UPDATE contributions SET value_json=? WHERE field=? AND content_id=(SELECT content_id FROM personal_items WHERE id=?)'
+      )
+      .bind(JSON.stringify(source), field, itemId)
+      .run();
+    if (changed.meta.changes) return;
+    const added = await api(`/items/${itemId}/enrichment`, 'POST', {
+      field,
+      value: 'https://images.example/placeholder.png',
+      provenance: { method: 'test-fixture' },
+    });
+    expect(added.status).toBe(201);
+    await store(itemId, field, source);
+  };
+  /** A fresh item whose thumbnail is `source`, read through the public route without a token. */
+  const route = (itemId: string, kind = 'thumbnail', query = '') =>
+    runtime.mf.dispatchFetch(`${ORIGIN}/v1/img/items/${itemId}/${kind}${query}`);
+  const proxy = async (source: string) => {
+    const itemId = await save();
+    await store(itemId, 'thumbnail', source);
+    return route(itemId);
+  };
+  const outcome = async (response: Awaited<ReturnType<typeof route>>) => ({
+    status: response.status,
+    code: ((await response.json()) as { error: { code: string } }).error.code,
+    cacheControl: response.headers.get('cache-control'),
   });
+  const failed = async (source: string) => outcome(await proxy(source));
+  const NOT_FOUND = { status: 404, code: 'image_not_found', cacheControl: 'public, max-age=60' };
 
-  it('serves a signed image without a bearer token, with cross-origin and caching headers', async () => {
-    const response = await proxy('https://images.example/cover.png');
+  it('serves the stored thumbnail and creator image without a bearer token', async () => {
+    const itemId = await save();
+    await store(itemId, 'thumbnail', 'https://images.example/cover.png');
+    await store(itemId, 'creatorImageUrl', 'https://images.example/icon.svg');
+    const response = await route(itemId, 'thumbnail', '?v=0123abcd');
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('image/png');
     expect(response.headers.get('cache-control')).toBe(
@@ -178,16 +209,116 @@ describe('signed image proxy route', () => {
     expect(response.headers.get('cross-origin-resource-policy')).toBe('cross-origin');
     expect(response.headers.get('content-security-policy')).toBeNull();
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(PNG);
+    const creator = await route(itemId, 'creator');
+    expect(creator.status).toBe(200);
+    expect(creator.headers.get('content-type')).toBe('image/svg+xml');
+    await creator.arrayBuffer();
+    expect(upstream).toEqual([
+      'https://images.example/cover.png',
+      'https://images.example/icon.svg',
+    ]);
   });
 
-  it('serves repeat requests from the Cache API without contacting the source again', async () => {
+  it('answers one 404 for unknown, deleted, image-less and malformed references, fetching nothing', async () => {
+    const before = upstream.length;
+    const bare = await save();
+    expect(await outcome(await route(bare))).toEqual(NOT_FOUND);
+    expect(await outcome(await route(bare, 'creator'))).toEqual(NOT_FOUND);
+    expect(await outcome(await route(`itm_${'0'.repeat(40)}`))).toEqual(NOT_FOUND);
+    const pictured = await save();
+    await store(pictured, 'thumbnail', 'https://images.example/cover.png');
+    // Only the two image kinds exist; other fields of the record are not reachable.
+    for (const kind of ['title', 'creatorImageUrl', 'url', 'THUMBNAIL'])
+      expect(await outcome(await route(pictured, kind)), kind).toEqual(NOT_FOUND);
+    for (const id of [
+      pictured.toUpperCase(),
+      pictured.slice(0, -1),
+      `${pictured}0`,
+      pictured.replace('itm_', 'cnt_'),
+      pictured.replace('itm_', ''),
+      `${pictured}%27%20OR%201=1`,
+      'itm_%25',
+    ])
+      expect(await outcome(await route(id)), id).toEqual(NOT_FOUND);
+    expect((await api(`/items/${pictured}`, 'DELETE')).status).toBe(204);
+    expect(await outcome(await route(pictured))).toEqual(NOT_FOUND);
+    expect(upstream.length).toBe(before);
+    // The old caller-supplied-URL form no longer exists; it falls through to the authenticated API.
+    for (const path of ['/v1/img', '/v1/img?u=https%3A%2F%2Fimages.example%2Fcover.png&s=x'])
+      expect((await runtime.mf.dispatchFetch(`${ORIGIN}${path}`)).status).toBe(401);
+    expect(upstream.length).toBe(before);
+  });
+
+  it('never fetches a URL from the request, only the stored one', async () => {
+    const itemId = await save();
+    await store(itemId, 'thumbnail', 'https://images.example/cover.png');
+    const before = upstream.length;
+    const response = await route(
+      itemId,
+      'thumbnail',
+      '?u=https%3A%2F%2Fevil.example%2Fx.png&url=https://evil.example/y.png&v=https://evil.example/z.png'
+    );
+    expect(response.status).toBe(200);
+    await response.arrayBuffer();
+    expect(upstream.slice(before).every((url) => url === 'https://images.example/cover.png')).toBe(
+      true
+    );
+    expect(upstream.some((url) => url.includes('evil.example'))).toBe(false);
+  });
+
+  it('serves the same visible contribution the item JSON shows when several exist', async () => {
+    const itemId = await save();
+    await store(itemId, 'thumbnail', 'https://images.example/cover.png');
+    const row = await runtime.db
+      .prepare('SELECT * FROM contributions WHERE field=? AND value_json=? LIMIT 1')
+      .bind('thumbnail', JSON.stringify('https://images.example/cover.png'))
+      .first<Record<string, unknown>>();
+    // A second, lower-ranked contribution must not be the one served.
+    await runtime.db
+      .prepare(
+        `INSERT INTO contributions(${Object.keys(row!).join(',')}) VALUES(${Object.keys(row!)
+          .map(() => '?')
+          .join(',')})`
+      )
+      .bind(
+        ...Object.entries({
+          ...row!,
+          id: 'ctr_lower_ranked',
+          content_id: (
+            await runtime.db
+              .prepare('SELECT content_id FROM personal_items WHERE id=?')
+              .bind(itemId)
+              .first<{ content_id: string }>()
+          )?.content_id,
+          value_json: JSON.stringify('https://images.example/page.html'),
+          priority: -1000,
+        }).map(([, value]) => value)
+      )
+      .run();
+    const shown = (await (await api(`/items/${itemId}`)).json()) as {
+      content: { thumbnail: string };
+    };
+    // The item JSON and the route select the same contribution: the cover, not the page.
+    expect(shown.content.thumbnail).toBe(
+      await itemImageUrl(ORIGIN, itemId, 'thumbnail', 'https://images.example/cover.png')
+    );
+    const response = await runtime.mf.dispatchFetch(shown.content.thumbnail);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('image/png');
+    await response.arrayBuffer();
+    expect(upstream).not.toContain('https://images.example/page.html');
+  });
+
+  it('caches by upstream URL: repeats hit the cache, a changed stored URL is fetched anew', async () => {
     const source = 'https://images.example/cached.png';
-    const first = await proxy(source);
+    const itemId = await save();
+    await store(itemId, 'thumbnail', source);
+    const fetches = (url = source) => upstream.filter((entry) => entry === url).length;
+    const first = await route(itemId);
     expect(first.headers.get('x-zine-image-cache')).toBe('MISS');
     await first.arrayBuffer();
-    const fetches = () => upstream.filter((url) => url === source).length;
     expect(fetches()).toBe(1);
-    let second = await proxy(source);
+    let second = await route(itemId);
     // The cache write completes in waitUntil, after the first response was sent.
     for (
       let attempt = 0;
@@ -196,7 +327,7 @@ describe('signed image proxy route', () => {
     ) {
       await second.arrayBuffer();
       await new Promise((resolve) => setTimeout(resolve, 100));
-      second = await proxy(source);
+      second = await route(itemId);
     }
     expect(second.status).toBe(200);
     expect(second.headers.get('x-zine-image-cache')).toBe('HIT');
@@ -207,7 +338,25 @@ describe('signed image proxy route', () => {
     expect(second.headers.get('cross-origin-resource-policy')).toBe('cross-origin');
     expect(new Uint8Array(await second.arrayBuffer())).toEqual(PNG);
     const before = fetches();
-    await (await proxy(source)).arrayBuffer();
+    // The version parameter is not part of the cache key.
+    await (await route(itemId, 'thumbnail', '?v=ffffffff')).arrayBuffer();
+    expect(fetches()).toBe(before);
+
+    // Another item storing the same image shares the cached copy.
+    const sibling = await proxy(source);
+    expect(sibling.headers.get('x-zine-image-cache')).toBe('HIT');
+    await sibling.arrayBuffer();
+    expect(fetches()).toBe(before);
+
+    // The same route URL now serves the newly stored image instead of the cached old one.
+    const replacement = 'https://images.example/icon.svg?changed';
+    await store(itemId, 'thumbnail', replacement);
+    const changed = await route(itemId);
+    expect(changed.status).toBe(200);
+    expect(changed.headers.get('x-zine-image-cache')).toBe('MISS');
+    expect(changed.headers.get('content-type')).toBe('image/svg+xml');
+    await changed.arrayBuffer();
+    expect(fetches(replacement)).toBe(1);
     expect(fetches()).toBe(before);
   });
 
@@ -222,7 +371,7 @@ describe('signed image proxy route', () => {
     await response.arrayBuffer();
   });
 
-  it('rejects private, literal-address and non-HTTP sources even when correctly signed', async () => {
+  it('rejects stored private, literal-address and non-HTTP sources', async () => {
     const before = upstream.length;
     for (const source of [
       'https://private.example/cover.png',
@@ -256,15 +405,11 @@ describe('signed image proxy route', () => {
   });
 
   it('maps a missing source to 404 and other failures to an uncached 502', async () => {
-    expect(await failed('https://images.example/missing.png')).toEqual({
-      status: 404,
-      code: 'image_not_found',
-      cacheControl: 'public, max-age=60',
-    });
+    expect(await failed('https://images.example/missing.png')).toEqual(NOT_FOUND);
     const source = 'https://images.example/broken.png';
     expect(await failed(source)).toMatchObject({ status: 502, code: 'image_source_unreachable' });
     // Failures are never stored: the source is asked again.
-    await failed(source);
+    expect(await failed(source)).toMatchObject({ status: 502 });
     expect(upstream.filter((url) => url === source).length).toBe(2);
   });
 
@@ -287,58 +432,5 @@ describe('signed image proxy route', () => {
     expect(await failed('https://images.example/loop')).toMatchObject({ status: 502 });
     // The original request plus at most three redirects.
     expect(upstream.filter((url) => url.includes('/loop')).length).toBe(4);
-  });
-});
-
-describe('deployment without IMAGE_PROXY_SECRET', () => {
-  let runtime: Awaited<ReturnType<typeof runtimeHarness>>;
-  beforeAll(async () => {
-    runtime = await runtimeHarness();
-  });
-  afterAll(async () => runtime?.close());
-
-  it('turns the route off and leaves image references exactly as stored', async () => {
-    const source = 'https://images.example/cover.png';
-    const response = await runtime.mf.dispatchFetch(await proxiedImageUrl(SECRET, ORIGIN, source));
-    expect(response.status).toBe(503);
-    expect(((await response.json()) as { error: { code: string } }).error.code).toBe(
-      'image_proxy_unavailable'
-    );
-
-    const token = await runtime.token('no-proxy-owner');
-    const call = async (path: string, method = 'GET', body?: unknown) => {
-      const result = await runtime.mf.dispatchFetch(`${ORIGIN}/v1${path}`, {
-        method,
-        headers: {
-          authorization: `Bearer ${token}`,
-          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
-        },
-        body: body === undefined ? undefined : JSON.stringify(body),
-      });
-      return { status: result.status, text: await result.text() };
-    };
-    const saved = await call('/saves', 'POST', { url: 'https://example.com/no-proxy' });
-    expect(saved.status).toBe(201);
-    const itemId = (JSON.parse(saved.text) as { item: { id: string } }).item.id;
-    for (const [field, value] of [
-      ['thumbnail', source],
-      ['creatorImageUrl', 'https://images.example/avatar.png'],
-    ])
-      expect(
-        (
-          await call(`/items/${itemId}/enrichment`, 'POST', {
-            field,
-            value,
-            provenance: { method: 'test-fixture' },
-          })
-        ).status
-      ).toBe(201);
-    for (const path of [`/items/${itemId}`, '/items', '/home']) {
-      const read = await call(path);
-      expect(read.status).toBe(200);
-      expect(read.text).toContain(`"thumbnail":"${source}"`);
-      expect(read.text).toContain('"creatorImageUrl":"https://images.example/avatar.png"');
-      expect(read.text).not.toContain('/v1/img');
-    }
   });
 });

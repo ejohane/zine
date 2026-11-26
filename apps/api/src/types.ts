@@ -26,8 +26,6 @@ export interface Env {
   X_BEARER_TOKEN?: string;
   X_CLIENT_ID?: string;
   X_CLIENT_SECRET?: string;
-  /** HMAC key for signed `/v1/img` references. Unset: the proxy is off and nothing is rewritten. */
-  IMAGE_PROXY_SECRET?: string;
 }
 
 export interface Principal {

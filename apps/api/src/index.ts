@@ -86,8 +86,9 @@ app.get('/', (c) => c.html(inspector(c.env, crypto.randomUUID())));
 app.get('/openapi.json', (c) => c.json(openApiDocument()));
 app.get('/docs', (c) => c.html(apiReference()));
 app.get('/architecture', (c) => c.html(architectureGuide()));
-// Public by design: the HMAC signature is the authorization (see image-proxy.ts).
-app.get('/v1/img', imageProxy);
+// Public by design: an <img> cannot send a bearer token. The route only ever fetches the
+// image already stored for that item, never a caller-supplied URL (see image-proxy.ts).
+app.get('/v1/img/items/:itemId/:kind', imageProxy);
 app.use('/v1/*', authenticate);
 app.use('/v1/*', accountRequestUsage);
 app.use('/v1/*', authorizeScopes);

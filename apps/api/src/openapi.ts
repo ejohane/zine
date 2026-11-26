@@ -528,7 +528,7 @@ interface Operation {
   output?: string;
   status?: number;
   query?: { name: string; schema: Json; description?: string; required?: boolean }[];
-  /** Authorized by something other than a bearer token (the signed image proxy). */
+  /** Needs no bearer token (the record-scoped image proxy). */
   public?: boolean;
   /** Success body is binary with this media type instead of JSON. */
   binary?: string;
@@ -558,24 +558,18 @@ op('get', `${p}/me`, 'Authenticated identity', undefined, 'Me');
 Object.assign(
   op(
     'get',
-    `${p}/img`,
-    'Fetch a cover or avatar through the signed image proxy. Public: the signature issued in API responses is the authorization. 503 when IMAGE_PROXY_SECRET is not configured'
+    `${p}/img/items/{itemId}/{kind}`,
+    "Fetch an item's stored cover (kind `thumbnail`) or creator avatar (kind `creator`) through the image proxy. Public, because an <img> cannot send a bearer token: only the image already stored for the item is fetched, and nothing but its bytes is returned. 404 for an unknown item or one without that image"
   ),
   {
     public: true,
     binary: 'image/*',
     query: [
       {
-        name: 'u',
-        required: true,
-        schema: { type: 'string', format: 'uri' },
-        description: 'Original public image URL, exactly as signed.',
-      },
-      {
-        name: 's',
-        required: true,
+        name: 'v',
         schema: { type: 'string' },
-        description: 'base64url HMAC-SHA256 signature of `u`.',
+        description:
+          'Cache-buster issued in API responses (a hash prefix of the stored image URL). Ignored by the route.',
       },
     ],
   } satisfies Partial<Operation>

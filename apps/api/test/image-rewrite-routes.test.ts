@@ -1,10 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { runtimeHarness } from '../scripts/runtime-harness';
-import { proxiedImageUrl } from '../src/image-proxy';
+import { itemImageUrl } from '../src/image-proxy';
 
-const SECRET = 'synthetic-image-proxy-secret';
-const ORIGIN = 'http://localhost';
+const ORIGIN = 'https://api.test';
 const COVER = 'https://images.example/cover.png?size=large&v=2';
 const AVATAR = 'https://images.example/avatar.png';
 
@@ -21,9 +20,10 @@ describe('image references at the HTTP response boundary', () => {
     path: string,
     method = 'GET',
     body?: unknown,
-    headers: Record<string, string> = {}
+    headers: Record<string, string> = {},
+    origin = ORIGIN
   ) {
-    const response = await runtime.mf.dispatchFetch(`${ORIGIN}/v1${path}`, {
+    const response = await runtime.mf.dispatchFetch(`${origin}/v1${path}`, {
       method,
       headers: {
         authorization: `Bearer ${token}`,
@@ -41,13 +41,20 @@ describe('image references at the HTTP response boundary', () => {
   };
 
   beforeAll(async () => {
-    runtime = await runtimeHarness({ bindings: { IMAGE_PROXY_SECRET: SECRET } });
+    // No image-related binding or secret: rewriting is always on.
+    runtime = await runtimeHarness();
     token = await runtime.token('image-owner');
-    cover = await proxiedImageUrl(SECRET, ORIGIN, COVER);
-    avatar = await proxiedImageUrl(SECRET, ORIGIN, AVATAR);
     const saved = await call('/saves', 'POST', { url: 'https://example.com/with-images' });
     expect(saved.status).toBe(201);
     itemId = saved.body.item.id;
+    cover = await itemImageUrl(ORIGIN, itemId, 'thumbnail', COVER);
+    avatar = await itemImageUrl(ORIGIN, itemId, 'creator', AVATAR);
+    expect(cover).toMatch(
+      new RegExp(`^${ORIGIN}/v1/img/items/${itemId}/thumbnail\\?v=[a-f0-9]{8}$`)
+    );
+    expect(avatar).toMatch(
+      new RegExp(`^${ORIGIN}/v1/img/items/${itemId}/creator\\?v=[a-f0-9]{8}$`)
+    );
     for (const [field, value] of [
       ['thumbnail', COVER],
       ['creatorImageUrl', AVATAR],
@@ -87,8 +94,7 @@ describe('image references at the HTTP response boundary', () => {
     expectRewritten(list.body.items.find((item: Json) => item.id === itemId).content);
     const search = await call('/items/search', 'POST', { query: 'with-images', match: 'keyword' });
     expect(search.status).toBe(200);
-    expect(search.text).not.toContain(`"thumbnail":"${COVER}"`);
-    expect(search.text).not.toContain(`"creatorImageUrl":"${AVATAR}"`);
+    expectRewritten(search.body.items.find((item: Json) => item.id === itemId).content);
   });
 
   it('rewrites Home, its preview and Home after publishing an edition', async () => {
@@ -114,9 +120,10 @@ describe('image references at the HTTP response boundary', () => {
     expectRewritten(members.body.items[0].item.content);
   });
 
-  it('rewrites item mutations that return the item', async () => {
+  it('never returns original image URLs from saves and item mutations', async () => {
     const patched = await call(`/items/${itemId}`, 'PATCH', { tags: ['pictured'] });
     expect(patched.status).toBe(200);
+    // These return a receipt without content today; no original URL may appear if that changes.
     expect(patched.text).not.toContain(`"thumbnail":"${COVER}"`);
     const progress = await call(`/items/${itemId}/progress`, 'PATCH', {
       position: 0.2,
@@ -124,12 +131,30 @@ describe('image references at the HTTP response boundary', () => {
     });
     expect(progress.status).toBe(200);
     expect(progress.text).not.toContain(`"thumbnail":"${COVER}"`);
+    const again = await call('/saves', 'POST', { url: 'https://example.com/with-images' });
+    expect(again.status).toBe(200);
+    expect(again.text).not.toContain(`"thumbnail":"${COVER}"`);
   });
 
-  it('serves the rewritten reference without a bearer token', async () => {
-    // The harness has no outbound source, so only the signature gate is asserted here.
-    const unsigned = await runtime.mf.dispatchFetch(cover.replace(/&s=.*/, ''));
-    expect(unsigned.status).toBe(403);
+  it('leaves bodies as stored for a non-https origin, where clients would not render the reference', async () => {
+    for (const path of [`/items/${itemId}`, '/items', '/home']) {
+      const local = await call(path, 'GET', undefined, {}, 'http://localhost');
+      expect(local.status).toBe(200);
+      expect(local.text).toContain(`"thumbnail":"${COVER}"`);
+      expect(local.text).toContain(`"creatorImageUrl":"${AVATAR}"`);
+      expect(local.text).not.toContain('/v1/img');
+    }
+  });
+
+  it('answers the rewritten reference without a bearer token', async () => {
+    // The harness has no outbound source, so the stored host fails the public-DNS check (502).
+    // What matters here: the reference reaches the public route, not the 401 of the API.
+    const response = await runtime.mf.dispatchFetch(cover);
+    expect(response.status).not.toBe(401);
+    expect(response.status).not.toBe(404);
+    await response.arrayBuffer();
+    const unknown = await runtime.mf.dispatchFetch(cover.replace(itemId, `itm_${'0'.repeat(40)}`));
+    expect(unknown.status).toBe(404);
   });
 
   it('keeps original URLs in stored state, exports and the idempotency record', async () => {
