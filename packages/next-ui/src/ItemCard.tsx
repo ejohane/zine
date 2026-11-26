@@ -89,9 +89,20 @@ function Fill(props: {
   );
 }
 
+/**
+ * Whether the image at `url` failed to load, and the `onError` handler that records it.
+ * The failed URL itself is remembered, so a different URL gets a fresh attempt.
+ */
+function useImageFailure(url: string | undefined) {
+  const [failedUrl, setFailedUrl] = useState<string>();
+  return [url !== undefined && failedUrl === url, () => setFailedUrl(url)] as const;
+}
+
 function Avatar({ creator, square }: { creator: Creator; square?: boolean }) {
   const className = square ? 'zn-card__avatar zn-card__avatar--square' : 'zn-card__avatar';
-  if (creator.avatarUrl) return <img className={className} src={creator.avatarUrl} alt="" />;
+  const [failed, onError] = useImageFailure(creator.avatarUrl);
+  if (creator.avatarUrl && !failed)
+    return <img className={className} src={creator.avatarUrl} alt="" onError={onError} />;
   return (
     <span className={className} aria-hidden="true">
       {creator.name.slice(0, 1).toUpperCase()}
@@ -114,7 +125,7 @@ function ratio(picture: Picture): CSSProperties {
 }
 
 /** The picture area of a video, podcast or article. Videos and articles fill it; a podcast cover is never cropped. */
-function Stage({ item }: { item: CardItem }) {
+function Stage({ item, onError }: { item: CardItem; onError: () => void }) {
   const picture = item.picture;
   if (!picture) {
     return (
@@ -126,29 +137,31 @@ function Stage({ item }: { item: CardItem }) {
   if (item.kind === 'podcast') {
     return (
       <div className="zn-card__stage zn-card__stage--cover">
-        <img className="zn-card__backdrop" src={picture.url} alt="" />
-        <img className="zn-card__cover" src={picture.url} alt="" />
+        <img className="zn-card__backdrop" src={picture.url} alt="" onError={onError} />
+        <img className="zn-card__cover" src={picture.url} alt="" onError={onError} />
       </div>
     );
   }
   return (
     <div className="zn-card__stage">
-      <img src={picture.url} alt="" />
+      <img src={picture.url} alt="" onError={onError} />
     </div>
   );
 }
 
 function Quote({ quote, withPicture }: { quote: QuotedPost; withPicture: boolean }) {
+  const [failed, onError] = useImageFailure(quote.picture?.url);
   return (
     <div className="zn-card__quote">
       <CreatorLine creator={quote.creator} square />
       <div className="zn-card__quote-text">{quote.text}</div>
-      {withPicture && quote.picture ? (
+      {withPicture && quote.picture && !failed ? (
         <img
           className="zn-card__quote-picture"
           src={quote.picture.url}
           alt=""
           style={ratio(quote.picture)}
+          onError={onError}
         />
       ) : null}
     </div>
@@ -219,7 +232,15 @@ function Heading({ item }: { item: CardItem }) {
   );
 }
 
-function PostBody({ item, size }: { item: CardItem; size: CardSize }) {
+function PostBody({
+  item,
+  size,
+  onError,
+}: {
+  item: CardItem;
+  size: CardSize;
+  onError: () => void;
+}) {
   const guess = FIRST_GUESS[size].words;
   const text = item.body ?? item.description ?? '';
   const loud =
@@ -245,7 +266,13 @@ function PostBody({ item, size }: { item: CardItem; size: CardSize }) {
     return (
       <div className="zn-card__beside">
         {words}
-        <img className="zn-card__media" src={picture.url} alt="" style={ratio(picture)} />
+        <img
+          className="zn-card__media"
+          src={picture.url}
+          alt=""
+          style={ratio(picture)}
+          onError={onError}
+        />
       </div>
     );
   }
@@ -254,11 +281,17 @@ function PostBody({ item, size }: { item: CardItem; size: CardSize }) {
       {words}
       {picture && isTall(picture) ? (
         <div className="zn-card__media-panel">
-          <img src={picture.url} alt="" style={ratio(picture)} />
+          <img src={picture.url} alt="" style={ratio(picture)} onError={onError} />
         </div>
       ) : null}
       {picture && !isTall(picture) ? (
-        <img className="zn-card__media" src={picture.url} alt="" style={ratio(picture)} />
+        <img
+          className="zn-card__media"
+          src={picture.url}
+          alt=""
+          style={ratio(picture)}
+          onError={onError}
+        />
       ) : null}
       {item.quote ? <Quote quote={item.quote} withPicture={size === 'tall'} /> : null}
       {item.link ? <LinkBar domain={item.link} /> : null}
@@ -273,13 +306,17 @@ function compactHint(item: CardItem): string | undefined {
 }
 
 export function ItemCard({
-  item,
+  item: original,
   size = 'large',
   tallWidth = 'wide',
   now,
   onAction,
   newTab,
 }: ItemCardProps) {
+  // A picture that fails to load is treated as no picture at all, so every size falls back to
+  // the layout it already has for that case and a broken-image icon never shows.
+  const [pictureFailed, onPictureError] = useImageFailure(original.picture?.url);
+  const item = pictureFailed ? { ...original, picture: undefined } : original;
   const isPost = item.kind === 'post';
   const picture = item.picture;
   const classes = ['zn-card', `zn-card--${size}`, `zn-card--${item.kind}`];
@@ -291,7 +328,7 @@ export function ItemCard({
   const ownWords = !isPost && (!picture || size === 'tall') && item.body ? item.body : undefined;
   const summary = ownWords ?? item.description;
   const content = isPost ? (
-    <PostBody item={item} size={size} />
+    <PostBody item={item} size={size} onError={onPictureError} />
   ) : summary ? (
     <Fill
       firstGuess={ownWords ? FIRST_GUESS[size].words : FIRST_GUESS[size].summary}
@@ -303,7 +340,7 @@ export function ItemCard({
 
   const footer = (
     <Footer
-      item={item}
+      item={original}
       now={now}
       hint={size === 'compact' ? compactHint(item) : undefined}
       onAction={onAction}
@@ -323,7 +360,13 @@ export function ItemCard({
     // Things you play keep their picture on the left; things you read keep it on the right.
     const side = picture ? (
       isPost ? (
-        <img className="zn-card__thumb" src={picture.url} alt="" style={ratio(picture)} />
+        <img
+          className="zn-card__thumb"
+          src={picture.url}
+          alt=""
+          style={ratio(picture)}
+          onError={onPictureError}
+        />
       ) : (
         <img
           className={
@@ -333,6 +376,7 @@ export function ItemCard({
           }
           src={picture.url}
           alt=""
+          onError={onPictureError}
         />
       )
     ) : null;
@@ -356,7 +400,7 @@ export function ItemCard({
   return (
     <article className={classes.join(' ')}>
       {link}
-      {showStage ? <Stage item={item} /> : null}
+      {showStage ? <Stage item={item} onError={onPictureError} /> : null}
       <div className="zn-card__text">
         <Heading item={item} />
         {content}
