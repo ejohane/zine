@@ -14,7 +14,8 @@ legacy web app as part of these experiments.
 - Erik authorized production-account integration on 2026-11-10. The connected
   app uses real Clerk sessions and the independent production `/v1` service.
 - Serve at `https://api-next.myzine.app/next/` with a separate asset Worker and
-  path-scoped service worker. Preserve the backend deployment and auth policies.
+  path-scoped service worker. Merging to `main` publishes it
+  (`.github/workflows/next-web-release.yml`). Preserve the backend deployment and auth policies.
 - Local development uses `apps/api` `local:pull`/`local:dev` data through the Vite
   proxy; see `../api/docs/environments.md` (also branch previews and phone access). Never point local work at production.
 - Never substitute mock content on network/auth failure or import old mock edits.
