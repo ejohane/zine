@@ -303,8 +303,9 @@ pagination. Production acceptance receipts remain private.
   and 37 progress/metadata reconciliations. Zero conflicts.
 - `verify-legacy-capture.ts` on the inbox plan: 2,975 exact records, 0 missing/different,
   27 exact new lifecycles. Next `received` went 3,027 → 3,054.
-- Not applied: 65 newer saved/archived legacy records (26 would be new saves) and 23
-  non-inbox reconciliations. Rerun the catch-up without the inbox filter to bring them over.
+- Saved/archived follow-up (snapshot `saved-2026-11-26`, same 5,431 records): 26 new saves,
+  39 attachments to existing Next items and 23 reconciliations, zero conflicts. Verifying the
+  full plan: all 5,431 records exact, 0 missing/different. Next `saved` went 1,415 → 1,441.
 - The historical mapping was rebuilt from the 444 `real-library-*` save receipts in
   production; the original private mapping file was not in this checkout.
 
