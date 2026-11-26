@@ -295,6 +295,19 @@ authenticated Saved and Inbox reads. Imported D1 and R2 data stayed in place.
 Migration 25 computes the legacy tie key at write time and uses indexed
 pagination. Production acceptance receipts remain private.
 
+### Inbox catch-up (2026-11-26)
+
+- Snapshot `catchup-2026-11-26` held 5,431 legacy records (215 newer than the Nov 11 run).
+  Only groups whose legacy records are all `INBOX` were applied: 27 new Next inbox items,
+  123 records attached to items Next subscriptions had already delivered (Next state kept),
+  and 37 progress/metadata reconciliations. Zero conflicts.
+- `verify-legacy-capture.ts` on the inbox plan: 2,975 exact records, 0 missing/different,
+  27 exact new lifecycles. Next `received` went 3,027 → 3,054.
+- Not applied: 65 newer saved/archived legacy records (26 would be new saves) and 23
+  non-inbox reconciliations. Rerun the catch-up without the inbox filter to bring them over.
+- The historical mapping was rebuilt from the 444 `real-library-*` save receipts in
+  production; the original private mapping file was not in this checkout.
+
 ### Run catch-up
 
 From `apps/api`, create a fresh owner snapshot and keep the historical mapping
