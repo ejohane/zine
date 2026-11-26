@@ -1,0 +1,72 @@
+name: Zine Next web release
+
+# Publishes apps/next-web to https://api-next.myzine.app/next/ whenever main changes the app or
+# the packages it is built from. Only the separate `zine-next-web` asset Worker is deployed; the
+# API Worker, its database and its release process (api-next-release.yml) are untouched.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/next-web/**'
+      - 'packages/next-ui/**'
+      - 'packages/next-design/**'
+      - 'bun.lock'
+      - '.github/workflows/next-web-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One release at a time; a newer push waits for the one in flight rather than cancelling a deploy.
+concurrency:
+  group: zine-next-web-production
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.4'
+      - run: bun install --frozen-lockfile
+      - name: Check the design packages
+        run: |
+          bun run --cwd packages/next-design lint
+          bun run --cwd packages/next-design typecheck
+          bun run --cwd packages/next-design test
+          bun run --cwd packages/next-ui lint
+          bun run --cwd packages/next-ui typecheck
+          bun run --cwd packages/next-ui test
+      - name: Check and build the web app
+        run: |
+          bun run --cwd apps/next-web lint
+          bun run --cwd apps/next-web test
+          bun run --cwd apps/next-web build
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: bunx wrangler@4.158.0 deploy --config apps/next-web/wrangler.jsonc
+      - name: Confirm the published app is this build
+        # The service worker file names the build (a hash of every asset), so matching it proves
+        # production is serving what was just built.
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            if curl --fail --silent --show-error --max-time 20 \
+              "https://api-next.myzine.app/next/sw.js?release=${GITHUB_SHA}-${attempt}" -o published-sw.js &&
+              cmp --silent published-sw.js apps/next-web/dist/sw.js; then
+              head -c 60 published-sw.js; echo
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::https://api-next.myzine.app/next/ is not serving this build."
+          exit 1

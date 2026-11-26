@@ -60,7 +60,10 @@ jobs:
 
   production:
     needs: staging
-    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'production' && github.ref == 'refs/heads/main'
+    # Every merge to main is staged and then promoted. A manual run can still stop at staging.
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || inputs.environment == 'production')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
