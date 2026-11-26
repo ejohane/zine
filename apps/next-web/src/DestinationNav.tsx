@@ -1,5 +1,14 @@
-import { useEffect, useRef } from 'react';
-import { House, Inbox, LibraryBig, Menu, Search, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import {
+  House,
+  Inbox,
+  LibraryBig,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Search,
+  X,
+} from 'lucide-react';
 
 const destinations = { Home: House, Inbox, Library: LibraryBig, Search };
 export type Destination = keyof typeof destinations;
@@ -13,6 +22,35 @@ export function readDestination(): Destination {
   );
 }
 
+export const sidebarCollapsedKey = 'zine-next-web-sidebar-collapsed';
+
+export function parseSidebarCollapsed(value: string | null | undefined): boolean {
+  return value === 'true';
+}
+
+// Storage is passed lazily because merely touching `localStorage` can throw
+// when the browser blocks site data.
+export function readSidebarCollapsed(
+  storage: () => Pick<Storage, 'getItem'> = () => localStorage
+): boolean {
+  try {
+    return parseSidebarCollapsed(storage().getItem(sidebarCollapsedKey));
+  } catch {
+    return false;
+  }
+}
+
+export function writeSidebarCollapsed(
+  collapsed: boolean,
+  storage: () => Pick<Storage, 'setItem'> = () => localStorage
+): void {
+  try {
+    storage().setItem(sidebarCollapsedKey, String(collapsed));
+  } catch {
+    // The preference just lasts for this visit.
+  }
+}
+
 export function DestinationNav({
   current,
   choose,
@@ -20,6 +58,12 @@ export function DestinationNav({
   current: Destination;
   choose: (next: Destination) => void;
 }) {
+  const [collapsed, setCollapsed] = useState(() => readSidebarCollapsed());
+  const toggle = () => {
+    writeSidebarCollapsed(!collapsed);
+    setCollapsed(!collapsed);
+  };
+  const Toggle = collapsed ? PanelLeftOpen : PanelLeftClose;
   const drawer = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const wide = matchMedia('(min-width: 720px) and (orientation: landscape)');
@@ -29,12 +73,14 @@ export function DestinationNav({
     wide.addEventListener('change', close);
     return () => wide.removeEventListener('change', close);
   }, []);
-  const links = () => (
+  const links = (rail = false) => (
     <nav aria-label="Destinations" className="destination-links">
       {(Object.entries(destinations) as [Destination, typeof House][]).map(([name, Icon]) => (
         <button
           key={name}
           type="button"
+          aria-label={name}
+          title={rail ? name : undefined}
           aria-current={current === name ? 'page' : undefined}
           onClick={() => {
             drawer.current?.close();
@@ -42,16 +88,31 @@ export function DestinationNav({
           }}
         >
           <Icon aria-hidden="true" />
-          {name}
+          <span className="destination-label">{name}</span>
         </button>
       ))}
     </nav>
   );
   return (
     <>
-      <aside className="destination-sidebar">
-        <p className="destination-brand">Zine</p>
-        {links()}
+      <aside className="destination-sidebar" data-collapsed={collapsed}>
+        <div className="destination-sidebar-header">
+          <p className="destination-brand">
+            Z<span className="destination-label">ine</span>
+          </p>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+            aria-expanded={!collapsed}
+            aria-controls="destination-sidebar-links"
+            title={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+            onClick={toggle}
+          >
+            <Toggle aria-hidden="true" />
+          </button>
+        </div>
+        <div id="destination-sidebar-links">{links(collapsed)}</div>
       </aside>
       <div className="destination-mobile">
         <button
