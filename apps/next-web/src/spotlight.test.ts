@@ -92,6 +92,17 @@ describe('spreads', () => {
     ]);
   });
 
+  test('a block of five gives the big card four rows', () => {
+    const spreads = toSpreads(
+      ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((id) => item(id, id === 'c')),
+      5
+    );
+    expect(spreads.map((s) => [s.hero.id, s.rows.map((row) => row.id)])).toEqual([
+      ['c', ['a', 'b', 'd', 'e']],
+      ['f', ['g']],
+    ]);
+  });
+
   test('nothing in, nothing out', () => {
     expect(toSpreads([])).toEqual([]);
   });

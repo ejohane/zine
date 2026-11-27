@@ -38,18 +38,26 @@ export const inboxCards = (items: RemoteItem[]) =>
   cards(items.filter((item) => item.status === 'received' && !item.archived));
 
 /**
- * Groups of four, in order. The first item with a picture in each group is its big card; the
- * rest are its rows. A last, shorter group still gets a big card.
+ * Groups of `size`, in order (four by default: a big card and three rows). The first item with
+ * a picture in each group is its big card; the rest are its rows. A last, shorter group still
+ * gets a big card.
  */
-export function toSpreads(items: readonly CardItem[]): Spread[] {
+export function toSpreads(items: readonly CardItem[], size = 4): Spread[] {
   const spreads: Spread[] = [];
-  for (let start = 0; start < items.length; start += 4) {
-    const group = items.slice(start, start + 4);
+  for (let start = 0; start < items.length; start += size) {
+    const group = items.slice(start, start + size);
     const hero = group.find((item) => item.picture) ?? group[0]!;
     spreads.push({ hero, rows: group.filter((item) => item !== hero) });
   }
   return spreads;
 }
+
+/**
+ * An upright tablet (an iPad mini and its like): wider than a phone, taller than it is wide.
+ * Home puts the rows two-up under the big card there, so a block takes five.
+ */
+export const uprightTablet =
+  '(orientation: portrait) and (min-width: 600px) and (max-width: 900px)';
 
 /** The number beside each filter, when Home has told us. Posts include threads. */
 export function sectionCount(counts: Home['counts'], section: Section): number | undefined {

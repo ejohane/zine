@@ -5,7 +5,7 @@ import type { CardItem } from '@zine/next-ui';
 import '@fontsource-variable/inter';
 import '@zine/next-design/tokens.css';
 import '@zine/next-ui/cards.css';
-import { inboxCards, spotlightItems, toSpreads } from './spotlight';
+import { inboxCards, spotlightItems, toSpreads, uprightTablet } from './spotlight';
 import type { Home, RemoteItem } from './live-api';
 import type { Section } from './model';
 
@@ -52,6 +52,21 @@ function withShape(item: CardItem, shapes: Record<string, Shape>): CardItem {
   if (!shape) return item;
   if (shape === 'missing' || !shape.width || !shape.height) return { ...item, picture: undefined };
   return { ...item, picture: { ...item.picture, ...shape } };
+}
+
+/** Whether a media query matches, kept up to date. */
+function useMedia(query: string) {
+  const [matches, setMatches] = useState(
+    () => typeof matchMedia !== 'undefined' && matchMedia(query).matches
+  );
+  useEffect(() => {
+    const media = matchMedia(query);
+    const update = () => setMatches(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, [query]);
+  return matches;
 }
 
 /** The designed width of a wide card (`--zn-size-card-wide`). */
@@ -149,7 +164,8 @@ function InboxRail(props: {
 
 /**
  * Home: your saves, a few at a time. Each block is one big card beside three rows, sides swapping
- * from block to block, with the inbox as a sideways rail after the first. A card opens the
+ * from block to block, with the inbox as a sideways rail after the first. An upright tablet puts
+ * the big card over four rows, two by two; a phone stacks everything. A card opens the
  * original in a new tab; its three dots open the item here.
  */
 export function SpotlightHome({
@@ -170,7 +186,12 @@ export function SpotlightHome({
   const saves = useMemo(() => spotlightItems(home, items, section), [home, items, section]);
   const waiting = useMemo(() => inboxCards(inbox).slice(0, 16), [inbox]);
   const shapes = usePostPictureShapes(saves);
-  const spreads = toSpreads(saves.map((item) => withShape(item, shapes)));
+  // On an upright tablet the rows sit two-up under the big card, so a block is one and four.
+  const twoUp = useMedia(uprightTablet);
+  const spreads = toSpreads(
+    saves.map((item) => withShape(item, shapes)),
+    twoUp ? 5 : 4
+  );
   return (
     <div className="sp-home" aria-label="Home">
       {spreads.map((spread, index) => (

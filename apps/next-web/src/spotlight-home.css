@@ -460,6 +460,22 @@
     order: 0;
   }
 }
+/* An upright tablet: the big card across the top, its rows two by two beneath. The query matches
+   `uprightTablet` in spotlight.ts, which makes each block one card and four rows there. */
+@media (orientation: portrait) and (min-width: 600px) and (max-width: 900px) {
+  .sp-spread {
+    gap: 32px;
+  }
+  .sp-rows {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px 32px;
+  }
+  .sp-rows > * {
+    padding: 0;
+    border: 0;
+  }
+}
 @media (max-width: 900px) {
   .destination-shell .page,
   .destination-shell .page.page--spotlight {
