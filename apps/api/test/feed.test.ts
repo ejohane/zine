@@ -32,6 +32,38 @@ describe('feed and source identity contracts', () => {
       creator: 'Author',
     });
   });
+  it('never treats a blank image or link as the feed URL', () => {
+    // YouTube channel feeds publish no icon or logo; `new URL('', base)` is the base itself.
+    const youtube = parseFeed(
+      `<feed xmlns="http://www.w3.org/2005/Atom" xmlns:yt="http://www.youtube.com/xml/schemas/2015"><title>Channel</title><yt:channelId>UCabcdefghijklmnopqrstuv</yt:channelId><entry><id>yt:video:abc</id><yt:videoId>abcdefghijk</yt:videoId><yt:channelId>UCabcdefghijklmnopqrstuv</yt:channelId><title>Video</title><link rel="alternate" href="https://www.youtube.com/watch?v=abcdefghijk"/><author><name>Channel</name></author><published>2026-11-07T01:00:00Z</published></entry></feed>`,
+      'https://www.youtube.com/feeds/videos.xml?channel_id=UCabcdefghijklmnopqrstuv'
+    );
+    expect(youtube.entries[0].creatorImageUrl).toBeUndefined();
+    expect(youtube.entries[0].source).toEqual({
+      id: 'UCabcdefghijklmnopqrstuv',
+      name: 'Channel',
+      url: 'https://www.youtube.com/channel/UCabcdefghijklmnopqrstuv',
+      kind: 'channel',
+    });
+    const rss = parseFeed(
+      `<rss version="2.0"><channel><title>Blog</title><link></link><item><title>Post</title><link>https://example.com/post</link></item><item><title>No link</title><link></link></item></channel></rss>`,
+      'https://example.com/rss.xml'
+    );
+    expect(rss.entries).toHaveLength(1);
+    expect(rss.entries[0].creatorImageUrl).toBeUndefined();
+    expect(rss.entries[0].thumbnail).toBeUndefined();
+    expect(rss.homeUrl).toBeUndefined();
+    const json = parseFeed(
+      JSON.stringify({
+        version: 'https://jsonfeed.org/version/1.1',
+        title: 'Notes',
+        items: [{ id: 'one', url: 'https://example.com/one', content_text: 'Hi' }],
+      }),
+      'https://example.com/feed.json'
+    );
+    expect(json.entries[0].creatorImageUrl).toBeUndefined();
+    expect(json.entries[0].thumbnail).toBeUndefined();
+  });
   it('handles JSON Feed enclosures and pagination', () => {
     const feed = parseFeed(
       JSON.stringify({

@@ -193,7 +193,7 @@ async function initialState(env: Env, owner: string, itemId: string): Promise<St
   }
   if (!material.trim()) return null;
   const selected = item.enrichment.fields[inputField];
-  const inputIds = selected ? [selected.contributionId] : [];
+  const inputIds = selected?.contributionId ? [selected.contributionId] : [];
   if (!inputIds.length) return null;
   const sourceCoverage =
     inputField === 'article'

@@ -3,12 +3,13 @@ import { processUnderstanding, scheduleUnderstanding } from './understanding';
 import type { UnderstandingPayload } from './understanding';
 import { contribute } from './enrichment';
 import { all, ApiError, id, now, ownedItem, stmt } from './lib';
+import { visibleContributions } from './items';
 import { ProviderError } from './remote';
 import { publishedTranscript } from './providers/transcript';
 import { extractWeb } from './providers/web';
 import { extractSpotify } from './providers/spotify';
 import { extractYouTube } from './providers/youtube';
-import { hasYouTubeApi } from './providers/youtube-api';
+import { hasYouTubeApi, youtubeResourceContributions } from './providers/youtube-api';
 import { extractX } from './providers/x';
 import { indexItem } from './semantic';
 import { diagnostic } from './diagnostics';
@@ -19,6 +20,17 @@ import { addRelationship, relationshipSchema } from './relationships';
 import { reconcileVerifiedIdentity } from './reconciliation';
 import { acquireBudget, budgetScope, releaseBudget } from './budgets';
 import { syncSubscription } from './subscriptions';
+import {
+  backfillVideoChannels,
+  observeContributions,
+  PROVIDER_METADATA_COMPONENT,
+  PROVIDER_METADATA_STAGE,
+  scheduleYouTubeRetrofit,
+  youtubeVideoId,
+  purgeSharedProviderData,
+  refreshCreators,
+} from './creators';
+import { collectFeedCache } from './feed-cache';
 import type { Env } from './types';
 import type { ContributionInput } from './enrichment';
 import type { FeedEntry } from './providers/feed';
@@ -44,6 +56,7 @@ function feedContributions(entry: FeedEntry, sourceUrl = entry.url): Contributio
     ['durationSeconds', entry.durationSeconds],
     ['thumbnail', entry.thumbnail],
     ['creatorImageUrl', entry.creatorImageUrl],
+    ['source', entry.source],
     ['links', entry.enclosures],
     ['structuredData', { feedEntry: entry }],
   ];
@@ -108,6 +121,11 @@ async function retainFeedMetadata(env: Env, job: JobRow) {
     job.item_id,
     item.content_id,
     payload.generation,
+    feedContributions(payload.feedEntry, payload.feedSourceUrl)
+  );
+  await observeContributions(
+    env,
+    payload.feedEntry.url,
     feedContributions(payload.feedEntry, payload.feedSourceUrl)
   );
   await stmt(
@@ -178,6 +196,8 @@ async function enrich(env: Env, job: JobRow) {
   contributions.push(...extraction.contributions);
   components = extraction.components;
   await commit(contributions);
+  // Channel identity and avatars are public facts shared by every item from the creator.
+  if (content.platform === 'youtube') await observeContributions(env, payload.url, contributions);
   // Direct source/thread links are metadata edges, not additional saves.
   const relationship = async (
     kind: 'part_of' | 'quotes' | 'reply_to' | 'references',
@@ -263,6 +283,63 @@ async function enrich(env: Env, job: JobRow) {
       job.owner_id,
       payload.generation
     ).run();
+}
+
+/** Adds the Data API fields a YouTube item lacks, from the shared batched video record. */
+async function providerMetadataJob(env: Env, job: JobRow) {
+  if (!job.item_id) throw new ProviderError('job_item_missing', false);
+  const payload = JSON.parse(job.payload_json) as { url: string; generation: number };
+  const item = await ownedItem(env, job.owner_id, job.item_id);
+  if (item.generation !== payload.generation)
+    throw new ApiError(409, 'stale_generation', 'Job refers to a deleted item generation');
+  const videoId = youtubeVideoId(payload.url);
+  const video = videoId
+    ? await stmt(
+        env.DB,
+        'SELECT data_json,missing FROM youtube_videos WHERE video_id=? AND api_fetched_at IS NOT NULL',
+        videoId
+      ).first<{ data_json: string | null; missing: number }>()
+    : null;
+  // Cleared by retention before this ran: the scheduler looks it up again tomorrow.
+  if (!video) return;
+  let status: 'available' | 'unavailable' = 'unavailable';
+  let reason: string | null = 'youtube_item_unavailable';
+  if (!video.missing && video.data_json) {
+    const resource = youtubeResourceContributions(
+      payload.url,
+      'video',
+      JSON.parse(video.data_json) as Record<string, unknown>
+    );
+    const present = new Set(
+      (await visibleContributions(env, job.owner_id, item.content_id)).map((c) => c.field)
+    );
+    await commitSourceContributions(
+      env,
+      job,
+      job.item_id,
+      item.content_id,
+      payload.generation,
+      resource.filter((contribution) => !present.has(contribution.field))
+    );
+    await observeContributions(env, payload.url, resource);
+    status = 'available';
+    reason = null;
+  }
+  await stmt(
+    env.DB,
+    `INSERT INTO enrichment_components(content_id,owner_id,component,status,reason_code,updated_at)
+    SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM personal_items WHERE id=? AND owner_id=? AND status!='deleted' AND generation=?)
+    ON CONFLICT(content_id,owner_id,component) DO UPDATE SET status=excluded.status,reason_code=excluded.reason_code,updated_at=excluded.updated_at`,
+    item.content_id,
+    job.owner_id,
+    PROVIDER_METADATA_COMPONENT,
+    status,
+    reason,
+    now(),
+    job.item_id,
+    job.owner_id,
+    payload.generation
+  ).run();
 }
 
 async function transcriptJob(env: Env, job: JobRow) {
@@ -353,15 +430,19 @@ export async function runJob(env: Env, jobId: string) {
       job.kind === 'enrich' &&
       !JSON.parse(job.payload_json).stage &&
       JSON.parse(job.payload_json).metadataOnly;
-    scope = metadataOnly
-      ? null
-      : job.kind === 'enrich'
-        ? JSON.parse(job.payload_json).stage === 'understanding'
-          ? 'workers-ai:understanding'
-          : budgetScope((JSON.parse(job.payload_json) as { url: string }).url)
-        : job.kind === 'index'
-          ? 'workers-ai:embeddings'
-          : null;
+    const stage = job.kind === 'enrich' ? JSON.parse(job.payload_json).stage : undefined;
+    // Filling gaps from a stored, already-fetched video makes no provider request.
+    const localOnly = stage === PROVIDER_METADATA_STAGE;
+    scope =
+      metadataOnly || localOnly
+        ? null
+        : job.kind === 'enrich'
+          ? JSON.parse(job.payload_json).stage === 'understanding'
+            ? 'workers-ai:understanding'
+            : budgetScope((JSON.parse(job.payload_json) as { url: string }).url)
+          : job.kind === 'index'
+            ? 'workers-ai:embeddings'
+            : null;
     if (
       job.kind === 'enrich' &&
       !JSON.parse(job.payload_json).stage &&
@@ -402,6 +483,7 @@ export async function runJob(env: Env, jobId: string) {
     }
     if (
       !metadataOnly &&
+      !localOnly &&
       (job.kind === 'sync' ||
         (job.kind === 'enrich' && JSON.parse(job.payload_json).stage !== 'understanding'))
     )
@@ -415,6 +497,7 @@ export async function runJob(env: Env, jobId: string) {
         job.item_id!,
         JSON.parse(job.payload_json) as UnderstandingPayload
       );
+    else if (localOnly) await providerMetadataJob(env, job);
     else if (job.kind === 'enrich' && JSON.parse(job.payload_json).stage === 'published-transcript')
       await transcriptJob(env, job);
     else if (job.kind === 'enrich') await enrich(env, job);
@@ -717,6 +800,13 @@ async function maintenance(env: Env) {
   }
   await collectMaterialArtifacts(env);
   await stmt(env.DB, 'DELETE FROM usage_windows WHERE expires_at<?', now()).run();
+  await collectFeedCache(env);
+  await purgeSharedProviderData(env);
+  // Shared public lookups with the app's own key: at most one channels.list and one
+  // videos.list call (50 ids each) per cron run, under a separate budget.
+  await refreshCreators(env);
+  await backfillVideoChannels(env);
+  await scheduleYouTubeRetrofit(env);
   await scheduleSubscriptions(env);
   await scheduleUnderstanding(env);
   await scheduleIndexes(env);

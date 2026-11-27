@@ -1,4 +1,5 @@
 import { googleToken } from '../connections';
+import { cachedYouTubeVideo, freshApiCreatorImage, observeCreators } from '../creators';
 import { creatorImageReference, identify } from '../identity';
 import { ProviderError, providerJson } from '../remote';
 import type { Env } from '../types';
@@ -6,6 +7,7 @@ import type { ContributionInput } from '../enrichment';
 import type { Extraction } from './web';
 import type { FeedEntry } from './feed';
 type Obj = Record<string, unknown>;
+const VIDEO_CACHE_MS = 7 * 86_400_000;
 const object = (value: unknown): Obj => (value && typeof value === 'object' ? (value as Obj) : {});
 const text = (value: unknown) => (typeof value === 'string' ? value : '');
 interface Page {
@@ -172,15 +174,85 @@ export async function youtubePlaylistPage(
 // A video's creator image is its channel avatar, which needs one extra lookup (1 quota unit).
 // The avatar is optional, so a failed lookup never fails the extraction.
 async function channelAvatar(env: Env, owner: string | undefined, channelId: string) {
+  // The shared creator record is refreshed weekly for everyone; reuse it when current.
+  if (env.DB) {
+    const shared = await freshApiCreatorImage(env, channelId).catch(() => undefined);
+    if (shared) return shared;
+  }
   try {
     const result = await youtubeRequest(env, owner, 'channels', { part: 'snippet', id: channelId });
-    const thumbnails = object(object(result.items[0]?.snippet).thumbnails);
-    return creatorImageReference(
+    const snippet = object(result.items[0]?.snippet);
+    const thumbnails = object(snippet.thumbnails);
+    const image = creatorImageReference(
       object(thumbnails.high ?? thumbnails.medium ?? thumbnails.default).url
     );
+    // Only an actual channel response renews the shared record's freshness.
+    if (image && env.DB)
+      await observeCreators(env, [
+        {
+          channelId,
+          name: text(snippet.title) || undefined,
+          imageUrl: image,
+          method: 'youtube-data-api',
+        },
+      ]).catch(() => undefined);
+    return image;
   } catch {
     return undefined;
   }
+}
+function resourceThumbnail(item: Obj) {
+  const thumbnails = object(object(item.snippet).thumbnails);
+  return object(thumbnails.maxres ?? thumbnails.high ?? thumbnails.medium ?? thumbnails.default)
+    .url;
+}
+/**
+ * Source contributions for one Data API video, channel or playlist resource. No requests:
+ * used both by live extraction and by the retrofit of stored, batched video resources.
+ */
+export function youtubeResourceContributions(
+  sourceUrl: string,
+  kind: string | undefined,
+  item: Obj,
+  creatorImageUrl?: string
+): ContributionInput[] {
+  const snippet = object(item.snippet),
+    details = object(item.contentDetails);
+  const contributions: ContributionInput[] = [];
+  const add = (field: ContributionInput['field'], value: unknown) => {
+    if (value !== undefined && value !== null && value !== '')
+      contributions.push({
+        field,
+        value,
+        category: 'source',
+        provenance: { sourceUrl, method: 'youtube-data-api', inputContributionIds: [] },
+      });
+  };
+  add('title', snippet.title);
+  add('description', snippet.description);
+  add('creator', snippet.channelTitle ?? (kind === 'channel' ? snippet.title : undefined));
+  add('publishedAt', snippet.publishedAt);
+  add('language', snippet.defaultAudioLanguage ?? snippet.defaultLanguage);
+  add('topics', snippet.tags);
+  add('thumbnail', resourceThumbnail(item));
+  add('creatorImageUrl', creatorImageUrl);
+  add('durationSeconds', isoDuration(text(details.duration)));
+  add('structuredData', item);
+  const channelId = kind === 'channel' ? text(item.id) : text(snippet.channelId);
+  if (channelId)
+    add('source', {
+      id: channelId,
+      name: kind === 'channel' ? text(snippet.title) : text(snippet.channelTitle),
+      url: `https://www.youtube.com/channel/${channelId}`,
+      kind: 'channel',
+    });
+  const chapters = descriptionChapters(text(snippet.description));
+  if (chapters.length) add('chapters', chapters);
+  const links = [...text(snippet.description).matchAll(/https?:\/\/[^\s<>]+/g)].map((match) => ({
+    url: match[0].replace(/[),.;]+$/, ''),
+  }));
+  if (links.length) add('links', links);
+  return contributions;
 }
 export async function youtubeApiExtraction(
   env: Env,
@@ -198,16 +270,42 @@ export async function youtubeApiExtraction(
       : { id: identity.externalId! };
   const path =
     identity.kind === 'video' ? 'videos' : identity.kind === 'playlist' ? 'playlists' : 'channels';
-  const result = await youtubeRequest(env, owner, path, {
-    part:
-      identity.kind === 'playlist' ? 'snippet,contentDetails' : 'snippet,contentDetails,statistics',
-    ...params,
-  });
+  // A subscription's feed sync looks up its new videos in batches of 50 for everyone; a
+  // video resource stored that way in the last week needs no request of its own.
+  const cached =
+    identity.kind === 'video' && env.DB
+      ? await cachedYouTubeVideo(env, identity.externalId!, VIDEO_CACHE_MS).catch(() => undefined)
+      : undefined;
+  const result = cached
+    ? { items: [cached as Obj] }
+    : await youtubeRequest(env, owner, path, {
+        part:
+          identity.kind === 'playlist'
+            ? 'snippet,contentDetails'
+            : 'snippet,contentDetails,statistics',
+        ...params,
+      });
   const item = result.items[0];
   if (!item) throw new ProviderError('youtube_item_unavailable', false);
   const snippet = object(item.snippet),
     details = object(item.contentDetails);
-  const contributions: ContributionInput[] = [];
+  const channelId = identity.kind === 'channel' ? text(item.id) : text(snippet.channelId);
+  const avatar =
+    identity.kind === 'channel'
+      ? creatorImageReference(resourceThumbnail(item))
+      : identity.kind === 'video' && channelId
+        ? await channelAvatar(env, owner, channelId)
+        : undefined;
+  if (identity.kind === 'channel' && avatar && env.DB)
+    await observeCreators(env, [
+      {
+        channelId,
+        name: text(snippet.title) || undefined,
+        imageUrl: avatar,
+        method: 'youtube-data-api',
+      },
+    ]).catch(() => undefined);
+  const contributions = youtubeResourceContributions(identity.url, identity.kind, item, avatar);
   const add = (field: ContributionInput['field'], value: unknown) => {
     if (value !== undefined && value !== null && value !== '')
       contributions.push({
@@ -221,36 +319,6 @@ export async function youtubeApiExtraction(
         },
       });
   };
-  add('title', snippet.title);
-  add('description', snippet.description);
-  add('creator', snippet.channelTitle ?? (identity.kind === 'channel' ? snippet.title : undefined));
-  add('publishedAt', snippet.publishedAt);
-  add('language', snippet.defaultAudioLanguage ?? snippet.defaultLanguage);
-  add('topics', snippet.tags);
-  const thumbnails = object(snippet.thumbnails);
-  const thumbnail = object(
-    thumbnails.maxres ?? thumbnails.high ?? thumbnails.medium ?? thumbnails.default
-  ).url;
-  add('thumbnail', thumbnail);
-  const channelId = identity.kind === 'channel' ? text(item.id) : text(snippet.channelId);
-  if (identity.kind === 'channel') add('creatorImageUrl', creatorImageReference(thumbnail));
-  else if (identity.kind === 'video' && channelId)
-    add('creatorImageUrl', await channelAvatar(env, owner, channelId));
-  add('durationSeconds', isoDuration(text(details.duration)));
-  add('structuredData', item);
-  if (channelId)
-    add('source', {
-      id: channelId,
-      name: identity.kind === 'channel' ? text(snippet.title) : text(snippet.channelTitle),
-      url: `https://www.youtube.com/channel/${channelId}`,
-      kind: 'channel',
-    });
-  const chapters = descriptionChapters(text(snippet.description));
-  if (chapters.length) add('chapters', chapters);
-  const links = [...text(snippet.description).matchAll(/https?:\/\/[^\s<>]+/g)].map((match) => ({
-    url: match[0].replace(/[),.;]+$/, ''),
-  }));
-  if (links.length) add('links', links);
   if (identity.kind === 'playlist') {
     const page = await youtubePlaylistPage(env, owner, identity.url);
     add('members', {
