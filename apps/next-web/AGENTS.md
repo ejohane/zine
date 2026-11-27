@@ -10,8 +10,9 @@ legacy web app as part of these experiments.
   Cards come from `@zine/next-ui` and are magnified whole, never restyled. Erik chose it from the
   options in `design-lab/`; the rules are in `packages/next-design/DESIGN.md`.
 - The format filters are tabs that show counts (`LibraryTabs.tsx`; the numbers come with
-  `/v1/home`). Navigation is a small floating pill with Save above it (`DestinationNav.tsx`): at
-  the right edge on wide screens, along the bottom on upright ones. `spotlight-home.css` holds
+  `/v1/home`). Navigation is a left sidebar that collapses to an icon rail, with Save at its top
+  (`DestinationNav.tsx`); upright screens get a top bar and a drawer. Erik tried a floating
+  pill on 2026-11-27 and asked for the sidebar back the same day. `spotlight-home.css` holds
   both and points the app's colour and font variables at the Zine Next tokens; do not add a
   second palette. Library, Inbox and Search keep their older feeds.
 - Erik authorized production-account integration on 2026-11-10. The connected

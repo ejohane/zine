@@ -704,10 +704,9 @@ function Library({ identity, signOut }: { identity: Identity; signOut: () => Pro
               </button>
             </form>
           )}
-          {cachedAt && (
+          {cachedAt && offline && (
             <p className="sync-note secondary">
-              {offline ? 'Offline copy' : 'Showing your saved copy'} ·{' '}
-              {new Date(cachedAt).toLocaleString()}
+              Offline copy · {new Date(cachedAt).toLocaleString()}
             </p>
           )}
           {loading && !items.length && (

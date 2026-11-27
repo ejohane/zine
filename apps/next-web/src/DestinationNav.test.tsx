@@ -1,23 +1,128 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { DestinationNav } from './DestinationNav';
+import {
+  DestinationNav,
+  parseSidebarCollapsed,
+  readSidebarCollapsed,
+  sidebarCollapsedKey,
+  writeSidebarCollapsed,
+} from './DestinationNav';
 
-describe('DestinationNav markup', () => {
-  const markup = renderToStaticMarkup(
-    <DestinationNav current="Library" choose={() => {}} capture={() => {}} />
-  );
+function memoryStorage(initial: Record<string, string> = {}) {
+  const values = new Map(Object.entries(initial));
+  return {
+    values,
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => void values.set(key, value),
+  };
+}
 
-  test('names every destination and marks only the current one', () => {
-    for (const name of ['Home', 'Inbox', 'Library', 'Search'])
-      expect(markup).toContain(`aria-label="${name}"`);
-    expect(markup.match(/aria-current="page"/g)).toHaveLength(1);
-    expect(markup).toMatch(/aria-label="Library"[^>]*aria-current="page"/);
+const throwingStorage = {
+  getItem: () => {
+    throw Error('blocked');
+  },
+  setItem: () => {
+    throw Error('blocked');
+  },
+};
+
+const sidebar = (markup: string) =>
+  markup.slice(markup.indexOf('<aside'), markup.indexOf('</aside>'));
+
+describe('sidebar collapsed preference', () => {
+  test('uses a key consistent with the other next-web keys', () => {
+    expect(sidebarCollapsedKey).toBe('zine-next-web-sidebar-collapsed');
   });
 
-  test('keeps Save outside the destinations', () => {
-    const nav = markup.slice(markup.indexOf('<nav'), markup.indexOf('</nav>'));
-    expect(markup).toContain('aria-label="Save a link"');
-    expect(nav).not.toContain('Save a link');
-    expect(nav).toContain('aria-label="Destinations"');
+  test('defaults to expanded when storage is empty', () => {
+    expect(readSidebarCollapsed(memoryStorage())).toBe(false);
+  });
+
+  test('only the exact string "true" is collapsed', () => {
+    expect(readSidebarCollapsed(memoryStorage({ [sidebarCollapsedKey]: 'true' }))).toBe(true);
+    for (const value of ['false', 'TRUE', ' true', '1', 'yes', '', '{"collapsed":true}']) {
+      expect(readSidebarCollapsed(memoryStorage({ [sidebarCollapsedKey]: value }))).toBe(false);
+    }
+    for (const value of [true, 1, null, undefined, {}]) {
+      expect(parseSidebarCollapsed(value)).toBe(false);
+    }
+  });
+
+  test('falls back to expanded when storage throws or is unavailable', () => {
+    expect(readSidebarCollapsed(throwingStorage)).toBe(false);
+    expect(readSidebarCollapsed()).toBe(false);
+    expect(() => writeSidebarCollapsed(true, throwingStorage)).not.toThrow();
+    expect(() => writeSidebarCollapsed(true)).not.toThrow();
+  });
+
+  test('toggling writes the new value and reads it back', () => {
+    const storage = memoryStorage();
+    writeSidebarCollapsed(!readSidebarCollapsed(storage), storage);
+    expect(storage.values.get(sidebarCollapsedKey)).toBe('true');
+    expect(readSidebarCollapsed(storage)).toBe(true);
+    writeSidebarCollapsed(!readSidebarCollapsed(storage), storage);
+    expect(storage.values.get(sidebarCollapsedKey)).toBe('false');
+    expect(readSidebarCollapsed(storage)).toBe(false);
+  });
+});
+
+describe('DestinationNav markup', () => {
+  const globals = globalThis as { localStorage?: unknown };
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const render = (stored?: string) => {
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: memoryStorage(stored === undefined ? {} : { [sidebarCollapsedKey]: stored }),
+    });
+    return renderToStaticMarkup(
+      <DestinationNav current="Library" choose={() => {}} capture={() => {}} />
+    );
+  };
+  afterEach(() => {
+    if (original) Object.defineProperty(globalThis, 'localStorage', original);
+    else delete globals.localStorage;
+  });
+
+  test('renders an expanded sidebar with a collapse toggle by default', () => {
+    const aside = sidebar(render());
+    expect(aside).toContain('data-collapsed="false"');
+    expect(aside).toContain('aria-label="Collapse navigation"');
+    expect(aside).toContain('aria-expanded="true"');
+    expect(aside).not.toContain('Expand navigation');
+  });
+
+  test('renders the rail with an expand toggle and labeled destinations when collapsed', () => {
+    const aside = sidebar(render('true'));
+    expect(aside).toContain('data-collapsed="true"');
+    expect(aside).toContain('aria-label="Expand navigation"');
+    expect(aside).toContain('aria-expanded="false"');
+    for (const name of ['Home', 'Inbox', 'Library', 'Search']) {
+      expect(aside).toContain(`aria-label="${name}"`);
+      expect(aside).toContain(`<span class="destination-label">${name}</span>`);
+    }
+    expect(aside).toMatch(/aria-label="Library" aria-current="page"/);
+    expect(aside.match(/aria-current="page"/g)).toHaveLength(1);
+  });
+
+  test('treats an invalid stored value as expanded', () => {
+    expect(sidebar(render('collapsed'))).toContain('aria-expanded="true"');
+  });
+
+  test('keeps the mobile triggers and drawer regardless of the desktop state', () => {
+    for (const markup of [render(), render('true')]) {
+      const mobile = markup.slice(markup.indexOf('</aside>'));
+      expect(mobile).toContain('aria-label="Open navigation, current page Library"');
+      expect(mobile).toContain('aria-haspopup="dialog"');
+      expect(mobile).toContain('<dialog class="destination-drawer"');
+      expect(mobile).toContain('aria-label="Close navigation"');
+      expect(mobile).toContain('<p class="destination-brand">Zine</p>');
+      expect(mobile).not.toContain('title="Library"');
+    }
+  });
+
+  test('offers Save in the sidebar and in the mobile bar', () => {
+    const markup = render();
+    expect(sidebar(markup)).toContain('aria-label="Save a link"');
+    expect(markup.match(/aria-label="Save a link"/g)).toHaveLength(2);
   });
 });
