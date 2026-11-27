@@ -251,6 +251,7 @@ function Library({ identity, signOut }: { identity: Identity; signOut: () => Pro
   async function forgetDenied(id: string) {
     setCurrent(undefined);
     setItems((previous) => previous.filter((item) => item.id !== id));
+    setInbox((previous) => previous.filter((item) => item.id !== id));
     setHome(
       (previous) =>
         previous && {
@@ -449,7 +450,9 @@ function Library({ identity, signOut }: { identity: Identity; signOut: () => Pro
       return;
     }
     let stopped = false;
-    setCurrent(items.find((i) => i.id === panel));
+    // Home's inbox rail opens items that are not in the library feed.
+    const loaded = items.find((i) => i.id === panel) ?? inbox.find((i) => i.id === panel);
+    setCurrent(loaded);
     setError('');
     void (async () => {
       try {
@@ -459,7 +462,7 @@ function Library({ identity, signOut }: { identity: Identity; signOut: () => Pro
         cacheFailure();
       }
       if (!navigator.onLine) {
-        if (!stopped && !items.some((i) => i.id === panel)) {
+        if (!stopped && !loaded) {
           const cached = await readItem(owner, panel).catch(() => undefined);
           if (!cached) setError('Open this save while connected before reading it offline.');
         }
@@ -566,6 +569,7 @@ function Library({ identity, signOut }: { identity: Identity; signOut: () => Pro
     if (!alive.current) return value;
     setCurrent(value);
     setItems((previous) => previous.map((i) => (i.id === value.id ? value : i)));
+    setInbox((previous) => previous.map((i) => (i.id === value.id ? value : i)));
     // Home only shows open saves; keep its cards in step with the change just made.
     const open = value.status === 'saved' && !value.archived && !value.progress.completedAt;
     setHome(
@@ -582,12 +586,16 @@ function Library({ identity, signOut }: { identity: Identity; signOut: () => Pro
     );
     await cacheItem(value);
     try {
-      const snap = isSearch ? undefined : await readSnapshot(owner, snapshotKey);
-      if (snap)
-        await writeSnapshot({
-          ...snap,
-          items: snap.items.map((i) => (i.id === value.id ? value : i)),
-        });
+      // Home's rail shares the Inbox destination's saved copy, so keep that in step too.
+      const keys = new Set([...(isSearch ? [] : [snapshotKey]), 'Inbox']);
+      for (const key of keys) {
+        const snap = await readSnapshot(owner, key);
+        if (snap)
+          await writeSnapshot({
+            ...snap,
+            items: snap.items.map((i) => (i.id === value.id ? value : i)),
+          });
+      }
     } catch {
       cacheFailure();
     }
