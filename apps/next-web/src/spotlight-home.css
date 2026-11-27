@@ -56,14 +56,21 @@
 }
 
 /* ----- Filters that say how much is behind them ----- */
+/* The row runs to both page edges and scrolls sideways when the tabs do not fit; the auto margins
+   on its ends centre it when they do, without hiding the first tab when they do not. */
 .sp-tabs {
   display: flex;
   gap: 10px;
-  width: fit-content;
-  max-width: calc(100% + var(--page-left) + var(--page-right));
-  margin: 0 auto 40px;
+  margin: 0 calc(-1 * var(--page-right)) 40px calc(-1 * var(--page-left));
+  padding-inline: var(--page-left) var(--page-right);
   overflow-x: auto;
   scrollbar-width: none;
+}
+.sp-tabs > :first-child {
+  margin-left: auto;
+}
+.sp-tabs > :last-child {
+  margin-right: auto;
 }
 .sp-tabs::-webkit-scrollbar {
   display: none;
@@ -428,8 +435,21 @@
   }
 }
 
-/* ----- Narrow pages: the big card sits over its rows ----- */
-@container (max-width: 860px) {
+/* ----- The big card sits over its rows only when there is no room beside it -----
+   Upright screens stack. A landscape tablet keeps the two columns even with the sidebar open
+   (about 730 of page width on an iPad), so the page itself has to be genuinely narrow to stack. */
+@container (max-width: 640px) {
+  .sp-home {
+    gap: 56px;
+  }
+  .sp-spread {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sp-spread--flip > :first-child {
+    order: 0;
+  }
+}
+@media (max-width: 900px) and (orientation: portrait) {
   .sp-home {
     gap: 56px;
   }
@@ -447,8 +467,6 @@
     --page-right: max(24px, env(safe-area-inset-right));
   }
   .sp-tabs {
-    margin-inline: calc(-1 * var(--page-left)) calc(-1 * var(--page-right));
-    padding-inline: var(--page-left) var(--page-right);
     margin-bottom: 28px;
   }
 }

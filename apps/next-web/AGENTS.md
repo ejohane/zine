@@ -15,6 +15,10 @@ legacy web app as part of these experiments.
   pill on 2026-11-27 and asked for the sidebar back the same day. `spotlight-home.css` holds
   both and points the app's colour and font variables at the Zine Next tokens; do not add a
   second palette. Library, Inbox and Search keep their older feeds.
+- Look at Home before calling a layout change done, at the sizes Erik uses: iPad landscape
+  (about 1000 and 1180 wide) with the sidebar open and collapsed, plus a desktop, a portrait
+  tablet and a phone. Two columns must survive every landscape size; a 2026-11-27 change that
+  was only checked at 1440 and on a phone collapsed Home to one column on his iPad.
 - Erik authorized production-account integration on 2026-11-10. The connected
   app uses real Clerk sessions and the independent production `/v1` service.
 - Serve at `https://api-next.myzine.app/next/` with a separate asset Worker and
