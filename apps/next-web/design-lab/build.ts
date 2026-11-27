@@ -27,6 +27,7 @@ const script = (await result.outputs[0]!.text()).replaceAll('</script', '<\\/scr
 const css = [
   join(packages, 'next-design/generated/tokens.css'),
   join(packages, 'next-ui/src/cards.css'),
+  join(packages, 'next-ui/src/bento.css'),
   join(here, 'lab.css'),
 ]
   .map((file) => readFileSync(file, 'utf8'))
