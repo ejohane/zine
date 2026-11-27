@@ -17,6 +17,7 @@ import {
 import { contentIdentity, personalContentIdentity } from './identity';
 import { fetchPublic, ProviderError } from './remote';
 import { newestFirst, parseFeed } from './providers/feed';
+import { sharedFeedAt } from './feed-cache';
 import { extractWeb } from './providers/web';
 import { spotifySource, spotifySourcePage } from './providers/spotify';
 import {
@@ -626,7 +627,13 @@ async function subscriptionPage(
     );
   if (!['feed', 'youtube_feed'].includes(route.kind))
     throw new ProviderError('provider_route_not_implemented', false);
-  const feed = await feedAt(typeof page === 'string' ? page : route.url, headers);
+  const feed = await sharedFeedAt(
+    env,
+    typeof page === 'string' ? page : route.url,
+    headers,
+    feedAt,
+    { youtube: route.kind === 'youtube_feed' }
+  );
   if (route.kind === 'youtube_feed')
     for (const entry of feed.entries) entry.kind = youtubeFeedEntryKind(entry.url);
   return feed;

@@ -3,6 +3,62 @@
 Last reviewed: 2026-11-09 UTC. This file records observed state, not a substitute
 for current checks. Read `../AGENTS.md`, inspect git status, then run `bun run doctor`.
 
+## Shared creators, creator avatars and shared feed polling (2026-11-27, not yet released)
+
+- Branch `claude/brave-clarke-jaf99l`. Nothing was deployed from this session.
+- **Bug:** most new subscription items showed no creator avatar. `absolute('', feedUrl)` in
+  `src/providers/feed.ts` returned the feed URL, so YouTube feeds (no icon/logo) and RSS
+  feeds without an image stored the feed's own URL as `creatorImageUrl` (137 items in
+  production on 2026-11-27, e.g. `…/feeds/videos.xml?channel_id=…`, `seangoedecke.com/rss.xml`).
+  It outranked later real avatars (same priority, older). Blank values are now absent; the
+  same fix stops an RSS item without a `<link>` from taking the feed URL as its own URL.
+- **Why YouTube avatars were rare anyway:** production has no `YOUTUBE_API_KEY` secret and no
+  Google connection, so YouTube metadata came only from public-page scraping (avatar found for
+  27 of 275 items) or oEmbed (none). YouTube subscriptions are the public Atom feeds created
+  by `scripts/migrate-legacy-subscriptions.ts`; they need no credentials.
+- **Owner decision (multi-user direction):** public provider facts are stored once and shared
+  across users; anything a user saved, wrote or derived stays owner-scoped. The app's own key
+  does public lookups; a user's Google connection is for user-specific data only.
+- Migration `0028_shared_creators_and_feeds.sql`: deletes the feed-URL avatars (exact match
+  against their provenance `sourceUrl`); adds `creators`, `youtube_videos`, `feed_fetches` and
+  an index on `source_routes(url)`; seeds creators from YouTube sources and `source`
+  contributions, video→channel from subscription deliveries, and images from existing
+  provider avatars, then previous-app avatars matched on the owner's subscribed channel name.
+  On a copy of the 2026-11-27 backup: 144→3 feed-ingestion avatars (the 3 remaining are real),
+  65 creators (50 with an image), 2,439 videos mapped. Data steps only run where data exists:
+  `local:pull`/previews built from a backup taken before release will not have run them.
+- `src/creators.ts`: items show the shared creator record's image (owner corrections still
+  win; `enrichment.fields.creatorImageUrl.provenance.method` is `creator-record`, with a null
+  `contributionId`), resolved by the item's `source` channel or `youtube_videos`. The image proxy
+  uses the same selection. Trust order: Data API > public page > previous app; lower never
+  replaces higher. Maintenance (every cron, only with `YOUTUBE_API_KEY`, budget scope
+  `provider:youtube:shared`): `refreshCreators` (one `channels.list` per 50 due channels, weekly)
+  and `backfillVideoChannels` (one `videos.list` per 50 videos with no known channel). A 403
+  (quota) holds shared lookups for an hour. Data API images and video resources are cleared
+  after 30 days (YouTube developer policy; confirm the policy reading before relying on it).
+- `src/feed-cache.ts` (phase 2): `feed`/`youtube_feed` subscriptions share one upstream fetch
+  per exact URL for 10 minutes (R2 `feed-cache/<sha256(url)>.json`, leased to avoid
+  stampedes); per-subscription cursor/seen/filters/intake are unchanged. Subscriptions get
+  `"zine-<content sha256>"` as their etag and `notModified` when nothing changed. New content
+  brings every other subscription on the URL forward. YouTube feeds record video→channel and
+  look up new videos in one batched `videos.list`; per-item enrichment then reuses that
+  resource and the creator avatar instead of two requests per item. Copies unused by any
+  active subscription for a day are deleted. `feed_fetches` is skipped by restore/local/preview.
+- Checks: `bun run typecheck`, `lint`, prettier, full `bun run test`; new
+  `test/shared-creators.test.ts` (shared fetch/notModified/conditional revalidation/wake-up,
+  record precedence across owners and corrections, batched refresh and quota back-off,
+  backfill, and an end-to-end run where two owners subscribe to one channel: one sync fetch,
+  one `videos.list`, one `channels.list`, both see the avatar). Locally on the restored backup
+  with the migration applied: all 1,479 received YouTube items show an avatar (1,477 from
+  creator records), none show a feed URL. Not verified: a deployed Worker, a real Data API key,
+  real channels' responses, or the web UI.
+- Production investigation read the production D1 directly (read-only) before switching to
+  `local:pull`; future sessions should use `local:pull` as `AGENTS.md` requires.
+- **Next actions:** add a `YOUTUBE_API_KEY` Worker secret (a Google Cloud API key restricted to
+  the YouTube Data API v3); review/merge; release (applies 0028); confirm Inbox avatars on a
+  signed-in session; watch `shared_youtube_lookup_failed` logs. 15 seeded channels have no
+  image until the key exists. X inbox items (27) have no creator image — separate issue.
+
 ## Spotlight Home and library counts (2026-11-27, not yet released)
 
 - Branch `claude/modest-pascal-6um70x`. Nothing was deployed from this session.

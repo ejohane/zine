@@ -17,6 +17,7 @@ import {
   tagsSchema,
 } from './lib';
 import { personalContentIdentity } from './identity';
+import { shownCreatorImage } from './creators';
 import type { Env, Principal } from './types';
 
 export const saveSchema = z
@@ -329,11 +330,12 @@ async function getCanonicalItem(env: Env, owner: string, itemId: string, include
     ),
   ]);
   const [contributions, context, tags, collections, progress, components, occurrences] = results;
+  const creatorImage = await shownCreatorImage(env, content, contributions);
   const fields: Record<string, unknown> = {};
   const large = new Set(['transcript', 'article', 'thread', 'raw', 'members', 'structuredData']);
   const selected: Record<
     string,
-    { contributionId: string; category: string; provenance: unknown }
+    { contributionId: string | null; category: string; provenance: unknown }
   > = {};
   for (const contribution of contributions) {
     if (Object.hasOwn(selected, contribution.field)) continue;
@@ -348,6 +350,10 @@ async function getCanonicalItem(env: Env, owner: string, itemId: string, include
       const object = await env.ARTIFACTS.get(contribution.artifact_key);
       if (object) fields[contribution.field] = await object.json();
     }
+  }
+  if (creatorImage) {
+    fields.creatorImageUrl = creatorImage.value;
+    selected.creatorImageUrl = creatorImage.selection;
   }
   return {
     id: itemId,

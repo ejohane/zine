@@ -19,6 +19,13 @@ import { addRelationship, relationshipSchema } from './relationships';
 import { reconcileVerifiedIdentity } from './reconciliation';
 import { acquireBudget, budgetScope, releaseBudget } from './budgets';
 import { syncSubscription } from './subscriptions';
+import {
+  backfillVideoChannels,
+  observeContributions,
+  purgeSharedProviderData,
+  refreshCreators,
+} from './creators';
+import { collectFeedCache } from './feed-cache';
 import type { Env } from './types';
 import type { ContributionInput } from './enrichment';
 import type { FeedEntry } from './providers/feed';
@@ -44,6 +51,7 @@ function feedContributions(entry: FeedEntry, sourceUrl = entry.url): Contributio
     ['durationSeconds', entry.durationSeconds],
     ['thumbnail', entry.thumbnail],
     ['creatorImageUrl', entry.creatorImageUrl],
+    ['source', entry.source],
     ['links', entry.enclosures],
     ['structuredData', { feedEntry: entry }],
   ];
@@ -108,6 +116,11 @@ async function retainFeedMetadata(env: Env, job: JobRow) {
     job.item_id,
     item.content_id,
     payload.generation,
+    feedContributions(payload.feedEntry, payload.feedSourceUrl)
+  );
+  await observeContributions(
+    env,
+    payload.feedEntry.url,
     feedContributions(payload.feedEntry, payload.feedSourceUrl)
   );
   await stmt(
@@ -178,6 +191,8 @@ async function enrich(env: Env, job: JobRow) {
   contributions.push(...extraction.contributions);
   components = extraction.components;
   await commit(contributions);
+  // Channel identity and avatars are public facts shared by every item from the creator.
+  if (content.platform === 'youtube') await observeContributions(env, payload.url, contributions);
   // Direct source/thread links are metadata edges, not additional saves.
   const relationship = async (
     kind: 'part_of' | 'quotes' | 'reply_to' | 'references',
@@ -717,6 +732,12 @@ async function maintenance(env: Env) {
   }
   await collectMaterialArtifacts(env);
   await stmt(env.DB, 'DELETE FROM usage_windows WHERE expires_at<?', now()).run();
+  await collectFeedCache(env);
+  await purgeSharedProviderData(env);
+  // Shared public lookups with the app's own key: at most one channels.list and one
+  // videos.list call (50 ids each) per cron run, under a separate budget.
+  await refreshCreators(env);
+  await backfillVideoChannels(env);
   await scheduleSubscriptions(env);
   await scheduleUnderstanding(env);
   await scheduleIndexes(env);

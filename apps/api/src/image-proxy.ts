@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
+import { shownCreatorImage } from './creators';
 import { publicUrl } from './identity';
 import { visibleContributions } from './items';
 import { digest, stmt } from './lib';
@@ -119,10 +120,19 @@ async function storedImage(env: Env, itemId: string, kind: ImageKind) {
     itemId
   ).first<{ owner_id: string; content_id: string; status: string }>();
   if (!item || item.status === 'deleted') return undefined;
+  const contributions = await visibleContributions(env, item.owner_id, item.content_id);
+  if (kind === 'creator') {
+    // Same selection as getItem, including the shared creator record.
+    const content = await stmt(
+      env.DB,
+      'SELECT platform,canonical_url FROM content_items WHERE id=?',
+      item.content_id
+    ).first<{ platform: string; canonical_url: string }>();
+    if (!content) return undefined;
+    return (await shownCreatorImage(env, content, contributions))?.value || undefined;
+  }
   // Same ordering as getItem: the first visible contribution for a field is the shown one.
-  const shown = (await visibleContributions(env, item.owner_id, item.content_id)).find(
-    (contribution) => contribution.field === IMAGE_KINDS[kind]
-  );
+  const shown = contributions.find((contribution) => contribution.field === IMAGE_KINDS[kind]);
   if (!shown?.value_json) return undefined;
   const value: unknown = JSON.parse(shown.value_json);
   return typeof value === 'string' && value ? value : undefined;

@@ -18,6 +18,8 @@ export interface FeedEntry {
   durationSeconds?: number;
   thumbnail?: string;
   creatorImageUrl?: string;
+  /** The publishing channel, when the feed names one (YouTube `yt:channelId`). */
+  source?: { id: string; name?: string; url: string; kind: 'channel' };
   enclosures: { url: string; type?: string }[];
   transcripts: { url: string; type?: string; language?: string }[];
 }
@@ -48,7 +50,10 @@ function clean(input: string) {
   for (const n of document.querySelectorAll('script,style,noscript')) n.remove();
   return document.body.textContent?.trim() ?? '';
 }
+// A blank value is absent, not "the base URL": `new URL('', base)` returns `base`, which
+// once stored a feed's own URL as its entries' creator image and links.
 function absolute(input: string, base: string) {
+  if (!input.trim()) return undefined;
   try {
     return publicUrl(new URL(input, base).toString()).toString();
   } catch {
@@ -178,6 +183,15 @@ function rssFeed(channel: Obj, url: string): Feed {
     nextUrl: next ? absolute(text(next['@_href']), url) : undefined,
   };
 }
+function youtubeChannel(channelId: string, name: string | undefined): FeedEntry['source'] {
+  if (!/^UC[A-Za-z0-9_-]{22}$/.test(channelId)) return undefined;
+  return {
+    id: channelId,
+    name,
+    url: `https://www.youtube.com/channel/${channelId}`,
+    kind: 'channel',
+  };
+}
 function atomFeed(feed: Obj, url: string): Feed {
   const links = (value: unknown) => array(value).map(object);
   const alternate = (value: unknown) => {
@@ -200,6 +214,7 @@ function atomFeed(feed: Obj, url: string): Feed {
         .filter((e) => e.url);
       const content = object(item.content);
       const html = text(item.content) || text(item.summary) || text(content['#text']);
+      const creator = text(object(item.author).name) || text(object(feed.author).name) || undefined;
       return {
         id: text(item.id) || entryUrl,
         url: entryUrl,
@@ -207,13 +222,14 @@ function atomFeed(feed: Obj, url: string): Feed {
         description: clean(text(item.summary)) || media.description,
         text: clean(html),
         html,
-        creator: text(object(item.author).name) || text(object(feed.author).name) || undefined,
+        creator,
         publishedAt: date(item.published) || date(item.updated),
         kind: text(item['yt:videoId'])
           ? 'video'
           : enclosureKind([...enclosures, ...media.enclosures].map((e) => e.type)),
         thumbnail: media.thumbnail ?? mediaMetadata(feed, url).thumbnail,
         creatorImageUrl: creatorImageReference(absolute(text(feed.icon) || text(feed.logo), url)),
+        source: youtubeChannel(text(item['yt:channelId']) || text(feed['yt:channelId']), creator),
         durationSeconds: media.durationSeconds,
         enclosures: uniqueEnclosures([...enclosures, ...media.enclosures]),
         transcripts: [],

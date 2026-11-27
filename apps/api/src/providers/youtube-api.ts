@@ -1,4 +1,5 @@
 import { googleToken } from '../connections';
+import { cachedYouTubeVideo, freshApiCreatorImage } from '../creators';
 import { creatorImageReference, identify } from '../identity';
 import { ProviderError, providerJson } from '../remote';
 import type { Env } from '../types';
@@ -6,6 +7,7 @@ import type { ContributionInput } from '../enrichment';
 import type { Extraction } from './web';
 import type { FeedEntry } from './feed';
 type Obj = Record<string, unknown>;
+const VIDEO_CACHE_MS = 7 * 86_400_000;
 const object = (value: unknown): Obj => (value && typeof value === 'object' ? (value as Obj) : {});
 const text = (value: unknown) => (typeof value === 'string' ? value : '');
 interface Page {
@@ -172,6 +174,11 @@ export async function youtubePlaylistPage(
 // A video's creator image is its channel avatar, which needs one extra lookup (1 quota unit).
 // The avatar is optional, so a failed lookup never fails the extraction.
 async function channelAvatar(env: Env, owner: string | undefined, channelId: string) {
+  // The shared creator record is refreshed weekly for everyone; reuse it when current.
+  if (env.DB) {
+    const shared = await freshApiCreatorImage(env, channelId).catch(() => undefined);
+    if (shared) return shared;
+  }
   try {
     const result = await youtubeRequest(env, owner, 'channels', { part: 'snippet', id: channelId });
     const thumbnails = object(object(result.items[0]?.snippet).thumbnails);
@@ -198,11 +205,21 @@ export async function youtubeApiExtraction(
       : { id: identity.externalId! };
   const path =
     identity.kind === 'video' ? 'videos' : identity.kind === 'playlist' ? 'playlists' : 'channels';
-  const result = await youtubeRequest(env, owner, path, {
-    part:
-      identity.kind === 'playlist' ? 'snippet,contentDetails' : 'snippet,contentDetails,statistics',
-    ...params,
-  });
+  // A subscription's feed sync looks up its new videos in batches of 50 for everyone; a
+  // video resource stored that way in the last week needs no request of its own.
+  const cached =
+    identity.kind === 'video' && env.DB
+      ? await cachedYouTubeVideo(env, identity.externalId!, VIDEO_CACHE_MS).catch(() => undefined)
+      : undefined;
+  const result = cached
+    ? { items: [cached as Obj] }
+    : await youtubeRequest(env, owner, path, {
+        part:
+          identity.kind === 'playlist'
+            ? 'snippet,contentDetails'
+            : 'snippet,contentDetails,statistics',
+        ...params,
+      });
   const item = result.items[0];
   if (!item) throw new ProviderError('youtube_item_unavailable', false);
   const snippet = object(item.snippet),

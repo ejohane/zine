@@ -26,7 +26,8 @@ def literal(value):
 skip = {'d1_migrations', '_cf_KV', 'api_tokens', 'connections', 'webhooks',
         'webhook_deliveries', 'indexed_documents', 'index_requests', 'vector_garbage',
         'search_sessions', 'operational_alerts', 'service_checks', 'service_state',
-        'understanding_requests', 'understanding_runs', 'understanding_artifacts', 'schema_checksums', 'event_retention'}
+        'understanding_requests', 'understanding_runs', 'understanding_artifacts', 'schema_checksums', 'event_retention',
+        'feed_fetches'}
 tables = [r['name'] for r in db.execute("SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'search_fts%' ORDER BY name")]
 # Parent tables precede children, including across D1's import processing batches.
 ordered, visiting = [], set()
