@@ -5,6 +5,7 @@ import { contribute } from '../src/enrichment';
 import {
   backfillVideoChannels,
   lookupChannels,
+  observeContributions,
   observeCreators,
   purgeSharedProviderData,
   refreshCreators,
@@ -171,6 +172,34 @@ describe('shared public provider data for many users', () => {
         provenance: { method: 'creator-record', creatorKey: `youtube:channel:${OTHER_CHANNEL}` },
       });
     }
+    // Reusing the shared image on another item is not a new lookup: freshness is unchanged.
+    await runtime.db
+      .prepare(
+        "UPDATE creators SET image_observed_at='2026-01-01T00:00:00.000Z',refresh_after='2026-01-08T00:00:00.000Z' WHERE external_id=?"
+      )
+      .bind(OTHER_CHANNEL)
+      .run();
+    await observeContributions(env, url, [
+      {
+        field: 'source',
+        value: { id: OTHER_CHANNEL, name: 'Other', kind: 'channel' },
+        provenance: { method: 'youtube-data-api' },
+      },
+      {
+        field: 'creatorImageUrl',
+        value: 'https://yt3.example/fresh.jpg',
+        provenance: { method: 'youtube-data-api' },
+      },
+    ]);
+    expect(
+      await runtime.db
+        .prepare('SELECT image_observed_at,refresh_after FROM creators WHERE external_id=?')
+        .bind(OTHER_CHANNEL)
+        .first()
+    ).toEqual({
+      image_observed_at: '2026-01-01T00:00:00.000Z',
+      refresh_after: '2026-01-08T00:00:00.000Z',
+    });
     // A less trusted observation never replaces a Data API image.
     await observeCreators(env, [
       {

@@ -288,7 +288,9 @@ export async function observeContributions(
     {
       channelId,
       name: typeof sourceName === 'string' ? sourceName : undefined,
-      ...(image && (method === 'youtube-data-api' || method === 'youtube-public-page')
+      // Data API avatars are recorded where the channel lookup happens: an item's value may
+      // be a reused shared image, and recording it again would postpone its refresh.
+      ...(image && method === 'youtube-public-page'
         ? { imageUrl: String(image.value), method }
         : {}),
     },

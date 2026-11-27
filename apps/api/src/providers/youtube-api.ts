@@ -1,5 +1,5 @@
 import { googleToken } from '../connections';
-import { cachedYouTubeVideo, freshApiCreatorImage } from '../creators';
+import { cachedYouTubeVideo, freshApiCreatorImage, observeCreators } from '../creators';
 import { creatorImageReference, identify } from '../identity';
 import { ProviderError, providerJson } from '../remote';
 import type { Env } from '../types';
@@ -181,10 +181,22 @@ async function channelAvatar(env: Env, owner: string | undefined, channelId: str
   }
   try {
     const result = await youtubeRequest(env, owner, 'channels', { part: 'snippet', id: channelId });
-    const thumbnails = object(object(result.items[0]?.snippet).thumbnails);
-    return creatorImageReference(
+    const snippet = object(result.items[0]?.snippet);
+    const thumbnails = object(snippet.thumbnails);
+    const image = creatorImageReference(
       object(thumbnails.high ?? thumbnails.medium ?? thumbnails.default).url
     );
+    // Only an actual channel response renews the shared record's freshness.
+    if (image && env.DB)
+      await observeCreators(env, [
+        {
+          channelId,
+          name: text(snippet.title) || undefined,
+          imageUrl: image,
+          method: 'youtube-data-api',
+        },
+      ]).catch(() => undefined);
+    return image;
   } catch {
     return undefined;
   }
@@ -284,6 +296,15 @@ export async function youtubeApiExtraction(
       : identity.kind === 'video' && channelId
         ? await channelAvatar(env, owner, channelId)
         : undefined;
+  if (identity.kind === 'channel' && avatar && env.DB)
+    await observeCreators(env, [
+      {
+        channelId,
+        name: text(snippet.title) || undefined,
+        imageUrl: avatar,
+        method: 'youtube-data-api',
+      },
+    ]).catch(() => undefined);
   const contributions = youtubeResourceContributions(identity.url, identity.kind, item, avatar);
   const add = (field: ContributionInput['field'], value: unknown) => {
     if (value !== undefined && value !== null && value !== '')
