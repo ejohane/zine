@@ -68,6 +68,8 @@ describe('personal Home editorial', () => {
     };
     const preview = await call(token, '/home/preview', 'POST', draft);
     expect(preview.status).toBe(200);
+    expect(preview.body.counts).toMatchObject({ saved: 10, inbox: 0 });
+    expect(Object.values(preview.body.counts.savedByType).reduce((sum, n) => sum + n, 0)).toBe(10);
     expect(preview.body.sections.map(({ kind }: { kind: string }) => kind)).toEqual([
       'resume',
       'collection',
@@ -138,6 +140,7 @@ describe('personal Home editorial', () => {
       editionId: null,
       generatedAt: null,
       sections: [],
+      counts: { saved: 0, inbox: 0, savedByType: {} },
     });
   });
 });

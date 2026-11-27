@@ -1,0 +1,437 @@
+/*
+ * Design lab: Home options around the real Zine Next cards. Colour and type come only from the
+ * --zn-* tokens (packages/next-design); nothing here restyles the inside of a card.
+ * Layout concept: a dark lab strip on top, and under it one app-sized frame that scrolls on its own.
+ */
+:root {
+  --zn-font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --gutter-left: max(16px, env(safe-area-inset-left, 0px));
+  --gutter-right: max(16px, env(safe-area-inset-right, 0px));
+}
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--zn-color-canvas);
+  color: var(--zn-color-ink);
+  font: var(--zn-type-body);
+  font-family: var(--zn-font);
+}
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+}
+:focus-visible {
+  outline: 2px solid var(--zn-color-accent);
+  outline-offset: 2px;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+/* ----- Lab strip ----- */
+.lab {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.lab-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px var(--gutter-right) 8px var(--gutter-left);
+  background: var(--zn-color-raised);
+  color: var(--zn-color-on-raised);
+  border-bottom: 1px solid var(--zn-color-raised-outline);
+}
+.lab-tabs {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.lab-tabs a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  height: 32px;
+  padding: 0 12px 0 6px;
+  border-radius: var(--zn-radius-pill);
+  color: var(--zn-color-on-raised-muted);
+  font: 600 13px/1 var(--zn-font);
+  text-decoration: none;
+}
+.lab-tabs a span {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.lab-tabs a[aria-selected='true'] {
+  background: var(--zn-color-on-raised);
+  color: var(--zn-color-raised);
+}
+.lab-theme {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
+  border: 1px solid var(--zn-color-on-raised-muted);
+  border-radius: 50%;
+  background: none;
+  color: var(--zn-color-on-raised);
+}
+.lab-theme svg {
+  width: 16px;
+  height: 16px;
+}
+.lab-wait {
+  padding: 48px var(--gutter-right) 48px var(--gutter-left);
+  color: var(--zn-color-muted);
+}
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.frame {
+  height: 100%;
+  overflow: auto;
+  container-type: inline-size;
+  background: var(--zn-color-canvas);
+}
+
+/* ----- Shared ----- */
+/* Layout: lots of room, few things. One big bookmark and a short list, like a calm front page. */
+.page {
+  --side-left: max(48px, env(safe-area-inset-left, 0px));
+  --side-right: max(104px, env(safe-area-inset-right, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 72px;
+  max-width: 1720px;
+  margin: 0 auto;
+  padding: 0 var(--side-right) 140px var(--side-left);
+}
+.frame button,
+.edge button {
+  border: 0;
+  background: none;
+  color: var(--zn-color-ink);
+}
+
+/* Value tabs: what you have, as numbers. */
+.tabs {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 0 calc(-1 * var(--side-right)) -20px calc(-1 * var(--side-left));
+  padding: 20px var(--side-right) 0 var(--side-left);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs__mark,
+.tabs button {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 12px;
+  height: 60px;
+  padding: 0 20px 0 16px;
+  border-radius: var(--zn-radius-bubble);
+  background: var(--zn-color-bubble);
+  text-align: start;
+}
+.tabs__mark {
+  padding: 0 20px;
+  color: var(--zn-color-accent-text);
+  font: 700 26px/1 var(--zn-font);
+  letter-spacing: -0.05em;
+}
+.tabs button svg {
+  width: 24px;
+  height: 24px;
+  color: var(--zn-color-accent-text);
+}
+.tabs button span {
+  display: grid;
+  gap: 3px;
+}
+.tabs small {
+  color: var(--zn-color-muted);
+  font: 500 13px/1 var(--zn-font);
+}
+.tabs b {
+  font: 700 16px/1 var(--zn-font);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.tabs button[aria-pressed='true'] {
+  background: var(--zn-color-raised);
+}
+.tabs button[aria-pressed='true'] b {
+  color: var(--zn-color-on-raised);
+}
+.tabs button[aria-pressed='true'] small {
+  color: var(--zn-color-on-raised-muted);
+}
+.tabs button[aria-pressed='true'] svg {
+  color: var(--zn-color-accent);
+}
+
+/* The small floating nav at the edge. */
+.edge {
+  position: absolute;
+  right: max(20px, env(safe-area-inset-right, 0px));
+  bottom: max(24px, env(safe-area-inset-bottom, 0px));
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.edge div {
+  display: flex;
+  flex-direction: inherit;
+  gap: 4px;
+  padding: 6px;
+  border-radius: var(--zn-radius-pill);
+  background: var(--zn-color-raised);
+}
+.edge button {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  color: var(--zn-color-on-raised-muted);
+}
+.edge button svg {
+  width: 24px;
+  height: 24px;
+}
+.edge button[aria-current='page'] {
+  color: var(--zn-color-accent);
+}
+.edge .edge__save {
+  width: 64px;
+  height: 64px;
+  background: var(--zn-color-accent);
+  color: var(--zn-color-on-accent);
+}
+
+.scaled {
+  min-width: 0;
+}
+.scaled .zn-card {
+  width: 100%;
+}
+.rows {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.rows > * {
+  padding: 28px 0;
+  border-top: 1px solid var(--zn-color-line);
+}
+.rows > :first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.more {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  align-self: center;
+  width: min(100%, 560px);
+  height: 68px;
+  padding: 0 24px;
+  border-radius: var(--zn-radius-pill);
+  background: var(--zn-color-bubble) !important;
+  font: 500 19px/1 var(--zn-font);
+}
+.more span {
+  flex: 1;
+  text-align: start;
+}
+.more svg {
+  width: 22px;
+  height: 22px;
+  color: var(--zn-color-muted);
+}
+.more svg:first-child {
+  color: var(--zn-color-accent-text);
+}
+
+/* The inbox, sideways: runs off the right edge of the page. */
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  margin-right: calc(-1 * var(--side-right));
+}
+.rail header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding-right: var(--side-right);
+}
+.rail h2 {
+  font: var(--zn-type-display);
+  letter-spacing: var(--zn-tracking-display);
+}
+.rail header span {
+  margin-right: auto;
+  color: var(--zn-color-accent-text);
+  font: 700 16px/1 var(--zn-font);
+  font-variant-numeric: tabular-nums;
+}
+.rail header button {
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--zn-color-muted);
+}
+.rail header button svg {
+  width: 22px;
+  height: 22px;
+}
+.rail__track {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  padding-right: var(--side-right);
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  zoom: 1.2;
+}
+.rail__track .zn-card {
+  flex: none;
+  width: var(--zn-size-card-narrow);
+  scroll-snap-align: start;
+}
+@media (hover: none) {
+  .rail header button {
+    display: none;
+  }
+}
+
+/* ----- A. Spotlight ----- */
+.spread,
+.browse {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(40px, 6cqw, 112px);
+}
+.spread--flip > :first-child {
+  order: 2;
+}
+
+/* ----- B. Browse ----- */
+.browse {
+  align-items: start;
+}
+.browse__hero {
+  position: sticky;
+  top: 40px;
+}
+.browse .rows > * {
+  padding: 18px 16px;
+  margin: 0 -16px;
+  border-top: 0;
+  border-radius: var(--zn-radius-bubble);
+}
+.browse .rows__pick[aria-current='true'] {
+  background: var(--zn-color-bubble);
+}
+
+/* ----- C. Big bento ----- */
+.frame .zn-bento__band {
+  max-width: none;
+}
+.frame .zn-bento {
+  gap: 44px;
+}
+
+/* ----- Upright screens ----- */
+@container (max-width: 900px) {
+  .page {
+    --side-left: max(24px, env(safe-area-inset-left, 0px));
+    --side-right: max(24px, env(safe-area-inset-right, 0px));
+    gap: 56px;
+    padding-bottom: 150px;
+  }
+  .tabs {
+    justify-content: flex-start;
+  }
+  .spread,
+  .browse {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .spread--flip > :first-child {
+    order: 0;
+  }
+  .browse__hero {
+    position: static;
+  }
+}
+@container (max-width: 520px) {
+  .page {
+    --side-left: var(--gutter-left);
+    --side-right: var(--gutter-right);
+    gap: 44px;
+  }
+  .rows > * {
+    padding: 20px 0;
+  }
+  .rail__track {
+    zoom: 1;
+  }
+  .rail h2 {
+    font-size: 26px;
+  }
+}
+@media (max-width: 900px) {
+  .edge {
+    right: 50%;
+    flex-direction: row-reverse;
+    transform: translateX(50%);
+  }
+  .edge button {
+    width: 48px;
+    height: 48px;
+  }
+  .edge .edge__save {
+    width: 56px;
+    height: 56px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+  }
+}

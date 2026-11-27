@@ -1,14 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import {
-  House,
-  Inbox,
-  LibraryBig,
-  Menu,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Search,
-  X,
-} from 'lucide-react';
+import { House, Inbox, LibraryBig, Plus, Search } from 'lucide-react';
 
 const destinations = { Home: House, Inbox, Library: LibraryBig, Search };
 export type Destination = keyof typeof destinations;
@@ -22,137 +12,38 @@ export function readDestination(): Destination {
   );
 }
 
-export const sidebarCollapsedKey = 'zine-next-web-sidebar-collapsed';
-
-export function parseSidebarCollapsed(value: unknown): boolean {
-  return value === 'true';
-}
-
-// Storage is resolved inside the try block: reading `localStorage` itself can throw.
-export function readSidebarCollapsed(storage?: Pick<Storage, 'getItem'>): boolean {
-  try {
-    return parseSidebarCollapsed((storage ?? localStorage).getItem(sidebarCollapsedKey));
-  } catch {
-    return false;
-  }
-}
-
-export function writeSidebarCollapsed(collapsed: boolean, storage?: Pick<Storage, 'setItem'>) {
-  try {
-    (storage ?? localStorage).setItem(sidebarCollapsedKey, String(collapsed));
-  } catch {
-    // The preference is best effort; the sidebar still toggles for this visit.
-  }
-}
-
+/**
+ * The app's navigation: a small floating pill of destinations with Save above it. It sits at the
+ * right edge on wide screens and along the bottom on upright ones (see `spotlight-home.css`).
+ */
 export function DestinationNav({
   current,
   choose,
+  capture,
 }: {
   current: Destination;
   choose: (next: Destination) => void;
+  capture: () => void;
 }) {
-  const drawer = useRef<HTMLDialogElement>(null);
-  const [collapsed, setCollapsed] = useState(() => readSidebarCollapsed());
-  const toggle = () => {
-    writeSidebarCollapsed(!collapsed);
-    setCollapsed(!collapsed);
-  };
-  useEffect(() => {
-    const wide = matchMedia('(min-width: 720px) and (orientation: landscape)');
-    const close = () => {
-      if (wide.matches) drawer.current?.close();
-    };
-    wide.addEventListener('change', close);
-    return () => wide.removeEventListener('change', close);
-  }, []);
-  const links = (rail = false) => (
-    <nav aria-label="Destinations" className="destination-links">
-      {(Object.entries(destinations) as [Destination, typeof House][]).map(([name, Icon]) => (
-        <button
-          key={name}
-          type="button"
-          aria-label={name}
-          aria-current={current === name ? 'page' : undefined}
-          title={rail ? name : undefined}
-          onClick={() => {
-            drawer.current?.close();
-            choose(name);
-          }}
-        >
-          <Icon aria-hidden="true" />
-          <span className="destination-label">{name}</span>
-        </button>
-      ))}
-    </nav>
-  );
   return (
-    <>
-      <aside className="destination-sidebar" data-collapsed={collapsed}>
-        <div className="destination-sidebar-header">
-          <p className="destination-brand">
-            Z<span className="destination-label">ine</span>
-          </p>
+    <div className="edge-nav">
+      <button type="button" className="edge-nav__save" aria-label="Save a link" onClick={capture}>
+        <Plus aria-hidden="true" />
+      </button>
+      <nav aria-label="Destinations">
+        {(Object.entries(destinations) as [Destination, typeof House][]).map(([name, Icon]) => (
           <button
+            key={name}
             type="button"
-            className="icon-button destination-toggle"
-            aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
-            aria-expanded={!collapsed}
-            aria-controls="destination-sidebar-links"
-            title={collapsed ? 'Expand navigation' : 'Collapse navigation'}
-            onClick={toggle}
+            aria-label={name}
+            title={name}
+            aria-current={current === name ? 'page' : undefined}
+            onClick={() => choose(name)}
           >
-            {collapsed ? (
-              <PanelLeftOpen aria-hidden="true" />
-            ) : (
-              <PanelLeftClose aria-hidden="true" />
-            )}
+            <Icon aria-hidden="true" />
           </button>
-        </div>
-        <div id="destination-sidebar-links">{links(collapsed)}</div>
-      </aside>
-      <div className="destination-mobile">
-        <button
-          type="button"
-          className="destination-trigger glass"
-          aria-label={`Open navigation, current page ${current}`}
-          aria-haspopup="dialog"
-          onClick={() => drawer.current?.showModal()}
-        >
-          <Menu aria-hidden="true" /> {current}
-        </button>
-        <button
-          type="button"
-          className="destination-trigger glass"
-          aria-label="Search"
-          onClick={() => choose('Search')}
-        >
-          <Search aria-hidden="true" />
-        </button>
-      </div>
-      <dialog
-        ref={drawer}
-        className="destination-drawer"
-        aria-label="Zine navigation"
-        onClick={(event) => {
-          if (event.target === event.currentTarget) drawer.current?.close();
-        }}
-      >
-        <div className="destination-drawer-body">
-          <div className="destination-drawer-title">
-            <p className="destination-brand">Zine</p>
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="Close navigation"
-              onClick={() => drawer.current?.close()}
-            >
-              <X aria-hidden="true" />
-            </button>
-          </div>
-          {links()}
-        </div>
-      </dialog>
-    </>
+        ))}
+      </nav>
+    </div>
   );
 }

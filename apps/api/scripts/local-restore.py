@@ -19,7 +19,8 @@ def quote_id(value):
         raise ValueError('Unexpected database identifier')
     return '"' + value + '"'
 
-db = sqlite3.connect(target)
+# uri=True so the read-only ATTACH below works where SQLite was built without URI filenames on.
+db = sqlite3.connect(target, uri=True)
 db.execute('ATTACH DATABASE ? AS snap', (f'file:{source}?mode=ro',))
 tables = lambda schema: [r[0] for r in db.execute(
     f"SELECT name FROM {schema}.sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' "

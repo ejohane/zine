@@ -5,12 +5,15 @@ Erik explicitly requested this independent PWA as the experiment channel, recrea
 the legacy `apps/web` visual baseline. Do not alter the production iOS app or
 legacy web app as part of these experiments.
 
-- Home (2026-11-25) is a bento of Zine Next cards from `/v1/home`: `BentoHome.tsx` with
-  `@zine/next-ui` and the tokens in `@zine/next-design`. Its rules are in
-  `packages/next-design/DESIGN.md`; design new work in that language.
-- The format filters keep the floating icon/word filters and the native three-column bento
-  packing. One vertical page; only the filters scrub. `bento-home.css` points the app's colour and
-  font variables at the Zine Next tokens; do not add a second palette.
+- Home (2026-11-27) is "Spotlight": one big Zine Next card beside three rows, block after block,
+  with the inbox as a sideways rail after the first block (`SpotlightHome.tsx`, `spotlight.ts`).
+  Cards come from `@zine/next-ui` and are magnified whole, never restyled. Erik chose it from the
+  options in `design-lab/`; the rules are in `packages/next-design/DESIGN.md`.
+- The format filters are tabs that show counts (`LibraryTabs.tsx`; the numbers come with
+  `/v1/home`). Navigation is a small floating pill with Save above it (`DestinationNav.tsx`): at
+  the right edge on wide screens, along the bottom on upright ones. `spotlight-home.css` holds
+  both and points the app's colour and font variables at the Zine Next tokens; do not add a
+  second palette. Library, Inbox and Search keep their older feeds.
 - Erik authorized production-account integration on 2026-11-10. The connected
   app uses real Clerk sessions and the independent production `/v1` service.
 - Serve at `https://api-next.myzine.app/next/` with a separate asset Worker and

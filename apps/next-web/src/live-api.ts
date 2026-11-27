@@ -77,6 +77,8 @@ export type Home = {
   editionId: string | null;
   generatedAt: string | null;
   sections: HomeSection[];
+  /** Open saves in all and by content type, and what waits in the inbox. Older copies lack it. */
+  counts?: { saved: number; inbox: number; savedByType: Record<string, number> };
 };
 export type Collection = {
   id: string;

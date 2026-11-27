@@ -1,0 +1,353 @@
+/*
+ * Home ("Spotlight") and the app's navigation in the Zine Next design language
+ * (packages/next-design). Loaded after styles.css.
+ *
+ * The first block re-points the app's own colour and font variables at the Zine Next tokens, so
+ * the navigation, filters, sheets and the other feeds sit in the same language as Home without
+ * being redesigned. Everything below uses the --zn-* tokens directly.
+ */
+
+:root {
+  --zn-font: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --canvas: var(--zn-color-canvas);
+  --paper: var(--zn-color-canvas);
+  --inset: var(--zn-color-bubble);
+  --ink: var(--zn-color-ink);
+  --secondary: var(--zn-color-muted);
+  --line: var(--zn-color-outline);
+  --selection: var(--zn-color-accent-text);
+  --on-selection: var(--zn-color-canvas);
+  --glass: color-mix(in srgb, var(--zn-color-canvas) 78%, transparent);
+  --glass-selected: var(--zn-color-bubble);
+  --sans: var(--zn-font);
+}
+
+/* ----- The page ----- */
+
+/* Room for the floating navigation: at the right edge on wide screens, along the bottom on
+   upright ones. */
+.destination-shell .page {
+  --page-left: max(30px, env(safe-area-inset-left));
+  --page-right: max(104px, env(safe-area-inset-right));
+  padding: calc(20px + env(safe-area-inset-top)) var(--page-right)
+    max(44px, env(safe-area-inset-bottom)) var(--page-left);
+}
+.destination-shell .page.page--spotlight {
+  --page-left: max(48px, env(safe-area-inset-left));
+  max-width: 1720px;
+}
+.destination-shell .heading-row:has(.sr-only) {
+  margin: 0;
+}
+.destination-shell .heading-row h1 {
+  font: var(--zn-type-display);
+  letter-spacing: var(--zn-tracking-display);
+}
+.sp-tabs :focus-visible,
+.sp-home :focus-visible,
+.edge-nav :focus-visible {
+  outline: 2px solid var(--zn-color-accent);
+  outline-offset: 2px;
+}
+
+/* ----- Filters that say how much is behind them ----- */
+.sp-tabs {
+  display: flex;
+  gap: 10px;
+  width: fit-content;
+  max-width: calc(100% + var(--page-left) + var(--page-right));
+  margin: 0 auto 40px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sp-tabs::-webkit-scrollbar {
+  display: none;
+}
+.sp-tabs__mark,
+.sp-tabs button {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 12px;
+  height: 60px;
+  padding: 0 20px 0 16px;
+  border-radius: var(--zn-radius-bubble);
+  background: var(--zn-color-bubble);
+  color: var(--zn-color-ink);
+  text-align: start;
+}
+.sp-tabs__mark {
+  padding: 0 20px;
+  color: var(--zn-color-accent-text);
+  font: 700 26px/1 var(--zn-font);
+  letter-spacing: -0.05em;
+}
+.sp-tabs button svg {
+  width: 24px;
+  height: 24px;
+  color: var(--zn-color-accent-text);
+}
+.sp-tabs button span {
+  display: grid;
+  gap: 3px;
+}
+.sp-tabs small {
+  color: var(--zn-color-muted);
+  font: 500 13px/1 var(--zn-font);
+}
+.sp-tabs b {
+  font: 700 16px/1 var(--zn-font);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+/* Before the numbers arrive, the name stands alone at full strength. */
+.sp-tabs small:only-child {
+  color: inherit;
+  font: 600 15px/1 var(--zn-font);
+}
+/* Ink on canvas, flipped: the raised colour is the same as the tab's own at night. */
+.sp-tabs button[aria-pressed='true'] {
+  background: var(--zn-color-ink);
+  color: var(--zn-color-canvas);
+}
+.sp-tabs button[aria-pressed='true'] small {
+  color: color-mix(in srgb, var(--zn-color-canvas) 70%, var(--zn-color-ink));
+}
+.sp-tabs button[aria-pressed='true'] small:only-child {
+  color: inherit;
+}
+.sp-tabs button[aria-pressed='true'] svg {
+  color: var(--zn-color-accent);
+}
+
+/* ----- Home: one big card beside three rows ----- */
+.sp-home {
+  display: flex;
+  flex-direction: column;
+  gap: 72px;
+  color: var(--zn-color-ink);
+  font: var(--zn-type-body);
+}
+.sp-spread {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(40px, 6cqw, 112px);
+}
+.sp-spread--flip > :first-child {
+  order: 2;
+}
+/* A last block with no rows keeps its card at the usual size. */
+.sp-spread > :only-child {
+  grid-column: 1;
+}
+.sp-scaled {
+  min-width: 0;
+}
+.sp-scaled .zn-card {
+  width: 100%;
+}
+/* A card a little wider than designed keeps the designed picture height, so its text keeps its room. */
+.sp-scaled .zn-card--large .zn-card__stage {
+  max-height: calc(var(--zn-size-card-wide) * 9 / 16);
+}
+.sp-rows {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.sp-rows > * {
+  padding: 28px 0;
+  border-top: 1px solid var(--zn-color-line);
+}
+.sp-rows > :first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.sp-rows > :last-child {
+  padding-bottom: 0;
+}
+
+/* The inbox, sideways: runs off the right edge of the page. */
+.sp-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  margin-right: calc(-1 * var(--page-right));
+}
+.sp-rail header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: var(--page-right);
+}
+.sp-rail__title {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-right: auto;
+  padding: 0;
+}
+.sp-rail h2 {
+  margin: 0;
+  font: var(--zn-type-display);
+  letter-spacing: var(--zn-tracking-display);
+}
+.sp-rail__title span {
+  color: var(--zn-color-accent-text);
+  font: 700 16px/1 var(--zn-font);
+  font-variant-numeric: tabular-nums;
+}
+.sp-rail__arrow {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--zn-color-muted);
+}
+.sp-rail__arrow svg {
+  width: 22px;
+  height: 22px;
+}
+.sp-rail__track {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  padding-right: var(--page-right);
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  zoom: 1.2;
+}
+.sp-rail__track::-webkit-scrollbar {
+  display: none;
+}
+.sp-rail__track .zn-card {
+  flex: none;
+  scroll-snap-align: start;
+}
+@media (hover: none) {
+  .sp-rail__arrow {
+    display: none;
+  }
+}
+
+.page--spotlight .load-more {
+  display: flex;
+  width: min(100%, 560px);
+  min-height: 68px;
+  margin: 72px auto 0;
+  border-radius: var(--zn-radius-pill);
+  background: var(--zn-color-bubble);
+  font: 500 19px/1 var(--zn-font);
+}
+
+/* ----- Navigation: a small floating pill, Save above it ----- */
+.edge-nav {
+  position: fixed;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: max(24px, env(safe-area-inset-bottom));
+  z-index: 11;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.edge-nav nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--zn-color-raised-outline);
+  border-radius: var(--zn-radius-pill);
+  background: var(--zn-color-raised);
+}
+.edge-nav button {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  color: var(--zn-color-on-raised-muted);
+}
+.edge-nav button svg {
+  width: 24px;
+  height: 24px;
+}
+.edge-nav button:hover {
+  color: var(--zn-color-on-raised);
+}
+.edge-nav button[aria-current='page'] {
+  color: var(--zn-color-accent);
+}
+.edge-nav .edge-nav__save {
+  width: 64px;
+  height: 64px;
+  background: var(--zn-color-accent);
+  color: var(--zn-color-on-accent);
+}
+
+/* ----- Upright screens ----- */
+@media (max-width: 900px) {
+  .destination-shell .page,
+  .destination-shell .page.page--spotlight {
+    --page-left: max(24px, env(safe-area-inset-left));
+    --page-right: max(24px, env(safe-area-inset-right));
+    padding-bottom: calc(130px + env(safe-area-inset-bottom));
+  }
+  .sp-tabs {
+    margin-inline: calc(-1 * var(--page-left)) calc(-1 * var(--page-right));
+    padding-inline: var(--page-left) var(--page-right);
+    margin-bottom: 28px;
+  }
+  .sp-home {
+    gap: 56px;
+  }
+  .sp-spread {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sp-spread--flip > :first-child {
+    order: 0;
+  }
+  .edge-nav {
+    right: 50%;
+    flex-direction: row-reverse;
+    transform: translateX(50%);
+  }
+  .edge-nav nav {
+    flex-direction: row;
+  }
+  .edge-nav button {
+    width: 48px;
+    height: 48px;
+  }
+  .edge-nav .edge-nav__save {
+    width: 56px;
+    height: 56px;
+  }
+}
+@media (max-width: 520px) {
+  .destination-shell .page,
+  .destination-shell .page.page--spotlight {
+    --page-left: max(16px, env(safe-area-inset-left));
+    --page-right: max(16px, env(safe-area-inset-right));
+  }
+  .sp-home {
+    gap: 44px;
+  }
+  .sp-rows > * {
+    padding: 20px 0;
+  }
+  .sp-rail__track {
+    zoom: 1;
+  }
+  .sp-rail h2 {
+    font-size: 26px;
+  }
+}
+
+/* The other feeds' cards keep a surface of their own against the canvas. */
+.story-card {
+  --paper: var(--zn-color-bubble);
+}

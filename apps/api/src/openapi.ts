@@ -178,6 +178,11 @@ const schemaSources: Record<string, z.ZodType> = {
   Home: z.object({
     editionId: nullableString,
     generatedAt: nullableString,
+    counts: z.object({
+      saved: z.number().int(),
+      inbox: z.number().int(),
+      savedByType: z.record(z.string(), z.number().int()),
+    }),
     sections: z.array(
       z.object({
         id: z.string(),
