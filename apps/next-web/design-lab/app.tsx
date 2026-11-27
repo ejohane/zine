@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ItemCard, packBento, readsTall } from '@zine/next-ui';
-import type { BentoCell, CardSize, ItemKind } from '@zine/next-ui';
+import { ItemCard, packBento } from '@zine/next-ui';
+import type { BentoCell, CardSize } from '@zine/next-ui';
 import {
   BookOpen,
   ChevronLeft,
@@ -10,8 +10,7 @@ import {
   Headphones,
   House,
   Inbox,
-  LibraryBig,
-  MessageSquare,
+  LayoutGrid,
   Moon,
   Play,
   Plus,
@@ -21,9 +20,7 @@ import {
 import { count, loadLab } from './data';
 import type { Lab, LabItem } from './data';
 
-type Shell = (props: { lab: Lab }) => ReactNode;
-
-/* ---------- The real cards ---------- */
+/* ---------- The real cards, at any scale ---------- */
 
 function Card(props: { lab: Lab; item: LabItem; size: CardSize; narrow?: boolean }) {
   return (
@@ -37,7 +34,201 @@ function Card(props: { lab: Lab; item: LabItem; size: CardSize; narrow?: boolean
   );
 }
 
-/** One column of a bento band, as `@zine/next-ui` lays it out. */
+/**
+ * A card enlarged to fill the width it is given. The card itself is untouched: it is laid out
+ * at its designed width and the whole thing is magnified, so its proportions never change.
+ */
+function Scaled(props: { lab: Lab; item: LabItem; size: 'large' | 'compact'; max?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState({ zoom: 1, width: 392 });
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const measure = () => {
+      // Never smaller than designed: a narrow screen gets the card at its own size, full width.
+      const zoom = Math.min(props.max ?? 1.9, Math.max(1, element.clientWidth / 392));
+      setBox({ zoom, width: element.clientWidth / zoom });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [props.max]);
+  return (
+    <div ref={ref} className="scaled">
+      <div style={{ zoom: box.zoom, width: box.width }}>
+        <Card lab={props.lab} item={props.item} size={props.size} />
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Chrome: value tabs on top, a small floating nav at the edge ---------- */
+
+type Tab = 'all' | 'read' | 'watch' | 'listen' | 'inbox';
+
+function useTab(lab: Lab) {
+  const [tab, setTab] = useState<Tab>('all');
+  const by = lab.counts.savedBy;
+  const tabs: [Tab, string, number, typeof Play][] = [
+    ['all', 'All', lab.counts.saved, LayoutGrid],
+    ['read', 'Read', by.article + by.post, BookOpen],
+    ['watch', 'Watch', by.video, Play],
+    ['listen', 'Listen', by.podcast, Headphones],
+    ['inbox', 'Inbox', lab.counts.inbox, Inbox],
+  ];
+  const started = new Set(lab.resume.map((item) => item.id));
+  const resume = lab.resume.slice(0, 4);
+  // Open on a picture: started things that have one go first.
+  const opening = [
+    ...resume.filter((item) => item.picture),
+    ...resume.filter((item) => !item.picture),
+  ];
+  const saved = [...opening, ...lab.saved.filter((item) => !started.has(item.id))];
+  const items =
+    tab === 'inbox'
+      ? lab.inbox
+      : saved.filter(
+          (item) =>
+            tab === 'all' ||
+            (tab === 'read' && (item.kind === 'article' || item.kind === 'post')) ||
+            (tab === 'watch' && item.kind === 'video') ||
+            (tab === 'listen' && item.kind === 'podcast')
+        );
+  const bar = (
+    <nav className="tabs" aria-label="Show">
+      <span className="tabs__mark" aria-label="Zine">
+        Z
+      </span>
+      {tabs.map(([id, label, value, Icon]) => (
+        <button key={id} type="button" aria-pressed={tab === id} onClick={() => setTab(id)}>
+          <Icon aria-hidden="true" />
+          <span>
+            <small>{label}</small>
+            <b>{count(value)}</b>
+          </span>
+        </button>
+      ))}
+    </nav>
+  );
+  return { tab, items, bar };
+}
+
+function InboxRail({ lab, items }: { lab: Lab; items: LabItem[] }) {
+  const track = useRef<HTMLDivElement>(null);
+  const scroll = (direction: number) =>
+    track.current?.scrollBy({
+      left: direction * track.current.clientWidth * 0.8,
+      behavior: 'smooth',
+    });
+  if (items.length < 3) return null;
+  return (
+    <section className="rail" aria-label="Inbox">
+      <header>
+        <h2>Inbox</h2>
+        <span>{count(lab.counts.inbox)}</span>
+        <button type="button" aria-label="Back" onClick={() => scroll(-1)}>
+          <ChevronLeft aria-hidden="true" />
+        </button>
+        <button type="button" aria-label="More" onClick={() => scroll(1)}>
+          <ChevronRight aria-hidden="true" />
+        </button>
+      </header>
+      <div className="rail__track" ref={track} tabIndex={0}>
+        {items.map((item) => (
+          <Card key={item.id} lab={lab} item={item} size="tile" />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+const MoreButton = ({ children }: { children: ReactNode }) => (
+  <button type="button" className="more">
+    <LayoutGrid aria-hidden="true" />
+    <span>{children}</span>
+    <ChevronRight aria-hidden="true" />
+  </button>
+);
+
+/** Pictures lead: within each group of four, the first item with a picture becomes the hero. */
+function spreads(items: LabItem[], limit: number) {
+  const groups: { hero: LabItem; rows: LabItem[] }[] = [];
+  for (let start = 0; start + 3 < items.length && groups.length < limit; start += 4) {
+    const group = items.slice(start, start + 4);
+    const hero = group.find((item) => item.picture) ?? group[0]!;
+    groups.push({ hero, rows: group.filter((item) => item !== hero) });
+  }
+  return groups;
+}
+
+type Shell = (props: { lab: Lab }) => ReactNode;
+
+/* ---------- A. Spotlight: one big bookmark, three beside it ---------- */
+
+const Spotlight: Shell = ({ lab }) => {
+  const { tab, items, bar } = useTab(lab);
+  const groups = spreads(items, 7);
+  return (
+    <div className="page">
+      {bar}
+      {groups.map((group, index) => (
+        <Fragment key={group.hero.id}>
+          <section className={index % 2 ? 'spread spread--flip' : 'spread'}>
+            <Scaled lab={lab} item={group.hero} size="large" />
+            <div className="rows">
+              {group.rows.map((item) => (
+                <Scaled key={item.id} lab={lab} item={item} size="compact" max={1.5} />
+              ))}
+            </div>
+          </section>
+          {index === 0 && tab !== 'inbox' ? (
+            <InboxRail lab={lab} items={lab.inbox.slice(0, 16)} />
+          ) : null}
+        </Fragment>
+      ))}
+      <MoreButton>{tab === 'inbox' ? 'Inbox' : `All ${count(lab.counts.saved)}`}</MoreButton>
+    </div>
+  );
+};
+
+/* ---------- B. Browse: the list drives the big picture ---------- */
+
+const Browse: Shell = ({ lab }) => {
+  const { tab, items, bar } = useTab(lab);
+  const list = items.slice(0, 24);
+  const [chosen, setChosen] = useState<string>();
+  const hero =
+    list.find((item) => item.id === chosen) ?? list.find((item) => item.picture) ?? list[0];
+  return (
+    <div className="page">
+      {bar}
+      <section className="browse">
+        <div className="browse__hero">
+          {hero ? <Scaled lab={lab} item={hero} size="large" /> : null}
+        </div>
+        <div className="rows">
+          {list.map((item) => (
+            <div
+              key={item.id}
+              className="rows__pick"
+              aria-current={item === hero}
+              onPointerEnter={() => setChosen(item.id)}
+              onFocus={() => setChosen(item.id)}
+            >
+              <Scaled lab={lab} item={item} size="compact" max={1.35} />
+            </div>
+          ))}
+        </div>
+      </section>
+      {tab !== 'inbox' ? <InboxRail lab={lab} items={lab.inbox.slice(0, 16)} /> : null}
+      <MoreButton>{tab === 'inbox' ? 'Inbox' : `All ${count(lab.counts.saved)}`}</MoreButton>
+    </div>
+  );
+};
+
+/* ---------- C. Big bento: the bento, with everything larger ---------- */
+
 function Cell({ lab, cell }: { lab: Lab; cell: BentoCell<LabItem> }) {
   const { kind, items } = cell;
   const card = (item: LabItem, size: CardSize, narrow = false) => (
@@ -70,233 +261,50 @@ function Cell({ lab, cell }: { lab: Lab; cell: BentoCell<LabItem> }) {
   return <div className={`zn-bento__cell zn-bento__cell--${kind}`}>{content}</div>;
 }
 
-/** How many columns fit: wide cards stay between about 300 and 430 across, on any screen. */
-function useColumns(widest: number) {
+const BigBento: Shell = ({ lab }) => {
+  const { tab, items, bar } = useTab(lab);
   const ref = useRef<HTMLDivElement>(null);
-  const [columns, setColumns] = useState(3);
+  const [layout, setLayout] = useState({ columns: 3, zoom: 1.35 });
   useLayoutEffect(() => {
     const box = ref.current;
     if (!box) return;
-    const measure = () =>
-      setColumns(Math.min(widest, Math.max(1, Math.ceil((box.clientWidth + 16) / 446))));
+    const measure = () => {
+      const style = getComputedStyle(box);
+      const width =
+        box.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      // Bigger cards on bigger screens: about 1.35x on a desktop, life-size on a phone.
+      const zoom = width > 1000 ? 1.35 : width > 600 ? 1.15 : 1;
+      setLayout({ zoom, columns: Math.max(1, Math.ceil((width / zoom + 16) / 446)) });
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(box);
     return () => observer.disconnect();
-  }, [widest]);
-  return [ref, columns] as const;
-}
-
-/** The package's bento packing at any column count, with room to slip something between bands. */
-function Bands(props: {
-  lab: Lab;
-  items: LabItem[];
-  canBeTall: (item: LabItem) => boolean;
-  between?: (afterBand: number) => ReactNode;
-}) {
-  const [ref, columns] = useColumns(6);
-  const bands = packBento(props.items, columns, props.canBeTall);
-  return (
-    <div ref={ref} className="zn-bento" style={{ '--zn-bento-columns': columns } as CSSProperties}>
-      {bands.map((band, index) => (
-        <Fragment key={band.cells[0]!.items[0]!.id}>
-          <div className={`zn-bento__band zn-bento__band--${band.height}`}>
-            {band.cells.map((cell) => (
-              <Cell key={cell.items[0]!.id} lab={props.lab} cell={cell} />
-            ))}
-          </div>
-          {props.between?.(index)}
-        </Fragment>
+  }, []);
+  const bands = packBento(items.slice(0, 60), layout.columns, () => false);
+  const bento = (from: number, to?: number) => (
+    <div
+      className="zn-bento"
+      style={{ '--zn-bento-columns': layout.columns, zoom: layout.zoom } as CSSProperties}
+    >
+      {bands.slice(from, to).map((band) => (
+        <div
+          key={band.cells[0]!.items[0]!.id}
+          className={`zn-bento__band zn-bento__band--${band.height}`}
+        >
+          {band.cells.map((cell) => (
+            <Cell key={cell.items[0]!.id} lab={lab} cell={cell} />
+          ))}
+        </div>
       ))}
     </div>
   );
-}
-
-/** The inbox, sideways. */
-function InboxRail({
-  lab,
-  items,
-  tone,
-}: {
-  lab: Lab;
-  items: LabItem[];
-  tone?: 'accent' | 'badge';
-}) {
-  const track = useRef<HTMLDivElement>(null);
-  const scroll = (direction: number) =>
-    track.current?.scrollBy({
-      left: direction * track.current.clientWidth * 0.8,
-      behavior: 'smooth',
-    });
   return (
-    <section className={tone ? `rail rail--${tone}` : 'rail'} aria-label="Inbox">
-      <header>
-        <h2>Inbox</h2>
-        <span className="rail__count">{count(lab.counts.inbox)}</span>
-        <button type="button" aria-label="Back" onClick={() => scroll(-1)}>
-          <ChevronLeft aria-hidden="true" />
-        </button>
-        <button type="button" aria-label="More" onClick={() => scroll(1)}>
-          <ChevronRight aria-hidden="true" />
-        </button>
-      </header>
-      <div className="rail__track" ref={track} tabIndex={0}>
-        {items.map((item) => (
-          <Card key={item.id} lab={lab} item={item} size="tile" />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-const icon = (Icon: typeof Play, label: string, extra?: string, current?: boolean) => (
-  <button
-    type="button"
-    className={extra}
-    aria-label={label}
-    title={label}
-    aria-current={current ? 'page' : undefined}
-  >
-    <Icon aria-hidden="true" />
-  </button>
-);
-
-/** Things in progress lead, then everything else, newest first. */
-function bookmarks(lab: Lab, limit: number) {
-  const started = new Set(lab.resume.map((item) => item.id));
-  const resume = lab.resume.slice(0, 4);
-  // Open on a picture: started things that have one go first.
-  const opening = [
-    ...resume.filter((item) => item.picture),
-    ...resume.filter((item) => !item.picture),
-  ];
-  return [...opening, ...lab.saved.filter((item) => !started.has(item.id))].slice(0, limit);
-}
-
-/* ---------- A. Plain: nothing but the bento ---------- */
-
-const formats: [ItemKind, typeof Play, string][] = [
-  ['article', BookOpen, 'Articles'],
-  ['video', Play, 'Videos'],
-  ['podcast', Headphones, 'Podcasts'],
-  ['post', MessageSquare, 'Posts'],
-];
-
-const Plain: Shell = ({ lab }) => {
-  const [kind, setKind] = useState<ItemKind>();
-  const items = bookmarks(lab, 400)
-    .filter((item) => !kind || item.kind === kind)
-    .slice(0, 72);
-  const inbox = lab.inbox.filter((item) => !kind || item.kind === kind);
-  return (
-    <div className="plain">
-      <header className="plain-top">
-        <span className="brand">Zine</span>
-        <div role="group" aria-label="Format">
-          {formats.map(([id, Icon, label]) => (
-            <button
-              key={id}
-              type="button"
-              aria-label={label}
-              title={label}
-              aria-pressed={kind === id}
-              onClick={() => setKind(kind === id ? undefined : id)}
-            >
-              <Icon aria-hidden="true" />
-            </button>
-          ))}
-        </div>
-        {icon(Search, 'Search')}
-      </header>
-      <Bands
-        lab={lab}
-        items={items}
-        canBeTall={() => false}
-        between={(index) =>
-          index === 0 && inbox.length > 3 ? (
-            <InboxRail lab={lab} items={inbox.slice(0, 16)} />
-          ) : index === 4 && inbox.length > 20 ? (
-            <InboxRail lab={lab} items={inbox.slice(16, 32)} />
-          ) : null
-        }
-      />
-      {icon(Plus, 'Save a link', 'fab')}
-    </div>
-  );
-};
-
-/* ---------- B. Mosaic: small, dense, picture-first ---------- */
-
-const Mosaic: Shell = ({ lab }) => {
-  const items = bookmarks(lab, 96);
-  let sinceTall = 3;
-  return (
-    <div className="mosaic">
-      <span className="brand">Zine</span>
-      <div className="mosaic-grid">
-        {items.map((item, index) => {
-          // Now and then, something worth reading gets a card two tiles high.
-          const tall = sinceTall >= 5 && readsTall(item) && (item.kind === 'post' || !item.picture);
-          sinceTall = tall ? 0 : sinceTall + 1;
-          return (
-            <Fragment key={item.id}>
-              {index === 10 ? (
-                <InboxRail lab={lab} items={lab.inbox.slice(0, 18)} tone="badge" />
-              ) : null}
-              {index === 52 ? (
-                <InboxRail lab={lab} items={lab.inbox.slice(18, 36)} tone="badge" />
-              ) : null}
-              <Card lab={lab} item={item} size={tall ? 'tall' : 'tile'} narrow />
-            </Fragment>
-          );
-        })}
-      </div>
-      <nav className="dock" aria-label="Destinations">
-        {icon(House, 'Home', undefined, true)}
-        {icon(Inbox, 'Inbox')}
-        {icon(LibraryBig, 'Library')}
-        {icon(Search, 'Search')}
-        {icon(Plus, 'Save a link', 'dock__save')}
-      </nav>
-    </div>
-  );
-};
-
-/* ---------- C. Lead: a front page with one big story ---------- */
-
-const Lead: Shell = ({ lab }) => {
-  const all = bookmarks(lab, 70);
-  // One lead story: the first save with both a picture and enough words gets the tall card.
-  const lead = all.slice(0, 8).find((item) => readsTall(item) && item.picture);
-  const items = lead ? [lead, ...all.filter((item) => item !== lead)] : all;
-  const canBeTall = (item: LabItem) => item === lead;
-  return (
-    <div className="lead">
-      <nav className="lead-nav" aria-label="Destinations">
-        <span className="brand">Z</span>
-        {icon(House, 'Home', undefined, true)}
-        {icon(Inbox, 'Inbox')}
-        {icon(LibraryBig, 'Library')}
-        {icon(Search, 'Search')}
-        {icon(Plus, 'Save a link', 'lead-nav__save')}
-      </nav>
-      <main className="lead-page">
-        <p className="lead-date">
-          {lab.now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-        </p>
-        <Bands
-          lab={lab}
-          items={items}
-          canBeTall={canBeTall}
-          between={(index) =>
-            index === 0 ? (
-              <InboxRail lab={lab} items={lab.inbox.slice(0, 16)} tone="accent" />
-            ) : index === 3 ? (
-              <InboxRail lab={lab} items={lab.inbox.slice(16, 32)} tone="accent" />
-            ) : null
-          }
-        />
-      </main>
+    <div className="page" ref={ref}>
+      {bar}
+      {bento(0, 1)}
+      {tab !== 'inbox' ? <InboxRail lab={lab} items={lab.inbox.slice(0, 16)} /> : null}
+      {bento(1)}
     </div>
   );
 };
@@ -304,9 +312,9 @@ const Lead: Shell = ({ lab }) => {
 /* ---------- The lab ---------- */
 
 const options: { id: string; name: string; Shell: Shell }[] = [
-  { id: 'plain', name: 'Plain', Shell: Plain },
-  { id: 'mosaic', name: 'Mosaic', Shell: Mosaic },
-  { id: 'lead', name: 'Lead', Shell: Lead },
+  { id: 'spotlight', name: 'Spotlight', Shell: Spotlight },
+  { id: 'browse', name: 'Browse', Shell: Browse },
+  { id: 'big-bento', name: 'Big bento', Shell: BigBento },
 ];
 
 function readHash() {
@@ -352,14 +360,32 @@ function App() {
           {dark ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
         </button>
       </header>
-      <div className="frame" key={current}>
-        {lab ? (
-          <option.Shell lab={lab} />
-        ) : (
-          <p className="lab-wait">
-            {failed ? 'Your saves did not load. Reload to try again.' : 'Loading…'}
-          </p>
-        )}
+      <div className="stage">
+        <div className="frame" key={current}>
+          {lab ? (
+            <option.Shell lab={lab} />
+          ) : (
+            <p className="lab-wait">
+              {failed ? 'Your saves did not load. Reload to try again.' : 'Loading…'}
+            </p>
+          )}
+        </div>
+        <nav className="edge" aria-label="Destinations">
+          <button type="button" className="edge__save" aria-label="Save a link">
+            <Plus aria-hidden="true" />
+          </button>
+          <div>
+            <button type="button" aria-label="Home" aria-current="page">
+              <House aria-hidden="true" />
+            </button>
+            <button type="button" aria-label="Inbox">
+              <Inbox aria-hidden="true" />
+            </button>
+            <button type="button" aria-label="Search">
+              <Search aria-hidden="true" />
+            </button>
+          </div>
+        </nav>
       </div>
     </div>
   );

@@ -112,11 +112,14 @@ def all_items():
 
 enrich()
 
+# The newest saves can be shown large, so their pictures are kept bigger.
+big = {item['id'] for section in data['home']['sections'] for item in section['cards']}
+big |= {item['id'] for item in data['saved'][:56]} | {item['id'] for item in data['posts'][:8]}
 wanted = {}
 for item in every_item():
     c = item['content']
     if str(c.get('thumbnail', '')).startswith('https://'):
-        wanted[c['thumbnail']] = 480
+        wanted[c['thumbnail']] = max(wanted.get(c['thumbnail'], 0), 880 if item['id'] in big else 480)
     if str(c.get('creatorImageUrl', '')).startswith('https://'):
         wanted.setdefault(c['creatorImageUrl'], 56)
 
