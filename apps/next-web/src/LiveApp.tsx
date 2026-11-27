@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ArrowUpRight, Archive, Check, LogOut, RefreshCw, Sparkles, WifiOff } from 'lucide-react';
-import { Header } from './Feed';
 import { DestinationNav, readDestination } from './DestinationNav';
 import type { Destination } from './DestinationNav';
 import { BentoFeed } from './HomeFeed';
-import { BentoHome } from './BentoHome';
-import { headlines, progress, resumeLabel, safeURL, timestamp } from './model';
+import { SpotlightHome } from './SpotlightHome';
+import { LibraryTabs } from './LibraryTabs';
+import { progress, resumeLabel, safeURL, timestamp } from './model';
 import type { Item, Section } from './model';
 import { API, ServiceError, apiOrigin, appURL, message } from './live-api';
 import type { RemoteItem, Collection, Material, Home } from './live-api';
@@ -222,6 +222,7 @@ function Library({ identity, signOut }: { identity: Identity; signOut: () => Pro
   const [cachedAt, setCachedAt] = useState<number>();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [home, setHome] = useState<Home>();
+  const [inbox, setInbox] = useState<RemoteItem[]>([]);
   const [panel, setPanel] = useState<string | null>(readPanel);
   const [current, setCurrent] = useState<RemoteItem>();
   const [busy, setBusy] = useState(false);
@@ -372,10 +373,12 @@ function Library({ identity, signOut }: { identity: Identity; signOut: () => Pro
       stopped = true;
     };
   }, [section, owner, revision, destination, isSearch, isInbox, snapshotKey, query]);
-  const onHome = destination === 'Home' && section === 'Home';
-  // Home's composed edition loads beside the library page; the library fills whatever it leaves.
+  const onHome = destination === 'Home';
+  const showFilters = onHome || destination === 'Library';
+  // Home's edition (what you have started, and the counts beside the filters) loads beside the
+  // library page; the library fills the rest of Home.
   useEffect(() => {
-    if (!onHome) return;
+    if (!showFilters) return;
     let stopped = false;
     void (async () => {
       try {
@@ -396,6 +399,35 @@ function Library({ identity, signOut }: { identity: Identity; signOut: () => Pro
         }
       } catch {
         // The library page still fills Home; its own errors are reported by the feed load.
+      }
+    })();
+    return () => {
+      stopped = true;
+    };
+  }, [showFilters, owner, revision]);
+  // The first inbox page, for Home's sideways rail. It shares the Inbox destination's saved copy.
+  useEffect(() => {
+    if (!onHome) return;
+    let stopped = false;
+    void (async () => {
+      try {
+        const cached = await readSnapshot(owner, 'Inbox');
+        if (!stopped && cached) setInbox(cached.items);
+      } catch {
+        cacheFailure();
+      }
+      if (!navigator.onLine) return;
+      try {
+        const page = await api.list('Home', undefined, 'received');
+        if (stopped) return;
+        setInbox(page.items);
+        try {
+          await writeSnapshot({ owner, section: 'Inbox', ...page, savedAt: Date.now() });
+        } catch {
+          cacheFailure();
+        }
+      } catch {
+        // Home works without the rail; the Inbox destination reports its own errors.
       }
     })();
     return () => {
@@ -612,24 +644,29 @@ function Library({ identity, signOut }: { identity: Identity; signOut: () => Pro
   return (
     <>
       <div className="destination-shell" inert={!!panel}>
-        <DestinationNav current={destination} choose={chooseDestination} />
-        <Header
-          allLabel
-          showFilters={!isInbox && !isSearch}
-          section={section}
-          choose={(next) => {
-            if (next !== section) {
-              setItems([]);
-              setLoading(true);
-              setSection(next);
-              navigator.vibrate?.(8);
-            }
-          }}
+        <DestinationNav
+          current={destination}
+          choose={chooseDestination}
           capture={() => navigate('capture')}
         />
-        <main className={onHome ? 'page page--bento' : 'page'} id="main-content">
+        <main className={onHome ? 'page page--spotlight' : 'page'} id="main-content">
+          {showFilters && (
+            <LibraryTabs
+              section={section}
+              counts={home?.counts}
+              openInbox={() => chooseDestination('Inbox')}
+              choose={(next) => {
+                if (next !== section) {
+                  setItems([]);
+                  setLoading(true);
+                  setSection(next);
+                  navigator.vibrate?.(8);
+                }
+              }}
+            />
+          )}
           <div className="heading-row">
-            <h1>{destination === 'Home' ? headlines[section] : destination}</h1>
+            <h1 className={onHome ? 'sr-only' : undefined}>{destination}</h1>
           </div>
           {isSearch && (
             <form
@@ -684,9 +721,16 @@ function Library({ identity, signOut }: { identity: Identity; signOut: () => Pro
               )}
             </div>
           )}
-          {cards.length > 0 || (onHome && home?.sections.length) ? (
+          {cards.length > 0 || (onHome && section === 'Home' && home?.sections.length) ? (
             onHome ? (
-              <BentoHome home={home} items={items} open={navigate} />
+              <SpotlightHome
+                home={home}
+                items={items}
+                inbox={inbox}
+                section={section}
+                open={navigate}
+                openInbox={() => chooseDestination('Inbox')}
+              />
             ) : (
               <BentoFeed
                 cards={cards}

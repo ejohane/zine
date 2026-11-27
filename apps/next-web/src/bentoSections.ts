@@ -1,12 +1,5 @@
 import type { CardItem, ItemKind } from '@zine/next-ui';
-import type { Home, HomeCard, RemoteItem } from './live-api';
-
-/** One Home section, ready for the card components. */
-export interface BentoSection {
-  id: string;
-  title: string;
-  items: CardItem[];
-}
+import type { HomeCard } from './live-api';
 
 const https = (value?: string) => (value?.startsWith('https://') ? value : undefined);
 
@@ -23,15 +16,23 @@ const handleOf = (url: string) =>
 
 function fraction({ position, unit, completedAt }: HomeCard['progress'], seconds?: number) {
   if (completedAt || position === null || position <= 0) return undefined;
+  // Reading progress arrives as a fraction labelled "seconds"; with no length to divide by, a
+  // position under one can only be that fraction.
   const value =
-    unit === 'fraction' ? position : unit === 'seconds' && seconds ? position / seconds : undefined;
+    unit === 'fraction'
+      ? position
+      : unit === 'seconds' && seconds
+        ? position / seconds
+        : unit === 'seconds' && position < 1
+          ? position
+          : undefined;
   return value === undefined ? undefined : Math.min(1, Math.max(0, value));
 }
 
 /**
- * A Home card as a card item. `/v1/home` does not say how big a picture is, so every picture
- * starts with the usual shape for its kind (square for podcasts, 16:9 otherwise); the page
- * corrects post pictures once they load. Unsupported types return null.
+ * A Home card or library item as a card item. The API does not say how big a picture is, so
+ * every picture starts with the usual shape for its kind (square for podcasts, 16:9 otherwise);
+ * the page corrects post pictures once they load. Unsupported types return null.
  */
 export function toCardItem({ id, savedAt, progress, content }: HomeCard): CardItem | null {
   const kind = kindOf(content.type);
@@ -70,41 +71,4 @@ export function toCardItem({ id, savedAt, progress, content }: HomeCard): CardIt
     savedAt: savedAt ?? undefined,
     progress: fraction(progress, seconds),
   };
-}
-
-const shown = (cards: HomeCard[]) =>
-  cards.map(toCardItem).filter((item): item is CardItem => item !== null);
-
-/**
- * Home as bento sections: the sections `/v1/home` composed, then whatever else of the loaded
- * library they did not use. Before Home has loaded (or offline without a saved copy), the
- * library stands in with the same two opening sections.
- */
-export function toBentoSections(home: Home | undefined, library: RemoteItem[]): BentoSection[] {
-  const open = library.filter(
-    (item) => item.status === 'saved' && !item.archived && !item.progress.completedAt
-  );
-  const composed = home?.sections.length
-    ? home.sections.map((section) => ({
-        id: section.id,
-        title: section.title,
-        items: shown(section.cards),
-      }))
-    : [
-        {
-          id: 'resume',
-          title: 'Jump back in',
-          items: shown(open.filter((item) => (item.progress.position ?? 0) > 0).slice(0, 3)),
-        },
-      ];
-  const used = new Set(composed.flatMap((section) => section.items.map((item) => item.id)));
-  const rest = shown(open.filter((item) => !used.has(item.id)));
-  return [
-    ...composed,
-    {
-      id: 'library',
-      title: home?.sections.length ? 'More from your library' : 'Just saved',
-      items: rest,
-    },
-  ].filter((section) => section.items.length > 0);
 }

@@ -115,7 +115,8 @@ a rail of tiles; a wide grid) are examples, not a spec. How an agent chooses siz
 
 ## Bento layout and Home (25 Nov 2026)
 
-Built in `packages/next-ui` (`Bento`, `packBento`). It is the Home of `apps/next-web`, fed by the
+Built in `packages/next-ui` (`Bento`, `packBento`). It was the Home of `apps/next-web` until the
+Spotlight Home below replaced it on 27 Nov 2026. It was fed by the
 real `/v1/home`; the earlier Home (serif plates, phone edition) is removed. Erik asked for the
 screen and left the decisions to Claude; none of the rules below have been reviewed yet.
 
@@ -148,6 +149,31 @@ screen and left the decisions to Claude; none of the rules below have been revie
 Known gaps: `/v1/home` has no picture sizes (post pictures are measured after loading), no quoted
 post or link fields, and at most 700 characters of text, so tall cards can end with empty space.
 Home has only been seen with made-up data in a local browser, not with a real account.
+
+## Spotlight Home (27 Nov 2026)
+
+Erik found the bento Home too busy once it was live and chose this from a second round of
+options (kept in `apps/next-web/design-lab`), after an Apple Health screenshot as inspiration:
+much empty space, one big thing, a short list beside it. It replaces the bento as the Home of
+`apps/next-web` (`SpotlightHome.tsx`); `Bento` stays in `packages/next-ui` but no app uses it.
+
+- **Blocks of four.** Saves keep their order and are taken four at a time: one Large card beside
+  three Compact rows, 1px rules between the rows, sides swapping from block to block. The first
+  item with a picture in each four is the big one. Upright screens stack the big card over its rows.
+- **Cards are magnified, not redesigned.** A card is laid out at its designed width and enlarged
+  whole (up to 2.1x for the big card, 1.5x for rows), so every proportion holds. Never smaller
+  than designed: a phone shows cards life-size at full width.
+- **What leads.** Up to four things you have started, those with a picture first, then open saves.
+- **The inbox is a sideways rail** of Tiles after the first block, under "Inbox" and its count.
+- **Tabs carry numbers.** All, Articles, Videos, Podcasts, Posts and Inbox, each with how many it
+  holds, the chosen one ink on canvas flipped. No page heading and no section titles.
+- **Navigation floats.** A dark pill of four icons with the orange Save above it, at the right
+  edge on wide screens and along the bottom on upright ones. The current place is orange.
+- **Orange** marks Save, the current place, tab icons, what is left of something started, and the
+  inbox count. Nothing else.
+
+Not yet reviewed in the live app with a real account. Library, Inbox and Search still use the
+older feeds and cards.
 
 ## Open questions
 

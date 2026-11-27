@@ -155,6 +155,8 @@ saved are computed from the current library. Editorial sections contain a
 title and ordered cards. Completion, archive, deletion, ownership, and format
 eligibility are checked during every read. Live sections win duplicate cards.
 A collection is omitted when fewer than two eligible cards survive.
+It also returns `counts` for clients that label their filters with numbers:
+`saved` and `inbox` totals and `savedByType`, all over unarchived items.
 
 `POST /v1/home/preview` renders an unpublished draft through the same
 assembler. Both read operations require `library:read` for personal tokens.

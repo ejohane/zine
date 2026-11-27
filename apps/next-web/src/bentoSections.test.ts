@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { toBentoSections, toCardItem } from './bentoSections';
-import type { HomeCard, RemoteItem } from './live-api';
+import { toCardItem } from './bentoSections';
+import type { HomeCard } from './live-api';
 
 const card = (content: Partial<HomeCard['content']>, more: Partial<HomeCard> = {}): HomeCard => ({
   id: 'item-1',
@@ -84,42 +84,14 @@ describe('Home cards as card items', () => {
     expect(toCardItem(card({ url: 'not a link' }))).toBeNull();
   });
 
-  const saved = (id: string, position: number | null = null) =>
-    ({
-      ...card({}, { id, progress: { position, unit: 'fraction', completedAt: null } }),
-      status: 'saved',
-      archived: false,
-    }) as unknown as RemoteItem;
-
-  test('sections keep their order, empty ones drop out, and unused library items follow', () => {
-    const sections = toBentoSections(
-      {
-        editionId: null,
-        generatedAt: null,
-        sections: [
-          { id: 'resume', kind: 'resume', title: 'Jump back in', cards: [card({}, { id: 'a' })] },
-          { id: 'empty', kind: 'collection', title: 'None', cards: [card({ type: 'playlist' })] },
-          { id: 'recent', kind: 'recent', title: 'Just saved', cards: [card({}, { id: 'b' })] },
-        ],
-      },
-      [saved('a'), saved('c'), { ...saved('d'), archived: true }]
+  test('reading progress labelled seconds with no length is read as the fraction it is', () => {
+    const reading = toCardItem(
+      card({ readMinutes: 10 }, { progress: { position: 0.2, unit: 'seconds', completedAt: null } })
     );
-    expect(
-      sections.map((section) => [section.title, section.items.map((item) => item.id)])
-    ).toEqual([
-      ['Jump back in', ['a']],
-      ['Just saved', ['b']],
-      ['More from your library', ['c']],
-    ]);
-  });
-
-  test('without Home, the library stands in', () => {
-    const sections = toBentoSections(undefined, [saved('a'), saved('b', 0.4), saved('c')]);
-    expect(
-      sections.map((section) => [section.title, section.items.map((item) => item.id)])
-    ).toEqual([
-      ['Jump back in', ['b']],
-      ['Just saved', ['a', 'c']],
-    ]);
+    expect(reading?.progress).toBe(0.2);
+    const unknown = toCardItem(
+      card({}, { progress: { position: 95, unit: 'seconds', completedAt: null } })
+    );
+    expect(unknown?.progress).toBeUndefined();
   });
 });

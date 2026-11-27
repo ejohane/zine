@@ -228,8 +228,30 @@ async function liveIds(env: Env, owner: string, resume: boolean) {
   return rows.map((row) => row.id);
 }
 
+/**
+ * How much the library holds, for clients that label their filters with numbers: open saves by
+ * content type, and what is waiting in the inbox.
+ */
+async function libraryCounts(env: Env, owner: string) {
+  const { results } = await stmt(
+    env.DB,
+    `SELECT status,COALESCE(content_type,'unknown') AS type,COUNT(*) AS count FROM personal_items
+     WHERE owner_id=? AND status IN ('saved','received') AND archived=0 GROUP BY status,type`,
+    owner
+  ).all<{ status: string; type: string; count: number }>();
+  const counts = { saved: 0, inbox: 0, savedByType: {} as Record<string, number> };
+  for (const { status, type, count } of results) {
+    if (status === 'received') counts.inbox += count;
+    else {
+      counts.saved += count;
+      counts.savedByType[type] = count;
+    }
+  }
+  return counts;
+}
+
 export async function getHome(env: Env, owner: string, preview?: HomeDraft) {
-  const [row, resumeIds, recentIds] = await Promise.all([
+  const [row, resumeIds, recentIds, counts] = await Promise.all([
     preview
       ? null
       : stmt(
@@ -239,6 +261,7 @@ export async function getHome(env: Env, owner: string, preview?: HomeDraft) {
         ).first<{ id: string; generated_at: string; sections_json: string }>(),
     liveIds(env, owner, true),
     liveIds(env, owner, false),
+    libraryCounts(env, owner),
   ]);
   const edition = preview
     ? { id: 'preview', generatedAt: now(), draft: preview }
@@ -258,12 +281,15 @@ export async function getHome(env: Env, owner: string, preview?: HomeDraft) {
       const card = hydrated.get(itemId);
       return card ? [card] : [];
     });
-  return assembleHome(
-    edition,
-    cards(resumeIds).filter((card) => (card.progress.position ?? 0) > 0),
-    cards(recentIds),
-    hydrated
-  );
+  return {
+    ...assembleHome(
+      edition,
+      cards(resumeIds).filter((card) => (card.progress.position ?? 0) > 0),
+      cards(recentIds),
+      hydrated
+    ),
+    counts,
+  };
 }
 
 export async function publishHome(

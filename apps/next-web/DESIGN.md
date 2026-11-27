@@ -44,3 +44,9 @@ system typography **for Home** (format filters keep the native bento in `BentoFe
 - Visual check without the API: an ignored, machine-local harness can live in `output/` and is
   served by `bun run dev` (one existed on Erik's Mac at `output/home-preview/`; it is not in git).
   Prefer `local:pull` data or a branch preview for real checks.
+
+## Spotlight Home — 2026-11-27
+
+Erik replaced the bento Home with "Spotlight" and the sidebar with a floating navigation pill;
+the rules are in `packages/next-design/DESIGN.md`. This supersedes the floating filter strip, the
+collapsible sidebar and the mobile drawer above. Other destinations keep their older feeds.

@@ -3,6 +3,19 @@
 Last reviewed: 2026-11-09 UTC. This file records observed state, not a substitute
 for current checks. Read `../AGENTS.md`, inspect git status, then run `bun run doctor`.
 
+## Spotlight Home and library counts (2026-11-27, not yet released)
+
+- Branch `claude/modest-pascal-6um70x`. Nothing was deployed from this session.
+- `GET /v1/home` (and `/v1/home/preview`) now also return `counts`: `saved`, `inbox` and
+  `savedByType` (open, unarchived items by content type). One grouped query in `getHome`
+  (`src/home.ts`); covered in `test/home.test.ts` and the OpenAPI `Home` schema.
+- `apps/next-web` Home is now "Spotlight" (see `apps/next-web/AGENTS.md`). The web app reads
+  `counts` when present, so either side can ship first.
+- `scripts/local-restore.py` opens SQLite with `uri=True`; `local:pull` failed on Linux without it.
+- Checked in a local browser against `local:pull` data from a backup taken 2026-11-27 01:53 UTC.
+  Not checked: a signed-in production or preview session, Safari, or the installed PWA.
+- **Next action:** Erik reviews the branch; label a PR `preview` to try it with a real sign-in.
+
 ## Image proxy, card image fallbacks and web article images (2026-11-26, not yet released)
 
 - Branch `zine-next-image-fixes` (PR #483). Nothing was deployed from this session.

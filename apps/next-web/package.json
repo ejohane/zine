@@ -10,7 +10,7 @@
     "preview": "vite preview --host 0.0.0.0 --port 4194 --strictPort",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src scripts --ext .ts,.tsx,.mjs",
-    "test": "bun test src/model.test.ts src/live-api.test.ts src/bentoSections.test.ts src/DestinationNav.test.tsx"
+    "test": "bun test src/model.test.ts src/live-api.test.ts src/bentoSections.test.ts src/spotlight.test.ts src/DestinationNav.test.tsx"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.3.0",
