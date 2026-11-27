@@ -15,9 +15,11 @@ legacy web app as part of these experiments.
   pill on 2026-11-27 and asked for the sidebar back the same day. `spotlight-home.css` holds
   both and points the app's colour and font variables at the Zine Next tokens; do not add a
   second palette. Library, Inbox and Search keep their older feeds.
-- Look at Home before calling a layout change done, at the sizes Erik uses: iPad landscape
-  (about 1000 and 1180 wide) with the sidebar open and collapsed, plus a desktop, a portrait
-  tablet and a phone. Two columns must survive every landscape size; a 2026-11-27 change that
+- Look at Home before calling a layout change done, at the sizes Erik uses: his iPad mini in
+  Safari is about 676 wide upright (not the nominal 744) and about 1000 wide in landscape, with
+  roughly 140 of height lost to Safari's bars; check the sidebar open and collapsed, plus a
+  larger iPad (1180), a desktop and a phone. When a screenshot from him disagrees with a local
+  render, measure his screenshot rather than assume the device's nominal size. Two columns must survive every landscape size; a 2026-11-27 change that
   was only checked at 1440 and on a phone collapsed Home to one column on his iPad.
 - Erik authorized production-account integration on 2026-11-10. The connected
   app uses real Clerk sessions and the independent production `/v1` service.
