@@ -172,10 +172,15 @@
 }
 
 .zn-card__title {
+  /* Titles are set tight, so the last line's descenders ("g", "y") hang below its line box and
+     the clamp would cut them. A sliver of padding, taken back out of the margin, keeps them
+     whole without moving anything. */
+  --zn-card-title-tail: 0.08em;
   display: -webkit-box;
   flex-shrink: 0;
   overflow: hidden;
-  margin: 0 0 6px;
+  margin: 0 0 calc(6px - var(--zn-card-title-tail));
+  padding-bottom: var(--zn-card-title-tail);
   color: var(--zn-color-ink);
   font: var(--zn-card-title);
   letter-spacing: -0.03em;
@@ -185,7 +190,7 @@
 }
 
 .zn-card--compact .zn-card__title {
-  margin-bottom: 2px;
+  margin-bottom: calc(2px - var(--zn-card-title-tail));
 }
 
 .zn-card__creator {
@@ -218,6 +223,8 @@
 .zn-card__name {
   flex-shrink: 0;
   max-width: 100%;
+  /* Room for descenders: the row's own line height is 1, which would clip them here. */
+  line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -225,6 +232,7 @@
 
 .zn-card__handle {
   min-width: 0;
+  line-height: 1.35;
   overflow: hidden;
   color: var(--zn-color-muted);
   font-weight: 400;
