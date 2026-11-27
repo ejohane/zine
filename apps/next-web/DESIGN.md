@@ -47,6 +47,7 @@ system typography **for Home** (format filters keep the native bento in `BentoFe
 
 ## Spotlight Home — 2026-11-27
 
-Erik replaced the bento Home with "Spotlight" and the sidebar with a floating navigation pill;
-the rules are in `packages/next-design/DESIGN.md`. This supersedes the floating filter strip, the
-collapsible sidebar and the mobile drawer above. Other destinations keep their older feeds.
+Erik replaced the bento Home with "Spotlight"; the rules are in
+`packages/next-design/DESIGN.md`. This supersedes the floating filter strip above. Navigation is
+the collapsible left sidebar (drawer on upright screens) with Save at its top; a floating pill was
+tried and dropped the same day. Other destinations keep their older feeds.

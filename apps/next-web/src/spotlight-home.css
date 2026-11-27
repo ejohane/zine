@@ -24,16 +24,21 @@
 
 /* ----- The page ----- */
 
-/* Room for the floating navigation: at the right edge on wide screens, along the bottom on
-   upright ones. */
+/* Beside the sidebar the page starts at the top. On upright screens the menu button sits above
+   it, in the page's flow, and takes the page's top padding. */
 .destination-shell .page {
   --page-left: max(30px, env(safe-area-inset-left));
-  --page-right: max(104px, env(safe-area-inset-right));
-  padding: calc(20px + env(safe-area-inset-top)) var(--page-right)
-    max(44px, env(safe-area-inset-bottom)) var(--page-left);
+  --page-right: max(30px, env(safe-area-inset-right));
+  padding: 8px var(--page-right) max(44px, env(safe-area-inset-bottom)) var(--page-left);
+}
+@media (min-width: 720px) and (orientation: landscape) {
+  .destination-shell .page {
+    padding-top: calc(20px + env(safe-area-inset-top));
+  }
 }
 .destination-shell .page.page--spotlight {
   --page-left: max(48px, env(safe-area-inset-left));
+  --page-right: max(48px, env(safe-area-inset-right));
   max-width: 1720px;
 }
 .destination-shell .heading-row:has(.sr-only) {
@@ -44,21 +49,27 @@
   letter-spacing: var(--zn-tracking-display);
 }
 .sp-tabs :focus-visible,
-.sp-home :focus-visible,
-.edge-nav :focus-visible {
+.sp-home :focus-visible {
   outline: 2px solid var(--zn-color-accent);
   outline-offset: 2px;
 }
 
 /* ----- Filters that say how much is behind them ----- */
+/* The row runs to both page edges and scrolls sideways when the tabs do not fit; the auto margins
+   on its ends centre it when they do, without hiding the first tab when they do not. */
 .sp-tabs {
   display: flex;
   gap: 10px;
-  width: fit-content;
-  max-width: calc(100% + var(--page-left) + var(--page-right));
-  margin: 0 auto 40px;
+  margin: 0 calc(-1 * var(--page-right)) 40px calc(-1 * var(--page-left));
+  padding-inline: var(--page-left) var(--page-right);
   overflow-x: auto;
   scrollbar-width: none;
+}
+.sp-tabs > :first-child {
+  margin-left: auto;
+}
+.sp-tabs > :last-child {
+  margin-right: auto;
 }
 .sp-tabs::-webkit-scrollbar {
   display: none;
@@ -243,88 +254,234 @@
   font: 500 19px/1 var(--zn-font);
 }
 
-/* ----- Navigation: a small floating pill, Save above it ----- */
-.edge-nav {
-  position: fixed;
-  right: max(20px, env(safe-area-inset-right));
-  bottom: max(24px, env(safe-area-inset-bottom));
-  z-index: 11;
+/* ----- Navigation: an icon rail that expands to a labelled sidebar; a menu and drawer when upright.
+   It sits on the page with no dividing line or panel of its own, and stays quiet: muted items,
+   the current one marked by weight and an orange icon, Save as a small orange circle. ----- */
+.destination-shell {
+  --destination-width: 148px;
+}
+.destination-sidebar {
+  display: none;
+}
+.destination-brand {
+  margin: 0 11px 18px;
+  font-size: 1.5rem;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+}
+.destination-sidebar-header {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 18px;
 }
-.edge-nav nav {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 6px;
-  border: 1px solid var(--zn-color-raised-outline);
-  border-radius: var(--zn-radius-pill);
-  background: var(--zn-color-raised);
+.destination-sidebar-header .destination-brand {
+  margin-bottom: 0;
 }
-.edge-nav button {
+.destination-toggle {
+  color: var(--zn-color-outline);
+}
+.destination-toggle:hover {
+  color: var(--zn-color-ink);
+}
+.destination-toggle svg {
+  width: 19px;
+  height: 19px;
+}
+.destination-links {
   display: grid;
-  place-items: center;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  color: var(--zn-color-on-raised-muted);
+  gap: 4px;
 }
-.edge-nav button svg {
-  width: 24px;
-  height: 24px;
+.destination-links button,
+.destination-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  border-radius: 12px;
+  padding: 0 11px;
+  text-align: left;
 }
-.edge-nav button:hover {
-  color: var(--zn-color-on-raised);
+.destination-links button {
+  color: var(--zn-color-muted);
+  font-weight: 600;
 }
-.edge-nav button[aria-current='page'] {
-  color: var(--zn-color-accent);
+.destination-links button:hover {
+  color: var(--zn-color-ink);
 }
-.edge-nav .edge-nav__save {
-  width: 64px;
-  height: 64px;
-  background: var(--zn-color-accent);
-  color: var(--zn-color-on-accent);
+.destination-links button[aria-current='page'] {
+  color: var(--zn-color-ink);
+}
+.destination-links button[aria-current='page'] svg {
+  color: var(--zn-color-accent-text);
+}
+.destination-links svg,
+.destination-trigger svg {
+  width: 19px;
+  height: 19px;
+  flex: none;
+}
+/* Upright screens: one menu button at the top of the page. It is not pinned; it scrolls away. */
+.destination-mobile {
+  display: flex;
+  padding: calc(10px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 0
+    max(16px, env(safe-area-inset-left));
+}
+.destination-mobile .destination-trigger {
+  justify-content: center;
+  width: 44px;
+  padding: 0;
+  color: var(--zn-color-ink);
+}
+.destination-mobile .destination-trigger svg {
+  width: 22px;
+  height: 22px;
 }
 
-/* ----- Upright screens ----- */
+.destination-drawer {
+  inset: 0 auto 0 0;
+  width: min(270px, 82vw);
+  height: 100dvh;
+  max-height: none;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--ink);
+  background: var(--paper);
+}
+.destination-drawer::backdrop {
+  background: rgb(0 0 0 / 0.55);
+}
+.destination-drawer-body {
+  padding: max(16px, env(safe-area-inset-top)) 12px 20px;
+}
+.destination-drawer-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.destination-drawer-title .destination-brand {
+  margin-bottom: 0;
+}
+@media (min-width: 720px) and (orientation: landscape) {
+  .destination-shell {
+    margin-left: var(--destination-width);
+  }
+  .destination-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    display: block;
+    width: var(--destination-width);
+    padding: 22px 10px;
+    overflow: auto;
+  }
+  .destination-mobile {
+    display: none;
+  }
+  .destination-shell:has(.destination-sidebar[data-collapsed='true']) {
+    --destination-width: 72px;
+  }
+  .destination-sidebar[data-collapsed='true'] .destination-sidebar-header {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .destination-sidebar[data-collapsed='true'] .destination-brand {
+    margin-inline: 0;
+  }
+  .destination-sidebar[data-collapsed='true'] .destination-links button {
+    justify-content: center;
+    padding: 0;
+  }
+  .destination-sidebar[data-collapsed='true'] .destination-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+.destination-drawer {
+  background: var(--zn-color-canvas);
+}
+.destination-save {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  margin-bottom: 14px;
+  border-radius: var(--zn-radius-pill);
+  background: var(--zn-color-accent);
+  color: var(--zn-color-on-accent);
+  font: 700 15px/1 var(--zn-font);
+}
+.destination-save svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+.destination-drawer .destination-save {
+  margin-bottom: 12px;
+}
+/* In the sidebar Save is a small circle in both states; its name stays for screen readers. */
+.destination-sidebar .destination-save {
+  width: 44px;
+  margin: 0 0 16px 4px;
+  border-radius: 50%;
+}
+.destination-sidebar .destination-save .destination-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@media (min-width: 720px) and (orientation: landscape) {
+  .destination-sidebar[data-collapsed='true'] .destination-save {
+    margin-inline: auto;
+  }
+  .destination-sidebar[data-collapsed='true'] .destination-links button[aria-current='page'] {
+    color: var(--zn-color-accent-text);
+  }
+}
+
+/* ----- The big card sits over its rows only when there is no room beside it -----
+   Tablets keep the two columns in both orientations. Erik's iPad mini is about 676 wide upright
+   in Safari (628 of page), narrower than the device's nominal 744, so the two columns have to
+   hold well below that; they tighten a little there. Only a page as narrow as a phone stacks. */
+@container (max-width: 720px) {
+  .sp-spread {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 28px;
+  }
+  .sp-home {
+    gap: 56px;
+  }
+}
+@container (max-width: 540px) {
+  .sp-spread {
+    grid-template-columns: minmax(0, 1fr);
+    gap: clamp(40px, 6cqw, 112px);
+  }
+  .sp-spread--flip > :first-child {
+    order: 0;
+  }
+}
 @media (max-width: 900px) {
   .destination-shell .page,
   .destination-shell .page.page--spotlight {
     --page-left: max(24px, env(safe-area-inset-left));
     --page-right: max(24px, env(safe-area-inset-right));
-    padding-bottom: calc(130px + env(safe-area-inset-bottom));
   }
   .sp-tabs {
-    margin-inline: calc(-1 * var(--page-left)) calc(-1 * var(--page-right));
-    padding-inline: var(--page-left) var(--page-right);
     margin-bottom: 28px;
-  }
-  .sp-home {
-    gap: 56px;
-  }
-  .sp-spread {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .sp-spread--flip > :first-child {
-    order: 0;
-  }
-  .edge-nav {
-    right: 50%;
-    flex-direction: row-reverse;
-    transform: translateX(50%);
-  }
-  .edge-nav nav {
-    flex-direction: row;
-  }
-  .edge-nav button {
-    width: 48px;
-    height: 48px;
-  }
-  .edge-nav .edge-nav__save {
-    width: 56px;
-    height: 56px;
   }
 }
 @media (max-width: 520px) {

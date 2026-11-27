@@ -79,6 +79,9 @@ to see every card rendered from the sample saves.
   a tinted panel) so tiles still line up. This placeholder is provisional.
 - **Compact pictures:** things you play (video, podcast) keep the picture on the left; things you
   read (article, post) keep it on the right.
+- **Compact footer (27 Nov 2026):** the footer runs across the whole card, under the picture, so
+  the three dots are always at the right edge. The card keeps its 84 height, so the picture is as
+  tall as the text above the footer (58) rather than the whole card.
 - **Posts:** a post with no title starts with its creator line. Wide media goes under the words;
   tall media goes beside them at Large size and sits whole on a tinted panel elsewhere. A quoted
   post sits in a tinted panel, and shows its own picture only on the Tall card. A link gets a
@@ -159,7 +162,10 @@ much empty space, one big thing, a short list beside it. It replaces the bento a
 
 - **Blocks of four.** Saves keep their order and are taken four at a time: one Large card beside
   three Compact rows, 1px rules between the rows, sides swapping from block to block. The first
-  item with a picture in each four is the big one. Upright screens stack the big card over its rows.
+  item with a picture in each four is the big one. Tablets keep the two columns upright as well
+  as in landscape, at the cards' designed size; only a phone stacks the big card over its rows.
+  (A version with the big card across the top of an upright tablet was built on 27 Nov 2026 and
+  dropped the same day: it filled the screen with one item.)
 - **Cards are magnified, not redesigned.** A card is laid out at its designed width and enlarged
   whole (up to 2.1x for the big card, 1.5x for rows), so every proportion holds. Never smaller
   than designed: a phone shows cards life-size at full width.
@@ -167,8 +173,12 @@ much empty space, one big thing, a short list beside it. It replaces the bento a
 - **The inbox is a sideways rail** of Tiles after the first block, under "Inbox" and its count.
 - **Tabs carry numbers.** All, Articles, Videos, Podcasts, Posts and Inbox, each with how many it
   holds, the chosen one ink on canvas flipped. No page heading and no section titles.
-- **Navigation floats.** A dark pill of four icons with the orange Save above it, at the right
-  edge on wide screens and along the bottom on upright ones. The current place is orange.
+- **Navigation is a quiet icon rail** on the left that expands to a labelled sidebar and
+  remembers the choice. It sits on the page with no dividing line or panel: muted items, the
+  current one marked by an orange icon (and by weight when expanded), Save as a small orange
+  circle at the top. Upright screens get a single menu button at the top of the page, which
+  scrolls away, and a drawer that holds Save and the destinations. A floating pill and a boxed
+  sidebar with a wide Save button were both tried on 27 Nov 2026 and dropped.
 - **Orange** marks Save, the current place, tab icons, what is left of something started, and the
   inbox count. Nothing else.
 

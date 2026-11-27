@@ -77,7 +77,17 @@ describe('pictures', () => {
     }
     for (const item of [f.article, f.postWideVideo]) {
       const markup = html(item, 'compact');
-      expect(at(markup, 'zn-card__thumb')).toBeGreaterThan(at(markup, 'zn-card__footer'));
+      expect(at(markup, 'zn-card__thumb')).toBeGreaterThan(at(markup, 'zn-card__text'));
+    }
+  });
+
+  test('compact: the footer runs under the picture, across the whole card', () => {
+    for (const item of [f.video, f.podcast, f.article, f.postWideVideo]) {
+      const markup = html(item, 'compact');
+      const row = markup.slice(at(markup, 'zn-card__row'), at(markup, 'zn-card__footer'));
+      expect(row).toContain('zn-card__thumb');
+      expect(row).toContain('zn-card__text');
+      expect(at(markup, 'zn-card__footer')).toBeGreaterThan(at(markup, 'zn-card__thumb'));
     }
   });
 

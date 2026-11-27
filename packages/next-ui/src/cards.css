@@ -68,8 +68,6 @@
   --zn-card-title-lines: 2;
   --zn-card-avatar: 18px;
   --zn-card-footer: 26px;
-  flex-direction: row;
-  gap: 14px;
   height: var(--zn-size-card-compact);
 }
 
@@ -96,6 +94,15 @@
 
 .zn-card--post.zn-card--compact {
   --zn-card-title-lines: 1;
+}
+
+/* A compact card is its picture beside its text, then the footer across the whole width, so the
+   action is always at the right edge. */
+.zn-card__row {
+  display: flex;
+  flex: 1 1 0;
+  gap: 14px;
+  min-height: 0;
 }
 
 /* The whole card opens the original; the action button sits above the link. */
@@ -172,10 +179,15 @@
 }
 
 .zn-card__title {
+  /* Titles are set tight, so the last line's descenders ("g", "y") hang below its line box and
+     the clamp would cut them. A sliver of padding, taken back out of the margin, keeps them
+     whole without moving anything. */
+  --zn-card-title-tail: 0.08em;
   display: -webkit-box;
   flex-shrink: 0;
   overflow: hidden;
-  margin: 0 0 6px;
+  margin: 0 0 calc(6px - var(--zn-card-title-tail));
+  padding-bottom: var(--zn-card-title-tail);
   color: var(--zn-color-ink);
   font: var(--zn-card-title);
   letter-spacing: -0.03em;
@@ -185,7 +197,7 @@
 }
 
 .zn-card--compact .zn-card__title {
-  margin-bottom: 2px;
+  margin-bottom: calc(2px - var(--zn-card-title-tail));
 }
 
 .zn-card__creator {
@@ -218,6 +230,8 @@
 .zn-card__name {
   flex-shrink: 0;
   max-width: 100%;
+  /* Room for descenders: the row's own line height is 1, which would clip them here. */
+  line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -225,6 +239,7 @@
 
 .zn-card__handle {
   min-width: 0;
+  line-height: 1.35;
   overflow: hidden;
   color: var(--zn-color-muted);
   font-weight: 400;
@@ -464,7 +479,7 @@
   display: block;
   flex-shrink: 0;
   width: auto;
-  height: var(--zn-size-card-compact);
+  height: 100%;
   border-radius: var(--zn-radius-thumb);
   object-fit: cover;
 }
