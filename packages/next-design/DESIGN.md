@@ -162,10 +162,7 @@ much empty space, one big thing, a short list beside it. It replaces the bento a
 
 - **Blocks of four.** Saves keep their order and are taken four at a time: one Large card beside
   three Compact rows, 1px rules between the rows, sides swapping from block to block. The first
-  item with a picture in each four is the big one. A phone stacks the big card over its rows.
-- **Upright tablets (27 Nov 2026):** on an iPad mini held upright (600 to 900 wide), the big
-  card runs across the top and its rows sit two by two beneath at their designed size, so a
-  block there is one card and four rows. Erik chose this over keeping the landscape columns.
+  item with a picture in each four is the big one. Upright screens stack the big card over its rows.
 - **Cards are magnified, not redesigned.** A card is laid out at its designed width and enlarged
   whole (up to 2.1x for the big card, 1.5x for rows), so every proportion holds. Never smaller
   than designed: a phone shows cards life-size at full width.
