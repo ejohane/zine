@@ -436,20 +436,10 @@
 }
 
 /* ----- The big card sits over its rows only when there is no room beside it -----
-   Upright screens stack. A landscape tablet keeps the two columns even with the sidebar open
-   (about 730 of page width on an iPad), so the page itself has to be genuinely narrow to stack. */
+   Tablets keep the two columns in both orientations: an upright iPad mini (about 700 of page
+   width) and a landscape iPad with the sidebar open (about 730). Only a page as narrow as a
+   phone stacks. */
 @container (max-width: 640px) {
-  .sp-home {
-    gap: 56px;
-  }
-  .sp-spread {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .sp-spread--flip > :first-child {
-    order: 0;
-  }
-}
-@media (max-width: 900px) and (orientation: portrait) {
   .sp-home {
     gap: 56px;
   }
