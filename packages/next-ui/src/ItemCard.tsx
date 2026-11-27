@@ -384,13 +384,15 @@ export function ItemCard({
     return (
       <article className={classes.join(' ')}>
         {link}
-        {leads ? side : null}
-        <div className="zn-card__text">
-          <Heading item={item} />
-          {content}
-          {footer}
+        <div className="zn-card__row">
+          {leads ? side : null}
+          <div className="zn-card__text">
+            <Heading item={item} />
+            {content}
+          </div>
+          {leads ? null : side}
         </div>
-        {leads ? null : side}
+        {footer}
       </article>
     );
   }

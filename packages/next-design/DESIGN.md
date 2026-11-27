@@ -79,6 +79,9 @@ to see every card rendered from the sample saves.
   a tinted panel) so tiles still line up. This placeholder is provisional.
 - **Compact pictures:** things you play (video, podcast) keep the picture on the left; things you
   read (article, post) keep it on the right.
+- **Compact footer (27 Nov 2026):** the footer runs across the whole card, under the picture, so
+  the three dots are always at the right edge. The card keeps its 84 height, so the picture is as
+  tall as the text above the footer (58) rather than the whole card.
 - **Posts:** a post with no title starts with its creator line. Wide media goes under the words;
   tall media goes beside them at Large size and sits whole on a tinted panel elsewhere. A quoted
   post sits in a tinted panel, and shows its own picture only on the Tall card. A link gets a

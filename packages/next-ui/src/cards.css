@@ -68,8 +68,6 @@
   --zn-card-title-lines: 2;
   --zn-card-avatar: 18px;
   --zn-card-footer: 26px;
-  flex-direction: row;
-  gap: 14px;
   height: var(--zn-size-card-compact);
 }
 
@@ -96,6 +94,15 @@
 
 .zn-card--post.zn-card--compact {
   --zn-card-title-lines: 1;
+}
+
+/* A compact card is its picture beside its text, then the footer across the whole width, so the
+   action is always at the right edge. */
+.zn-card__row {
+  display: flex;
+  flex: 1 1 0;
+  gap: 14px;
+  min-height: 0;
 }
 
 /* The whole card opens the original; the action button sits above the link. */
@@ -472,7 +479,7 @@
   display: block;
   flex-shrink: 0;
   width: auto;
-  height: var(--zn-size-card-compact);
+  height: 100%;
   border-radius: var(--zn-radius-thumb);
   object-fit: cover;
 }
