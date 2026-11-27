@@ -25,8 +25,9 @@ export function readDestination(): Destination {
 
 export const sidebarCollapsedKey = 'zine-next-web-sidebar-collapsed';
 
+/** The icon rail is the default; only an explicit choice to expand ("false") opens the sidebar. */
 export function parseSidebarCollapsed(value: unknown): boolean {
-  return value === 'true';
+  return value !== 'false';
 }
 
 // Storage is resolved inside the try block: reading `localStorage` itself can throw.
@@ -34,7 +35,7 @@ export function readSidebarCollapsed(storage?: Pick<Storage, 'getItem'>): boolea
   try {
     return parseSidebarCollapsed((storage ?? localStorage).getItem(sidebarCollapsedKey));
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -47,7 +48,7 @@ export function writeSidebarCollapsed(collapsed: boolean, storage?: Pick<Storage
 }
 
 /**
- * The app's navigation: a left sidebar that collapses to an icon rail on wide screens, and on
+ * The app's navigation: an icon rail on wide screens that expands to a labelled sidebar, and on
  * upright ones a single menu button that opens a drawer. The button sits at the top of the page
  * and scrolls away with it. Save lives in the sidebar and in the drawer.
  */

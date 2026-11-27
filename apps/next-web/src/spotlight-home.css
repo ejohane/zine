@@ -254,9 +254,11 @@
   font: 500 19px/1 var(--zn-font);
 }
 
-/* ----- Navigation: a left sidebar that collapses to a rail; a top bar and drawer when upright ----- */
+/* ----- Navigation: an icon rail that expands to a labelled sidebar; a menu and drawer when upright.
+   It sits on the page with no dividing line or panel of its own, and stays quiet: muted items,
+   the current one marked by weight and an orange icon, Save as a small orange circle. ----- */
 .destination-shell {
-  --destination-width: 174px;
+  --destination-width: 148px;
 }
 .destination-sidebar {
   display: none;
@@ -277,7 +279,10 @@
   margin-bottom: 0;
 }
 .destination-toggle {
-  color: var(--secondary);
+  color: var(--zn-color-outline);
+}
+.destination-toggle:hover {
+  color: var(--zn-color-ink);
 }
 .destination-toggle svg {
   width: 19px;
@@ -297,13 +302,18 @@
   padding: 0 11px;
   text-align: left;
 }
+.destination-links button {
+  color: var(--zn-color-muted);
+  font-weight: 600;
+}
 .destination-links button:hover {
-  background: var(--inset);
+  color: var(--zn-color-ink);
 }
 .destination-links button[aria-current='page'] {
-  color: var(--selection);
-  background: var(--glass-selected);
-  font-weight: 650;
+  color: var(--zn-color-ink);
+}
+.destination-links button[aria-current='page'] svg {
+  color: var(--zn-color-accent-text);
 }
 .destination-links svg,
 .destination-trigger svg {
@@ -364,9 +374,7 @@
     inset: 0 auto 0 0;
     display: block;
     width: var(--destination-width);
-    padding: 24px 12px;
-    background: var(--paper);
-    border-right: 1px solid var(--line);
+    padding: 22px 10px;
     overflow: auto;
   }
   .destination-mobile {
@@ -396,10 +404,8 @@
     white-space: nowrap;
   }
 }
-.destination-sidebar,
 .destination-drawer {
   background: var(--zn-color-canvas);
-  border-color: var(--zn-color-line);
 }
 .destination-save {
   display: flex;
@@ -422,10 +428,27 @@
 .destination-drawer .destination-save {
   margin-bottom: 12px;
 }
+/* In the sidebar Save is a small circle in both states; its name stays for screen readers. */
+.destination-sidebar .destination-save {
+  width: 44px;
+  margin: 0 0 16px 4px;
+  border-radius: 50%;
+}
+.destination-sidebar .destination-save .destination-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 @media (min-width: 720px) and (orientation: landscape) {
   .destination-sidebar[data-collapsed='true'] .destination-save {
-    width: 44px;
     margin-inline: auto;
+  }
+  .destination-sidebar[data-collapsed='true'] .destination-links button[aria-current='page'] {
+    color: var(--zn-color-accent-text);
   }
 }
 

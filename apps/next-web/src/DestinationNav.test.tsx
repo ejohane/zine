@@ -34,23 +34,23 @@ describe('sidebar collapsed preference', () => {
     expect(sidebarCollapsedKey).toBe('zine-next-web-sidebar-collapsed');
   });
 
-  test('defaults to expanded when storage is empty', () => {
-    expect(readSidebarCollapsed(memoryStorage())).toBe(false);
+  test('defaults to the rail when storage is empty', () => {
+    expect(readSidebarCollapsed(memoryStorage())).toBe(true);
   });
 
-  test('only the exact string "true" is collapsed', () => {
-    expect(readSidebarCollapsed(memoryStorage({ [sidebarCollapsedKey]: 'true' }))).toBe(true);
-    for (const value of ['false', 'TRUE', ' true', '1', 'yes', '', '{"collapsed":true}']) {
-      expect(readSidebarCollapsed(memoryStorage({ [sidebarCollapsedKey]: value }))).toBe(false);
+  test('only the exact string "false" is expanded', () => {
+    expect(readSidebarCollapsed(memoryStorage({ [sidebarCollapsedKey]: 'false' }))).toBe(false);
+    for (const value of ['true', 'FALSE', ' false', '0', 'no', '', '{"collapsed":false}']) {
+      expect(readSidebarCollapsed(memoryStorage({ [sidebarCollapsedKey]: value }))).toBe(true);
     }
-    for (const value of [true, 1, null, undefined, {}]) {
-      expect(parseSidebarCollapsed(value)).toBe(false);
+    for (const value of [false, 0, null, undefined, {}]) {
+      expect(parseSidebarCollapsed(value)).toBe(true);
     }
   });
 
-  test('falls back to expanded when storage throws or is unavailable', () => {
-    expect(readSidebarCollapsed(throwingStorage)).toBe(false);
-    expect(readSidebarCollapsed()).toBe(false);
+  test('falls back to the rail when storage throws or is unavailable', () => {
+    expect(readSidebarCollapsed(throwingStorage)).toBe(true);
+    expect(readSidebarCollapsed()).toBe(true);
     expect(() => writeSidebarCollapsed(true, throwingStorage)).not.toThrow();
     expect(() => writeSidebarCollapsed(true)).not.toThrow();
   });
@@ -58,11 +58,11 @@ describe('sidebar collapsed preference', () => {
   test('toggling writes the new value and reads it back', () => {
     const storage = memoryStorage();
     writeSidebarCollapsed(!readSidebarCollapsed(storage), storage);
-    expect(storage.values.get(sidebarCollapsedKey)).toBe('true');
-    expect(readSidebarCollapsed(storage)).toBe(true);
-    writeSidebarCollapsed(!readSidebarCollapsed(storage), storage);
     expect(storage.values.get(sidebarCollapsedKey)).toBe('false');
     expect(readSidebarCollapsed(storage)).toBe(false);
+    writeSidebarCollapsed(!readSidebarCollapsed(storage), storage);
+    expect(storage.values.get(sidebarCollapsedKey)).toBe('true');
+    expect(readSidebarCollapsed(storage)).toBe(true);
   });
 });
 
@@ -83,16 +83,16 @@ describe('DestinationNav markup', () => {
     else delete globals.localStorage;
   });
 
-  test('renders an expanded sidebar with a collapse toggle by default', () => {
-    const aside = sidebar(render());
+  test('renders an expanded sidebar with a collapse toggle once expanded', () => {
+    const aside = sidebar(render('false'));
     expect(aside).toContain('data-collapsed="false"');
     expect(aside).toContain('aria-label="Collapse navigation"');
     expect(aside).toContain('aria-expanded="true"');
     expect(aside).not.toContain('Expand navigation');
   });
 
-  test('renders the rail with an expand toggle and labeled destinations when collapsed', () => {
-    const aside = sidebar(render('true'));
+  test('renders the rail with an expand toggle and labeled destinations by default', () => {
+    const aside = sidebar(render());
     expect(aside).toContain('data-collapsed="true"');
     expect(aside).toContain('aria-label="Expand navigation"');
     expect(aside).toContain('aria-expanded="false"');
@@ -104,12 +104,12 @@ describe('DestinationNav markup', () => {
     expect(aside.match(/aria-current="page"/g)).toHaveLength(1);
   });
 
-  test('treats an invalid stored value as expanded', () => {
-    expect(sidebar(render('collapsed'))).toContain('aria-expanded="true"');
+  test('treats an invalid stored value as the rail', () => {
+    expect(sidebar(render('expanded'))).toContain('aria-expanded="false"');
   });
 
   test('keeps the mobile triggers and drawer regardless of the desktop state', () => {
-    for (const markup of [render(), render('true')]) {
+    for (const markup of [render(), render('false')]) {
       const mobile = markup.slice(markup.indexOf('</aside>'));
       expect(mobile).toContain('aria-label="Open navigation, current page Library"');
       expect(mobile).toContain('aria-haspopup="dialog"');

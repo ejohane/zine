@@ -10,7 +10,8 @@ legacy web app as part of these experiments.
   Cards come from `@zine/next-ui` and are magnified whole, never restyled. Erik chose it from the
   options in `design-lab/`; the rules are in `packages/next-design/DESIGN.md`.
 - The format filters are tabs that show counts (`LibraryTabs.tsx`; the numbers come with
-  `/v1/home`). Navigation is a left sidebar that collapses to an icon rail, with Save at its top
+  `/v1/home`). Navigation is an icon rail by default that expands to a labelled sidebar (no
+  divider line, muted items, current one marked by an orange icon), with Save as a small circle at its top
   (`DestinationNav.tsx`); upright screens get one unpinned menu button that opens a drawer
   (no word beside it, no search or Save up top; Erik asked for that on 2026-11-27). Erik tried a floating
   pill on 2026-11-27 and asked for the sidebar back the same day. `spotlight-home.css` holds

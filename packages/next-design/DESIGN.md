@@ -173,10 +173,12 @@ much empty space, one big thing, a short list beside it. It replaces the bento a
 - **The inbox is a sideways rail** of Tiles after the first block, under "Inbox" and its count.
 - **Tabs carry numbers.** All, Articles, Videos, Podcasts, Posts and Inbox, each with how many it
   holds, the chosen one ink on canvas flipped. No page heading and no section titles.
-- **Navigation is a left sidebar** that collapses to an icon rail, with the orange Save at its
-  top; upright screens get a single menu button at the top of the page, which scrolls away,
-  and a drawer that holds Save and the destinations. A floating pill was
-  tried first and dropped the same day. The current place is orange.
+- **Navigation is a quiet icon rail** on the left that expands to a labelled sidebar and
+  remembers the choice. It sits on the page with no dividing line or panel: muted items, the
+  current one marked by an orange icon (and by weight when expanded), Save as a small orange
+  circle at the top. Upright screens get a single menu button at the top of the page, which
+  scrolls away, and a drawer that holds Save and the destinations. A floating pill and a boxed
+  sidebar with a wide Save button were both tried on 27 Nov 2026 and dropped.
 - **Orange** marks Save, the current place, tab icons, what is left of something started, and the
   inbox count. Nothing else.
 
