@@ -189,6 +189,59 @@ async function channelAvatar(env: Env, owner: string | undefined, channelId: str
     return undefined;
   }
 }
+function resourceThumbnail(item: Obj) {
+  const thumbnails = object(object(item.snippet).thumbnails);
+  return object(thumbnails.maxres ?? thumbnails.high ?? thumbnails.medium ?? thumbnails.default)
+    .url;
+}
+/**
+ * Source contributions for one Data API video, channel or playlist resource. No requests:
+ * used both by live extraction and by the retrofit of stored, batched video resources.
+ */
+export function youtubeResourceContributions(
+  sourceUrl: string,
+  kind: string | undefined,
+  item: Obj,
+  creatorImageUrl?: string
+): ContributionInput[] {
+  const snippet = object(item.snippet),
+    details = object(item.contentDetails);
+  const contributions: ContributionInput[] = [];
+  const add = (field: ContributionInput['field'], value: unknown) => {
+    if (value !== undefined && value !== null && value !== '')
+      contributions.push({
+        field,
+        value,
+        category: 'source',
+        provenance: { sourceUrl, method: 'youtube-data-api', inputContributionIds: [] },
+      });
+  };
+  add('title', snippet.title);
+  add('description', snippet.description);
+  add('creator', snippet.channelTitle ?? (kind === 'channel' ? snippet.title : undefined));
+  add('publishedAt', snippet.publishedAt);
+  add('language', snippet.defaultAudioLanguage ?? snippet.defaultLanguage);
+  add('topics', snippet.tags);
+  add('thumbnail', resourceThumbnail(item));
+  add('creatorImageUrl', creatorImageUrl);
+  add('durationSeconds', isoDuration(text(details.duration)));
+  add('structuredData', item);
+  const channelId = kind === 'channel' ? text(item.id) : text(snippet.channelId);
+  if (channelId)
+    add('source', {
+      id: channelId,
+      name: kind === 'channel' ? text(snippet.title) : text(snippet.channelTitle),
+      url: `https://www.youtube.com/channel/${channelId}`,
+      kind: 'channel',
+    });
+  const chapters = descriptionChapters(text(snippet.description));
+  if (chapters.length) add('chapters', chapters);
+  const links = [...text(snippet.description).matchAll(/https?:\/\/[^\s<>]+/g)].map((match) => ({
+    url: match[0].replace(/[),.;]+$/, ''),
+  }));
+  if (links.length) add('links', links);
+  return contributions;
+}
 export async function youtubeApiExtraction(
   env: Env,
   owner: string | undefined,
@@ -224,7 +277,14 @@ export async function youtubeApiExtraction(
   if (!item) throw new ProviderError('youtube_item_unavailable', false);
   const snippet = object(item.snippet),
     details = object(item.contentDetails);
-  const contributions: ContributionInput[] = [];
+  const channelId = identity.kind === 'channel' ? text(item.id) : text(snippet.channelId);
+  const avatar =
+    identity.kind === 'channel'
+      ? creatorImageReference(resourceThumbnail(item))
+      : identity.kind === 'video' && channelId
+        ? await channelAvatar(env, owner, channelId)
+        : undefined;
+  const contributions = youtubeResourceContributions(identity.url, identity.kind, item, avatar);
   const add = (field: ContributionInput['field'], value: unknown) => {
     if (value !== undefined && value !== null && value !== '')
       contributions.push({
@@ -238,36 +298,6 @@ export async function youtubeApiExtraction(
         },
       });
   };
-  add('title', snippet.title);
-  add('description', snippet.description);
-  add('creator', snippet.channelTitle ?? (identity.kind === 'channel' ? snippet.title : undefined));
-  add('publishedAt', snippet.publishedAt);
-  add('language', snippet.defaultAudioLanguage ?? snippet.defaultLanguage);
-  add('topics', snippet.tags);
-  const thumbnails = object(snippet.thumbnails);
-  const thumbnail = object(
-    thumbnails.maxres ?? thumbnails.high ?? thumbnails.medium ?? thumbnails.default
-  ).url;
-  add('thumbnail', thumbnail);
-  const channelId = identity.kind === 'channel' ? text(item.id) : text(snippet.channelId);
-  if (identity.kind === 'channel') add('creatorImageUrl', creatorImageReference(thumbnail));
-  else if (identity.kind === 'video' && channelId)
-    add('creatorImageUrl', await channelAvatar(env, owner, channelId));
-  add('durationSeconds', isoDuration(text(details.duration)));
-  add('structuredData', item);
-  if (channelId)
-    add('source', {
-      id: channelId,
-      name: identity.kind === 'channel' ? text(snippet.title) : text(snippet.channelTitle),
-      url: `https://www.youtube.com/channel/${channelId}`,
-      kind: 'channel',
-    });
-  const chapters = descriptionChapters(text(snippet.description));
-  if (chapters.length) add('chapters', chapters);
-  const links = [...text(snippet.description).matchAll(/https?:\/\/[^\s<>]+/g)].map((match) => ({
-    url: match[0].replace(/[),.;]+$/, ''),
-  }));
-  if (links.length) add('links', links);
   if (identity.kind === 'playlist') {
     const page = await youtubePlaylistPage(env, owner, identity.url);
     add('members', {

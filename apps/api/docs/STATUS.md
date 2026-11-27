@@ -52,12 +52,28 @@ for current checks. Read `../AGENTS.md`, inspect git status, then run `bun run d
   with the migration applied: all 1,479 received YouTube items show an avatar (1,477 from
   creator records), none show a feed URL. Not verified: a deployed Worker, a real Data API key,
   real channels' responses, or the web UI.
+- **YouTube retrofit (fill gaps only):** `scheduleYouTubeRetrofit` (`src/creators.ts`, every
+  cron, needs `YOUTUBE_API_KEY`) finds items, for any owner, whose YouTube video never got
+  Data API metadata (no `provider_metadata` component and no API `structuredData`), looks up
+  50 videos per `videos.list` call into `youtube_videos`, and queues `enrich` jobs with stage
+  `provider-metadata` (≤100 per run). The job (`providerMetadataJob` in `src/jobs.ts`) adds only
+  fields the item has no visible value for (typically `durationSeconds`, `chapters`, `language`,
+  `links`, `source`, `structuredData`), makes no provider request, does not count toward the
+  per-owner enrichment allowance, and marks `provider_metadata` available, or unavailable with
+  `youtube_item_unavailable` for videos YouTube no longer returns. Existing titles, descriptions,
+  thumbnails and summaries are kept, so no understanding re-runs. Transcripts are not available
+  through an API key. Expected for the current library: ~2,500 items, ~50 API units, a few
+  hours at one lookup per 5-minute cron. Scheduler queries checked on the restored backup:
+  2–11 ms per run (an item-driven first draft took 3.5 s). Covered by
+  `test/shared-creators.test.ts`.
 - Production investigation read the production D1 directly (read-only) before switching to
   `local:pull`; future sessions should use `local:pull` as `AGENTS.md` requires.
-- **Next actions:** add a `YOUTUBE_API_KEY` Worker secret (a Google Cloud API key restricted to
-  the YouTube Data API v3); review/merge; release (applies 0028); confirm Inbox avatars on a
-  signed-in session; watch `shared_youtube_lookup_failed` logs. 15 seeded channels have no
-  image until the key exists. X inbox items (27) have no creator image — separate issue.
+- `YOUTUBE_API_KEY` was added to `zine-api-next` by Erik on 2026-11-27 (21:40 UTC redeploy of
+  the then-current code); a video saved afterwards got `youtube-data-api` metadata in production.
+- **Next actions:** review/merge; release (applies 0028; maintenance then refreshes creators
+  and runs the retrofit); confirm Inbox avatars and filled durations/chapters on a signed-in
+  session; watch `shared_youtube_lookup_failed` logs and `provider_metadata` component counts.
+  X inbox items (27) have no creator image — separate issue.
 
 ## Spotlight Home and library counts (2026-11-27, not yet released)
 

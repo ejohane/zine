@@ -8,7 +8,9 @@ import {
   observeCreators,
   purgeSharedProviderData,
   refreshCreators,
+  scheduleYouTubeRetrofit,
 } from '../src/creators';
+import { runJob } from '../src/jobs';
 import { collectFeedCache, sharedFeedAt } from '../src/feed-cache';
 import type { FeedFetcher } from '../src/feed-cache';
 import type { Feed } from '../src/providers/feed';
@@ -326,6 +328,124 @@ describe('shared public provider data for many users', () => {
         .prepare("SELECT name FROM creators WHERE key='youtube:channel:UCbackfillbackfillbackfi'")
         .first('name')
     ).toBe('Backfilled');
+  });
+
+  it('fills only the missing fields of imported YouTube items from one batched lookup', async () => {
+    await runtime.db
+      .prepare("DELETE FROM provider_budgets WHERE scope='provider:youtube:shared'")
+      .run();
+    // Earlier tests leave YouTube items behind; settle them so this test sees only its own.
+    await runtime.db
+      .prepare(
+        "INSERT OR IGNORE INTO enrichment_components(content_id,owner_id,component,status,updated_at) SELECT content_id,owner_id,'provider_metadata','available','2026-01-01T00:00:00.000Z' FROM personal_items"
+      )
+      .run();
+    const a = { userId: 'retrofit-owner-a', contributor: 'fixture' };
+    const b = { userId: 'retrofit-owner-b', contributor: 'fixture' };
+    const url = 'https://www.youtube.com/watch?v=retrofit001';
+    const savedA = await save(env, a, saveSchema.parse({ url }));
+    const savedB = await save(env, b, saveSchema.parse({ url }));
+    const gone = await save(
+      env,
+      a,
+      saveSchema.parse({ url: 'https://www.youtube.com/watch?v=retrofitgon' })
+    );
+    // What the previous app imported for owner A: title, description and a summary.
+    for (const [field, value] of [
+      ['title', 'Imported title'],
+      ['description', 'Imported description'],
+    ] as const)
+      await contribute(env, a, savedA.body.item.id, {
+        field,
+        value,
+        category: 'source',
+        provenance: { method: 'legacy-library-migration', inputContributionIds: [] },
+      });
+    const understandingBefore = await runtime.db
+      .prepare('SELECT requested_revision FROM understanding_requests WHERE item_id=?')
+      .bind(savedA.body.item.id)
+      .first<number>('requested_revision');
+    const requests: URL[] = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      const request = new URL(input instanceof Request ? input.url : String(input));
+      requests.push(request);
+      return Response.json({
+        items: [
+          {
+            id: 'retrofit001',
+            snippet: {
+              title: 'API title',
+              description: 'API description\n0:00 Intro\n1:30 Main part',
+              channelId: 'UCretrofitretrofitretrof',
+              channelTitle: 'Retrofit channel',
+              publishedAt: '2026-01-02T00:00:00Z',
+              tags: ['one', 'two'],
+              defaultAudioLanguage: 'en',
+            },
+            contentDetails: { duration: 'PT12M' },
+          },
+        ],
+      });
+    });
+    const keyed = { ...env, YOUTUBE_API_KEY: 'synthetic-key' } as Env;
+    const first = await scheduleYouTubeRetrofit(keyed);
+    expect(requests).toHaveLength(1);
+    expect(requests[0].pathname).toBe('/youtube/v3/videos');
+    expect(requests[0].searchParams.get('id')!.split(',').sort()).toEqual([
+      'retrofit001',
+      'retrofitgon',
+    ]);
+    expect(first.queued).toBe(3);
+    const jobs = await runtime.db
+      .prepare(
+        "SELECT id FROM jobs WHERE json_extract(payload_json,'$.stage')='provider-metadata' AND status='pending'"
+      )
+      .all<{ id: string }>();
+    for (const job of jobs.results) await runJob(keyed, job.id);
+    // Applying stored resources makes no further request.
+    expect(requests).toHaveLength(1);
+
+    const itemA = await getItem(env, a.userId, savedA.body.item.id);
+    expect(itemA.content).toMatchObject({
+      title: 'Imported title',
+      description: 'Imported description',
+      durationSeconds: 720,
+      language: 'en',
+      chapters: [
+        { startSeconds: 0, title: 'Intro' },
+        { startSeconds: 90, title: 'Main part' },
+      ],
+    });
+    expect(itemA.enrichment.fields.durationSeconds).toMatchObject({
+      provenance: { method: 'youtube-data-api' },
+    });
+    const itemB = await getItem(env, b.userId, savedB.body.item.id);
+    expect(itemB.content).toMatchObject({ title: 'API title', durationSeconds: 720 });
+    // Owner A's description was kept, so its summary is not regenerated.
+    expect(
+      await runtime.db
+        .prepare('SELECT requested_revision FROM understanding_requests WHERE item_id=?')
+        .bind(savedA.body.item.id)
+        .first<number>('requested_revision')
+    ).toBe(understandingBefore);
+    const component = (item: Awaited<ReturnType<typeof getItem>>) =>
+      item.enrichment.components.find(
+        (entry: { component: string }) => entry.component === 'provider_metadata'
+      );
+    expect(component(itemA)).toMatchObject({ status: 'available' });
+    expect(component(await getItem(env, a.userId, gone.body.item.id))).toMatchObject({
+      status: 'unavailable',
+      reasonCode: 'youtube_item_unavailable',
+    });
+    // The channel is now known for avatars.
+    expect(
+      await runtime.db
+        .prepare("SELECT channel_id FROM youtube_videos WHERE video_id='retrofit001'")
+        .first('channel_id')
+    ).toBe('UCretrofitretrofitretrof');
+    // Everything is settled: no lookups, no jobs.
+    expect(await scheduleYouTubeRetrofit(keyed)).toEqual({ looked: 0, queued: 0 });
+    expect(requests).toHaveLength(1);
   });
 
   it('ignores malformed identifiers from provider responses', async () => {

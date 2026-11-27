@@ -60,6 +60,8 @@ CREATE TABLE feed_fetches (
 );
 -- A changed shared feed brings forward every subscription that polls the same URL.
 CREATE INDEX source_routes_url ON source_routes(url);
+-- Shared records are joined back to every owner's item for the same content.
+CREATE INDEX personal_items_content ON personal_items(content_id);
 
 -- Seed: creators for every subscribed YouTube channel.
 INSERT OR IGNORE INTO creators(key, platform, external_id, name, url, refresh_after, created_at, updated_at)

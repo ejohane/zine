@@ -481,3 +481,83 @@ export async function purgeSharedProviderData(env: Env) {
     cutoff
   ).run();
 }
+
+/** Marks an item whose YouTube metadata gaps were filled from the Data API. */
+export const PROVIDER_METADATA_COMPONENT = 'provider_metadata';
+export const PROVIDER_METADATA_STAGE = 'provider-metadata';
+/**
+ * An item by any owner whose YouTube video never received Data API metadata. Cheap checks
+ * come first: once an item is settled, its marker component ends the evaluation.
+ */
+const NEEDS_RETROFIT = `p.status!='deleted'
+    AND NOT EXISTS(SELECT 1 FROM enrichment_components e WHERE e.content_id=p.content_id AND e.owner_id=p.owner_id AND e.component='${PROVIDER_METADATA_COMPONENT}')
+    AND NOT EXISTS(SELECT 1 FROM contributions k WHERE k.content_id=p.content_id AND k.owner_id=p.owner_id AND k.field='structuredData' AND json_extract(k.provenance_json,'$.method')='youtube-data-api')`;
+const RETROFIT_DATA_MS = 7 * DAY;
+
+/**
+ * Fills gaps in YouTube items enriched without the Data API (imported libraries, items saved
+ * before a key existed). Each cron run looks up at most 50 such videos in one `videos.list`
+ * call, stored once for every owner, then queues a job per item that adds only the fields the
+ * item lacks. Nothing shown is overwritten, so existing titles, descriptions and generated
+ * summaries stay as they are, and no watch page is fetched.
+ */
+export async function scheduleYouTubeRetrofit(env: Env, enqueueLimit = 100) {
+  const cutoff = new Date(Date.now() - RETROFIT_DATA_MS).toISOString();
+  let looked = 0;
+  if (env.YOUTUBE_API_KEY) {
+    const pending = await all<{ video_id: string }>(
+      env.DB,
+      `SELECT DISTINCT substr(c.canonical_url,33,11) AS video_id
+      FROM content_items c JOIN personal_items p ON p.content_id=c.id
+      WHERE c.platform='youtube' AND c.kind='video'
+        AND c.canonical_url LIKE 'https://www.youtube.com/watch?v=%' AND length(c.canonical_url)=43
+        AND ${NEEDS_RETROFIT}
+        AND NOT EXISTS(SELECT 1 FROM youtube_videos v WHERE v.video_id=substr(c.canonical_url,33,11) AND v.api_fetched_at>?)
+      LIMIT 50`,
+      cutoff
+    );
+    if (pending.length)
+      looked =
+        (
+          await withSharedYouTubeApi(env, (request) =>
+            lookupVideos(
+              env,
+              request,
+              pending.map((row) => row.video_id)
+            )
+          )
+        )?.length ?? 0;
+  }
+  // Start from the few videos looked up recently, not from every item.
+  const ready = await all<{ id: string; owner_id: string; generation: number; url: string }>(
+    env.DB,
+    `SELECT p.id,p.owner_id,p.generation,c.canonical_url AS url
+    FROM youtube_videos v
+    JOIN content_items c ON c.identity_key='youtube:video:'||v.video_id
+    JOIN personal_items p ON p.content_id=c.id
+    WHERE v.api_fetched_at>? AND ${NEEDS_RETROFIT}
+      AND NOT EXISTS(SELECT 1 FROM jobs j WHERE j.owner_id=p.owner_id AND j.item_id=p.id AND j.kind='enrich'
+        AND json_extract(j.payload_json,'$.stage')='${PROVIDER_METADATA_STAGE}' AND j.status IN ('pending','running','failed'))
+    LIMIT ?`,
+    cutoff,
+    enqueueLimit
+  );
+  const timestamp = now();
+  const day = timestamp.slice(0, 10);
+  const statements = ready.map((row) =>
+    stmt(
+      env.DB,
+      "INSERT OR IGNORE INTO jobs(id,owner_id,item_id,kind,payload_json,status,available_at,created_at,updated_at) VALUES(?,?,?,'enrich',?,'pending',?,?,?)",
+      `job_ytmeta_${row.id}_${row.generation}_${day}`,
+      row.owner_id,
+      row.id,
+      JSON.stringify({ stage: PROVIDER_METADATA_STAGE, url: row.url, generation: row.generation }),
+      timestamp,
+      timestamp,
+      timestamp
+    )
+  );
+  for (let offset = 0; offset < statements.length; offset += 50)
+    await env.DB.batch(statements.slice(offset, offset + 50));
+  return { looked, queued: ready.length };
+}
