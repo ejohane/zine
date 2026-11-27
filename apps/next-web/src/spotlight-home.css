@@ -24,13 +24,12 @@
 
 /* ----- The page ----- */
 
-/* On upright screens the page starts under the navigation bar; beside the sidebar it starts at
-   the top. */
+/* Beside the sidebar the page starts at the top. On upright screens the menu button sits above
+   it, in the page's flow, and takes the page's top padding. */
 .destination-shell .page {
   --page-left: max(30px, env(safe-area-inset-left));
   --page-right: max(30px, env(safe-area-inset-right));
-  padding: calc(72px + env(safe-area-inset-top)) var(--page-right)
-    max(44px, env(safe-area-inset-bottom)) var(--page-left);
+  padding: 8px var(--page-right) max(44px, env(safe-area-inset-bottom)) var(--page-left);
 }
 @media (min-width: 720px) and (orientation: landscape) {
   .destination-shell .page {
@@ -312,18 +311,23 @@
   height: 19px;
   flex: none;
 }
+/* Upright screens: one menu button at the top of the page. It is not pinned; it scrolls away. */
 .destination-mobile {
-  position: fixed;
-  inset: max(6px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) auto
-    max(16px, env(safe-area-inset-left));
-  z-index: 11;
   display: flex;
-  justify-content: space-between;
-  pointer-events: none;
+  padding: calc(10px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 0
+    max(16px, env(safe-area-inset-left));
 }
-.destination-trigger {
-  pointer-events: auto;
+.destination-mobile .destination-trigger {
+  justify-content: center;
+  width: 44px;
+  padding: 0;
+  color: var(--zn-color-ink);
 }
+.destination-mobile .destination-trigger svg {
+  width: 22px;
+  height: 22px;
+}
+
 .destination-drawer {
   inset: 0 auto 0 0;
   width: min(270px, 82vw);
@@ -415,18 +419,8 @@
   height: 20px;
   flex: none;
 }
-.destination-mobile {
-  justify-content: flex-start;
-  gap: 8px;
-}
-.destination-mobile .destination-trigger:first-child {
-  margin-right: auto;
-}
-.destination-mobile .destination-save {
-  width: 44px;
-  margin: 0;
-  padding: 0;
-  border-radius: 50%;
+.destination-drawer .destination-save {
+  margin-bottom: 12px;
 }
 @media (min-width: 720px) and (orientation: landscape) {
   .destination-sidebar[data-collapsed='true'] .destination-save {

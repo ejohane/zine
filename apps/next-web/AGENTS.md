@@ -11,7 +11,8 @@ legacy web app as part of these experiments.
   options in `design-lab/`; the rules are in `packages/next-design/DESIGN.md`.
 - The format filters are tabs that show counts (`LibraryTabs.tsx`; the numbers come with
   `/v1/home`). Navigation is a left sidebar that collapses to an icon rail, with Save at its top
-  (`DestinationNav.tsx`); upright screens get a top bar and a drawer. Erik tried a floating
+  (`DestinationNav.tsx`); upright screens get one unpinned menu button that opens a drawer
+  (no word beside it, no search or Save up top; Erik asked for that on 2026-11-27). Erik tried a floating
   pill on 2026-11-27 and asked for the sidebar back the same day. `spotlight-home.css` holds
   both and points the app's colour and font variables at the Zine Next tokens; do not add a
   second palette. Library, Inbox and Search keep their older feeds.

@@ -47,8 +47,9 @@ export function writeSidebarCollapsed(collapsed: boolean, storage?: Pick<Storage
 }
 
 /**
- * The app's navigation: a left sidebar that collapses to an icon rail on wide screens, and a
- * top bar with a drawer on upright ones. Save lives with it in both.
+ * The app's navigation: a left sidebar that collapses to an icon rail on wide screens, and on
+ * upright ones a single menu button that opens a drawer. The button sits at the top of the page
+ * and scrolls away with it. Save lives in the sidebar and in the drawer.
  */
 export function DestinationNav({
   current,
@@ -131,28 +132,12 @@ export function DestinationNav({
       <div className="destination-mobile">
         <button
           type="button"
-          className="destination-trigger glass"
+          className="destination-trigger"
           aria-label={`Open navigation, current page ${current}`}
           aria-haspopup="dialog"
           onClick={() => drawer.current?.showModal()}
         >
-          <Menu aria-hidden="true" /> {current}
-        </button>
-        <button
-          type="button"
-          className="destination-trigger glass"
-          aria-label="Search"
-          onClick={() => choose('Search')}
-        >
-          <Search aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          className="destination-trigger destination-save"
-          aria-label="Save a link"
-          onClick={capture}
-        >
-          <Plus aria-hidden="true" />
+          <Menu aria-hidden="true" />
         </button>
       </div>
       <dialog
@@ -175,6 +160,18 @@ export function DestinationNav({
               <X aria-hidden="true" />
             </button>
           </div>
+          <button
+            type="button"
+            className="destination-save"
+            aria-label="Save a link"
+            onClick={() => {
+              drawer.current?.close();
+              capture();
+            }}
+          >
+            <Plus aria-hidden="true" />
+            <span className="destination-label">Save</span>
+          </button>
           {links()}
         </div>
       </dialog>

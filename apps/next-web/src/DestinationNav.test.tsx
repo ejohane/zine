@@ -120,9 +120,15 @@ describe('DestinationNav markup', () => {
     }
   });
 
-  test('offers Save in the sidebar and in the mobile bar', () => {
+  test('offers Save in the sidebar and in the drawer, and nothing but the menu up top', () => {
     const markup = render();
     expect(sidebar(markup)).toContain('aria-label="Save a link"');
-    expect(markup.match(/aria-label="Save a link"/g)).toHaveLength(2);
+    const drawer = markup.slice(markup.indexOf('<dialog'));
+    expect(drawer).toContain('aria-label="Save a link"');
+    const bar = markup.slice(markup.indexOf('destination-mobile'), markup.indexOf('<dialog'));
+    expect(bar.match(/<button/g)).toHaveLength(1);
+    expect(bar).not.toContain('Save a link');
+    expect(bar).not.toContain('aria-label="Search"');
+    expect(bar).not.toContain('Library</button>');
   });
 });
