@@ -106,8 +106,15 @@ async function subscriptionOwned(env: Env, owner: string, subscriptionId: string
   if (!subscription) throw new ApiError(404, 'not_found', 'Subscription not found');
   return subscription;
 }
-async function feedAt(url: string, headers: Record<string, string> = {}) {
+/**
+ * Long-running podcasts publish their whole back catalogue in one document (Huberman Lab was
+ * 4.4 MB with 462 episodes in 2026-11; parsing it takes about 18 MB of memory), so feeds get
+ * more room than the 4 MiB general page limit while staying well inside Worker memory.
+ */
+export const FEED_MAX_BYTES = 12 * 1024 * 1024;
+export async function feedAt(url: string, headers: Record<string, string> = {}) {
   const response = await fetchPublic(url, {
+    maxBytes: FEED_MAX_BYTES,
     headers,
     accept:
       'application/rss+xml,application/atom+xml,application/feed+json,application/xml,text/xml',
