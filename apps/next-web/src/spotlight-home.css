@@ -163,7 +163,7 @@
   min-width: 0;
 }
 .sp-rows > * {
-  padding: 28px 0;
+  padding: 28px 0 6px;
   border-top: 1px solid var(--zn-color-line);
 }
 .sp-rows > :first-child {
@@ -173,13 +173,14 @@
 .sp-rows > :last-child {
   padding-bottom: 0;
 }
-/* The list rows get a little air between their text and the footer (Erik, 2026-11-28): the card
-   grows by that gap, and the picture and text above keep their designed height. */
+/* The list rows' footer sits at the bottom of the row, just above the dividing line, with the
+   room between it and the text above (Erik, 2026-11-28). The card grows by that gap; the picture
+   and text keep their designed height. */
 .sp-rows .zn-card--compact {
-  height: calc(var(--zn-size-card-compact) + 10px);
+  height: calc(var(--zn-size-card-compact) + 20px);
 }
 .sp-rows .zn-card--compact .zn-card__footer {
-  margin-top: 10px;
+  margin-top: 20px;
 }
 
 /* The inbox, sideways: runs off the right edge of the page. */
@@ -492,7 +493,7 @@
     gap: 44px;
   }
   .sp-rows > * {
-    padding: 20px 0;
+    padding: 20px 0 6px;
   }
   .sp-rail__track {
     zoom: 0.9;
