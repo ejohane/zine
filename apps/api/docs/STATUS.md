@@ -3,16 +3,38 @@
 Last reviewed: 2026-11-09 UTC. This file records observed state, not a substitute
 for current checks. Read `../AGENTS.md`, inspect git status, then run `bun run doctor`.
 
-## Shared creators, creator avatars and shared feed polling (2026-11-27, not yet released)
+## Feed size limit for long podcasts (2026-11-28, not yet released)
 
-- Branch `claude/brave-clarke-jaf99l`. Nothing was deployed from this session.
+- Branch `claude/brave-clarke-jaf99l`. The Huberman Lab subscription
+  (`feeds.megaphone.fm/hubermanlab`) had failed every poll with `source_too_large` since
+  ~2026-11-11 (about 150 failed sync jobs a day): the feed is 4.36 MB / 462 episodes and
+  `fetchPublic` allows 4 MiB. Feeds (`feedAt` in `src/subscriptions.ts`) now allow 12 MiB
+  (`FEED_MAX_BYTES`); parsing this feed measured ~18 MB heap and 0.35 s. Other fetches keep
+  4 MiB. Covered by `test/feed-size.test.ts`. Once released the subscription recovers on its
+  next poll and delivers only episodes since its intake boundary.
+- Also failing daily, unchanged and not addressed: the X account subscription
+  (`provider_http_402` from the X API, likely X API credits).
+
+## Shared creators, creator avatars and shared feed polling (released 2026-11-27)
+
+- Released as `b6cb428` (PR #487), production deployment `8b845402-b489-4c7c-a0c8-242e0cc50361`
+  at 2026-11-27 22:44 UTC. The first production attempt applied migration 0028 (22:36:18) and
+  then failed recording schema checksums with D1 error 7429 ("D1 DB is overloaded. Too many
+  resources consumed within a 10 second window"; first misread as an API rate limit). The old
+  code ran against the new schema for ~8 minutes, which is compatible. A single re-run of the
+  production job recorded the checksum and deployed.
+- After release: 73 of 75 creators refreshed from the Data API in the first cron run; the
+  retrofit settled all 2,498 YouTube items by 2026-11-28 ~02:45 UTC (2 unavailable, 0 failed
+  jobs); 26 feeds were being fetched through the shared cache. A read-only status query hit 7429
+  again on 2026-11-28 and succeeded on retry; one cron run failed at 01:40 UTC without a recorded
+  category. If 7429 recurs, look at maintenance query weight first.
 - **Bug:** most new subscription items showed no creator avatar. `absolute('', feedUrl)` in
   `src/providers/feed.ts` returned the feed URL, so YouTube feeds (no icon/logo) and RSS
   feeds without an image stored the feed's own URL as `creatorImageUrl` (137 items in
   production on 2026-11-27, e.g. `…/feeds/videos.xml?channel_id=…`, `seangoedecke.com/rss.xml`).
   It outranked later real avatars (same priority, older). Blank values are now absent; the
   same fix stops an RSS item without a `<link>` from taking the feed URL as its own URL.
-- **Why YouTube avatars were rare anyway:** production has no `YOUTUBE_API_KEY` secret and no
+- **Why YouTube avatars were rare anyway:** before this work production had no `YOUTUBE_API_KEY` and no
   Google connection, so YouTube metadata came only from public-page scraping (avatar found for
   27 of 275 items) or oEmbed (none). YouTube subscriptions are the public Atom feeds created
   by `scripts/migrate-legacy-subscriptions.ts`; they need no credentials.
@@ -70,10 +92,9 @@ for current checks. Read `../AGENTS.md`, inspect git status, then run `bun run d
   `local:pull`; future sessions should use `local:pull` as `AGENTS.md` requires.
 - `YOUTUBE_API_KEY` was added to `zine-api-next` by Erik on 2026-11-27 (21:40 UTC redeploy of
   the then-current code); a video saved afterwards got `youtube-data-api` metadata in production.
-- **Next actions:** review/merge; release (applies 0028; maintenance then refreshes creators
-  and runs the retrofit); confirm Inbox avatars and filled durations/chapters on a signed-in
-  session; watch `shared_youtube_lookup_failed` logs and `provider_metadata` component counts.
-  X inbox items (27) have no creator image — separate issue.
+- Erik confirmed avatars in the production web app (`https://api-next.myzine.app/next/`).
+- **Next actions:** watch for D1 7429 and `shared_youtube_lookup_failed`; X inbox items (27)
+  have no creator image — separate issue.
 
 ## Spotlight Home and library counts (2026-11-27, not yet released)
 
