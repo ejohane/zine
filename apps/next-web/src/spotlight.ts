@@ -50,14 +50,3 @@ export function toSpreads(items: readonly CardItem[]): Spread[] {
   }
   return spreads;
 }
-
-/** The number beside each filter, when Home has told us. Posts include threads. */
-export function sectionCount(counts: Home['counts'], section: Section): number | undefined {
-  if (!counts) return undefined;
-  const by = counts.savedByType;
-  if (section === 'Home') return counts.saved;
-  if (section === 'Articles') return by.article ?? 0;
-  if (section === 'Videos') return by.video ?? 0;
-  if (section === 'Podcasts') return by.podcast_episode ?? 0;
-  return (by.post ?? 0) + (by.thread ?? 0);
-}

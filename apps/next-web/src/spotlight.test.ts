@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { CardItem } from '@zine/next-ui';
-import { inboxCards, sectionCount, spotlightItems, toSpreads } from './spotlight';
+import { inboxCards, spotlightItems, toSpreads } from './spotlight';
 import type { Home, HomeCard, RemoteItem } from './live-api';
 
 const content = (thumbnail?: string) => ({
@@ -94,25 +94,5 @@ describe('spreads', () => {
 
   test('nothing in, nothing out', () => {
     expect(toSpreads([])).toEqual([]);
-  });
-});
-
-describe('filter counts', () => {
-  const counts = {
-    saved: 20,
-    inbox: 7,
-    savedByType: { article: 5, video: 6, podcast_episode: 4, post: 3, thread: 1, playlist: 1 },
-  };
-
-  test('each filter reads its own types; posts include threads', () => {
-    expect(sectionCount(counts, 'Home')).toBe(20);
-    expect(sectionCount(counts, 'Articles')).toBe(5);
-    expect(sectionCount(counts, 'Videos')).toBe(6);
-    expect(sectionCount(counts, 'Podcasts')).toBe(4);
-    expect(sectionCount(counts, 'Posts')).toBe(4);
-  });
-
-  test('no counts yet means no numbers', () => {
-    expect(sectionCount(undefined, 'Home')).toBeUndefined();
   });
 });

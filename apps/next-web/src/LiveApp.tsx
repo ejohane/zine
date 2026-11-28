@@ -661,7 +661,6 @@ function Library({ identity, signOut }: { identity: Identity; signOut: () => Pro
           {showFilters && (
             <LibraryTabs
               section={section}
-              counts={home?.counts}
               openInbox={() => chooseDestination('Inbox')}
               choose={(next) => {
                 if (next !== section) {
