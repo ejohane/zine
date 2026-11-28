@@ -9,8 +9,9 @@ legacy web app as part of these experiments.
   with the inbox as a sideways rail after the first block (`SpotlightHome.tsx`, `spotlight.ts`).
   Cards come from `@zine/next-ui` and are magnified whole, never restyled. Erik chose it from the
   options in `design-lab/`; the rules are in `packages/next-design/DESIGN.md`.
-- The format filters are tabs that show counts (`LibraryTabs.tsx`; the numbers come with
-  `/v1/home`). Navigation is an icon rail by default that expands to a labelled sidebar (no
+- The format filters are tabs with names only (`LibraryTabs.tsx`); Erik asked on 2026-11-28 for
+  no counts there or beside the Inbox rail. Home also draws its cards at a 0.88 type scale
+  (`TYPE_SCALE` in `SpotlightHome.tsx`) and pins the list rows' footer to the bottom of the row, 20px below the text. Navigation is an icon rail by default that expands to a labelled sidebar (no
   divider line, muted items, current one marked by an orange icon), with Save as a small circle at its top
   (`DestinationNav.tsx`); upright screens get one unpinned menu button that opens a drawer
   (no word beside it, no search or Save up top; Erik asked for that on 2026-11-27). Erik tried a floating

@@ -56,11 +56,16 @@ function withShape(item: CardItem, shapes: Record<string, Shape>): CardItem {
 
 /** The designed width of a wide card (`--zn-size-card-wide`). */
 const CARD_WIDTH = 392;
+/**
+ * Home shows every card a little under its designed size, so its type reads smaller (Erik found
+ * it too big on 2026-11-28). The card is laid out wider to make up the width, never squeezed.
+ */
+const TYPE_SCALE = 0.88;
 
 /**
  * A card enlarged to fill the width it is given. The card is laid out at its designed width and
- * magnified whole, so its proportions never change. It is never shown smaller than designed: a
- * narrow screen gets the card at its own size, full width.
+ * magnified whole, so its proportions never change. A narrow screen gets the card at Home's
+ * type scale, laid out to the full width.
  */
 function Scaled(props: {
   item: CardItem;
@@ -74,7 +79,7 @@ function Scaled(props: {
     const element = ref.current;
     if (!element || typeof ResizeObserver === 'undefined') return;
     const measure = () => {
-      const zoom = Math.min(props.max, Math.max(1, element.clientWidth / CARD_WIDTH));
+      const zoom = Math.min(props.max, Math.max(1, element.clientWidth / CARD_WIDTH)) * TYPE_SCALE;
       setBox({ zoom, width: element.clientWidth / zoom });
     };
     measure();
@@ -98,7 +103,6 @@ function Scaled(props: {
 
 function InboxRail(props: {
   items: CardItem[];
-  count?: number;
   open: (id: string) => void;
   openInbox: () => void;
 }) {
@@ -113,7 +117,6 @@ function InboxRail(props: {
       <header>
         <button type="button" className="sp-rail__title" onClick={props.openInbox}>
           <h2 id="home-inbox">Inbox</h2>
-          {props.count ? <span>{props.count.toLocaleString('en-US')}</span> : null}
         </button>
         <button
           type="button"
@@ -176,22 +179,17 @@ export function SpotlightHome({
       {spreads.map((spread, index) => (
         <Fragment key={spread.hero.id}>
           <section className={index % 2 ? 'sp-spread sp-spread--flip' : 'sp-spread'}>
-            <Scaled item={spread.hero} size="large" max={2.1} open={open} />
+            <Scaled item={spread.hero} size="large" max={1.7} open={open} />
             {spread.rows.length ? (
               <div className="sp-rows">
                 {spread.rows.map((item) => (
-                  <Scaled key={item.id} item={item} size="compact" max={1.5} open={open} />
+                  <Scaled key={item.id} item={item} size="compact" max={1.25} open={open} />
                 ))}
               </div>
             ) : null}
           </section>
           {index === 0 && section === 'Home' && waiting.length >= 3 ? (
-            <InboxRail
-              items={waiting}
-              count={home?.counts?.inbox}
-              open={open}
-              openInbox={openInbox}
-            />
+            <InboxRail items={waiting} open={open} openInbox={openInbox} />
           ) : null}
         </Fragment>
       ))}

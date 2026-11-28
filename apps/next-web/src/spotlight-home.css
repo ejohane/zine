@@ -45,7 +45,7 @@
   margin: 0;
 }
 .destination-shell .heading-row h1 {
-  font: var(--zn-type-display);
+  font: 700 26px/1 var(--zn-font);
   letter-spacing: var(--zn-tracking-display);
 }
 .sp-tabs :focus-visible,
@@ -54,7 +54,7 @@
   outline-offset: 2px;
 }
 
-/* ----- Filters that say how much is behind them ----- */
+/* ----- Filters ----- */
 /* The row runs to both page edges and scrolls sideways when the tabs do not fit; the auto margins
    on its ends centre it when they do, without hiding the first tab when they do not. */
 .sp-tabs {
@@ -79,9 +79,9 @@
   display: flex;
   align-items: center;
   flex: none;
-  gap: 12px;
-  height: 60px;
-  padding: 0 20px 0 16px;
+  gap: 10px;
+  height: 48px;
+  padding: 0 18px 0 14px;
   border-radius: var(--zn-radius-bubble);
   background: var(--zn-color-bubble);
   color: var(--zn-color-ink);
@@ -90,12 +90,12 @@
 .sp-tabs__mark {
   padding: 0 20px;
   color: var(--zn-color-accent-text);
-  font: 700 26px/1 var(--zn-font);
+  font: 700 22px/1 var(--zn-font);
   letter-spacing: -0.05em;
 }
 .sp-tabs button svg {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   color: var(--zn-color-accent-text);
 }
 .sp-tabs button span {
@@ -106,15 +106,10 @@
   color: var(--zn-color-muted);
   font: 500 13px/1 var(--zn-font);
 }
-.sp-tabs b {
-  font: 700 16px/1 var(--zn-font);
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
-/* Before the numbers arrive, the name stands alone at full strength. */
+/* The name stands alone at full strength. */
 .sp-tabs small:only-child {
   color: inherit;
-  font: 600 15px/1 var(--zn-font);
+  font: 600 14px/1 var(--zn-font);
 }
 /* Ink on canvas, flipped: the raised colour is the same as the tab's own at night. */
 .sp-tabs button[aria-pressed='true'] {
@@ -168,7 +163,7 @@
   min-width: 0;
 }
 .sp-rows > * {
-  padding: 28px 0;
+  padding: 28px 0 6px;
   border-top: 1px solid var(--zn-color-line);
 }
 .sp-rows > :first-child {
@@ -177,6 +172,15 @@
 }
 .sp-rows > :last-child {
   padding-bottom: 0;
+}
+/* The list rows' footer sits at the bottom of the row, just above the dividing line, with the
+   room between it and the text above (Erik, 2026-11-28). The card grows by that gap; the picture
+   and text keep their designed height. */
+.sp-rows .zn-card--compact {
+  height: calc(var(--zn-size-card-compact) + 20px);
+}
+.sp-rows .zn-card--compact .zn-card__footer {
+  margin-top: 20px;
 }
 
 /* The inbox, sideways: runs off the right edge of the page. */
@@ -202,13 +206,8 @@
 }
 .sp-rail h2 {
   margin: 0;
-  font: var(--zn-type-display);
+  font: 700 26px/1 var(--zn-font);
   letter-spacing: var(--zn-tracking-display);
-}
-.sp-rail__title span {
-  color: var(--zn-color-accent-text);
-  font: 700 16px/1 var(--zn-font);
-  font-variant-numeric: tabular-nums;
 }
 .sp-rail__arrow {
   display: grid;
@@ -229,7 +228,7 @@
   padding-right: var(--page-right);
   scroll-snap-type: x proximity;
   scrollbar-width: none;
-  zoom: 1.2;
+  zoom: 0.95;
 }
 .sp-rail__track::-webkit-scrollbar {
   display: none;
@@ -247,11 +246,11 @@
 .page--spotlight .load-more {
   display: flex;
   width: min(100%, 560px);
-  min-height: 68px;
+  min-height: 56px;
   margin: 72px auto 0;
   border-radius: var(--zn-radius-pill);
   background: var(--zn-color-bubble);
-  font: 500 19px/1 var(--zn-font);
+  font: 500 16px/1 var(--zn-font);
 }
 
 /* ----- Navigation: an icon rail that expands to a labelled sidebar; a menu and drawer when upright.
@@ -494,13 +493,13 @@
     gap: 44px;
   }
   .sp-rows > * {
-    padding: 20px 0;
+    padding: 20px 0 6px;
   }
   .sp-rail__track {
-    zoom: 1;
+    zoom: 0.9;
   }
   .sp-rail h2 {
-    font-size: 26px;
+    font-size: 22px;
   }
 }
 
